@@ -1,0 +1,74 @@
+name: CanvasCountdown
+
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "26.0"
+
+settings:
+  base:
+    CLANG_ENABLE_MODULES: YES
+    ENABLE_HARDENED_RUNTIME: YES
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_VERSION: "6.0"
+
+targets:
+  CanvasCountdown:
+    type: application
+    platform: macOS
+    sources:
+      - path: CanvasCountdown
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: CanvasCountdown/Resources/CanvasCountdown.entitlements
+        CURRENT_PROJECT_VERSION: 1
+        DEVELOPMENT_ASSET_PATHS: "\"CanvasCountdown/Preview Content\""
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Canvas Countdown
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026"
+        MARKETING_VERSION: 1.0
+        PRODUCT_BUNDLE_IDENTIFIER: com.local.CanvasCountdown
+        PRODUCT_MODULE_NAME: CanvasCountdown
+        PRODUCT_NAME: CanvasCountdown
+        OTHER_SWIFT_FLAGS: "$(inherited) -disable-sandbox"
+    dependencies:
+      - sdk: AppKit.framework
+      - sdk: Security.framework
+      - sdk: ServiceManagement.framework
+      - sdk: UserNotifications.framework
+
+  CanvasCountdownTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: CanvasCountdownTests
+    resources:
+      - path: CanvasCountdownTests/Fixtures
+        optional: true
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        OTHER_SWIFT_FLAGS: "$(inherited) -disable-sandbox"
+        PRODUCT_BUNDLE_IDENTIFIER: com.local.CanvasCountdownTests
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - target: CanvasCountdown
+
+schemes:
+  CanvasCountdown:
+    build:
+      targets:
+        CanvasCountdown: all
+        CanvasCountdownTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CanvasCountdownTests
+    archive:
+      config: Release

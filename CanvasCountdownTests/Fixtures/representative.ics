@@ -1,0 +1,42 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Canvas Countdown Tests//EN
+BEGIN:VEVENT
+UID:utc-1@example.edu
+DTSTAMP:20260728T001500Z
+DTSTART:20260803T063000Z
+DTEND:20260803T073000Z
+LAST-MODIFIED:20260728T001500Z
+SUMMARY:Research proposal
+DESCRIPTION:Upload a PDF
+URL:https://canvas.example.edu/courses/42/assignments/9
+END:VEVENT
+BEGIN:VEVENT
+UID:all-day-1@example.edu
+DTSTART;VALUE=DATE:20260804
+DTEND;VALUE=DATE:20260805
+SUMMARY:Field notes
+END:VEVENT
+BEGIN:VEVENT
+UID:tzid-1@example.edu
+DTSTART;TZID=America/New_York:20261102T094500
+SUMMARY:Seminar
+END:VEVENT
+BEGIN:VEVENT
+UID:folded-1@example.edu
+DTSTART:20260810T100000Z
+SUMMARY:A very long assignment title\, with
+  detail
+DESCRIPTION:Line one\nLine two\; bring notes\, laptop\\charger
+END:VEVENT
+BEGIN:VEVENT
+UID:cancelled@example.edu
+DTSTART:20260802T100000Z
+STATUS:CANCELLED
+SUMMARY:Withdrawn task
+END:VEVENT
+BEGIN:VEVENT
+UID:missing-date@example.edu
+SUMMARY:No useful deadline
+END:VEVENT
+END:VCALENDAR

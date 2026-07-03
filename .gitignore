@@ -1,0 +1,38 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcresult
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Generated local build products
+work/
+outputs/
+
+# Temporary test and verification artifacts
+TestResults/
+*.tmp
+*.log
+
+# Exported diagnostics
+Canvas-Countdown-Diagnostics*.txt
+*-diagnostics.txt
+
+# Distribution images
+*.dmg
+
+# Private local configuration and anything holding a feed URL or token
+*.local.xcconfig
+Local.xcconfig
+.env
+.env.*
+secrets.*
+feed-url*
+*.feedurl
+
+# macOS
+.DS_Store
