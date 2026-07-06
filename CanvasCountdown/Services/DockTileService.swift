@@ -8,12 +8,26 @@ protocol DockRendering: AnyObject {
     func render(daysRemaining: Int?, label: String)
 }
 
+/// The subset of `NSDockTile` the countdown needs.
+///
+/// `NSDockTile` cannot be instantiated directly, so tests would otherwise be
+/// forced to mutate `NSApplication.shared.dockTile` — the real Dock icon of
+/// whoever is running the suite. This protocol lets them supply a double.
+@MainActor
+protocol DockTileSurface: AnyObject {
+    var contentView: NSView? { get set }
+    var badgeLabel: String? { get set }
+    func display()
+}
+
+extension NSDockTile: DockTileSurface {}
+
 @MainActor
 final class DockTileService: DockRendering {
-    private let dockTile: NSDockTile
+    private let dockTile: any DockTileSurface
     private let tileView: CountdownDockTileView
 
-    init(dockTile: NSDockTile = NSApplication.shared.dockTile) {
+    init(dockTile: any DockTileSurface = NSApplication.shared.dockTile) {
         self.dockTile = dockTile
         self.tileView = CountdownDockTileView(
             frame: NSRect(x: 0, y: 0, width: 128, height: 128)

@@ -11,31 +11,10 @@ struct CanvasCountdownApp: App {
 
     init() {
         do {
-            let container = try ModelContainer(for: AssignmentEvent.self)
-            let repository = SwiftDataAssignmentRepository(
-                modelContainer: container
-            )
-            let feedURLStore = KeychainFeedURLStore()
-            let refreshCoordinator = RefreshCoordinator(
-                fetcher: URLSessionCanvasFeedFetcher(),
-                parser: ICSParser(),
-                repository: repository,
-                feedURLStore: feedURLStore
-            )
-            let settingsStore = SettingsStore()
-
-            modelContainer = container
+            let dependencies = try AppDependencies.make()
+            modelContainer = dependencies.modelContainer
             startupErrorMessage = nil
-            _viewModel = State(
-                initialValue: MainViewModel(
-                    repository: repository,
-                    refreshCoordinator: refreshCoordinator,
-                    feedURLStore: feedURLStore,
-                    settingsStore: settingsStore,
-                    dockRenderer: DockTileService(),
-                    notificationScheduler: NotificationService()
-                )
-            )
+            _viewModel = State(initialValue: dependencies.viewModel)
         } catch {
             modelContainer = nil
             startupErrorMessage =

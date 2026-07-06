@@ -38,6 +38,10 @@ final class MainViewModel {
     private let notificationScheduler: any NotificationScheduling
     @ObservationIgnored
     private let calendar: Calendar
+    /// Disabled for isolated (automated) launches so a test host never starts a
+    /// refresh loop, a countdown timer, or a launch-time feed download.
+    @ObservationIgnored
+    private let automaticActivityEnabled: Bool
 
     @ObservationIgnored
     private var parsedPreviewEvents: [String: ParsedCalendarEvent] = [:]
@@ -57,8 +61,10 @@ final class MainViewModel {
         settingsStore: SettingsStore,
         dockRenderer: any DockRendering,
         notificationScheduler: any NotificationScheduling,
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        automaticActivityEnabled: Bool = true
     ) {
+        self.automaticActivityEnabled = automaticActivityEnabled
         self.repository = repository
         self.refreshCoordinator = refreshCoordinator
         self.feedURLStore = feedURLStore
@@ -181,13 +187,17 @@ final class MainViewModel {
             notificationPermission = NotificationPermissionState(permission)
             synchronizeDock()
 
-            if feedURL == nil, assignments.isEmpty {
+            if automaticActivityEnabled, feedURL == nil, assignments.isEmpty {
                 presentFeedImport(onboarding: true)
             }
         } catch {
             present(error)
         }
         isLoading = false
+
+        guard automaticActivityEnabled else {
+            return
+        }
 
         startAutomaticRefreshLoop()
         startCountdownTransitionLoop()
@@ -541,7 +551,7 @@ final class MainViewModel {
 
     private func startAutomaticRefreshLoop() {
         automaticRefreshTask?.cancel()
-        guard hasConfiguredFeed else {
+        guard automaticActivityEnabled, hasConfiguredFeed else {
             automaticRefreshTask = nil
             return
         }
@@ -582,6 +592,10 @@ final class MainViewModel {
 
     private func startCountdownTransitionLoop() {
         countdownTransitionTask?.cancel()
+        guard automaticActivityEnabled else {
+            countdownTransitionTask = nil
+            return
+        }
         countdownTransitionTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else {

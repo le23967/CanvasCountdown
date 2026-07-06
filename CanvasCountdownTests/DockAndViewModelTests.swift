@@ -7,8 +7,7 @@ import XCTest
 @MainActor
 final class DockAndViewModelTests: XCTestCase {
     func testDockServiceInstallsCustomContentViewWithoutUsingBadge() {
-        let dockTile = NSApplication.shared.dockTile
-        dockTile.badgeLabel = nil
+        let dockTile = DockTileSurfaceSpy()
 
         let service = DockTileService(dockTile: dockTile)
         service.render(daysRemaining: 42, label: "DAYS")
@@ -16,6 +15,10 @@ final class DockAndViewModelTests: XCTestCase {
         XCTAssertNotNil(dockTile.contentView)
         XCTAssertNil(dockTile.badgeLabel)
         XCTAssertEqual(dockTile.contentView?.frame.size, NSSize(width: 128, height: 128))
+        XCTAssertEqual(dockTile.displayCount, 1)
+
+        // The real application Dock tile must be untouched by the suite.
+        XCTAssertNil(NSApplication.shared.dockTile.badgeLabel)
     }
 
     func testNextCountdownTransitionUsesExactDueTimeBeforeMidnight() throws {
@@ -338,6 +341,17 @@ private struct Harness {
     let viewModel: MainViewModel
     let settings: SettingsStore
     let dock: DockRendererSpy
+}
+
+@MainActor
+private final class DockTileSurfaceSpy: DockTileSurface {
+    var contentView: NSView?
+    var badgeLabel: String?
+    private(set) var displayCount = 0
+
+    func display() {
+        displayCount += 1
+    }
 }
 
 @MainActor
