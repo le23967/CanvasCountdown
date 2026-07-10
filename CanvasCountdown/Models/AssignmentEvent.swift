@@ -21,6 +21,14 @@ final class AssignmentEvent {
     var createdAt: Date
     var updatedAt: Date
 
+    /// Feed presence bookkeeping. A Canvas row is never deleted just because one
+    /// refresh did not mention it; it is counted, and only archived once it has
+    /// been absent from several consecutive authoritative feeds.
+    var lastSeenInFeedAt: Date?
+    var missingRefreshCount: Int = 0
+    var isArchived: Bool = false
+    var archivedAt: Date?
+
     init(
         id: UUID = UUID(),
         externalID: String? = nil,
@@ -32,7 +40,11 @@ final class AssignmentEvent {
         isCompleted: Bool = false,
         isIgnored: Bool = false,
         createdAt: Date = .now,
-        updatedAt: Date = .now
+        updatedAt: Date = .now,
+        lastSeenInFeedAt: Date? = nil,
+        missingRefreshCount: Int = 0,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.externalID = externalID
@@ -45,6 +57,10 @@ final class AssignmentEvent {
         self.isIgnored = isIgnored
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.lastSeenInFeedAt = lastSeenInFeedAt
+        self.missingRefreshCount = missingRefreshCount
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
     }
 }
 
@@ -60,6 +76,10 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
     var isIgnored: Bool
     var createdAt: Date
     var updatedAt: Date
+    var lastSeenInFeedAt: Date?
+    var missingRefreshCount: Int
+    var isArchived: Bool
+    var archivedAt: Date?
 
     init(
         id: UUID = UUID(),
@@ -72,7 +92,11 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
         isCompleted: Bool = false,
         isIgnored: Bool = false,
         createdAt: Date = .now,
-        updatedAt: Date = .now
+        updatedAt: Date = .now,
+        lastSeenInFeedAt: Date? = nil,
+        missingRefreshCount: Int = 0,
+        isArchived: Bool = false,
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.externalID = externalID
@@ -85,6 +109,10 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
         self.isIgnored = isIgnored
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.lastSeenInFeedAt = lastSeenInFeedAt
+        self.missingRefreshCount = missingRefreshCount
+        self.isArchived = isArchived
+        self.archivedAt = archivedAt
     }
 
     init(_ event: AssignmentEvent) {
@@ -99,8 +127,18 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
             isCompleted: event.isCompleted,
             isIgnored: event.isIgnored,
             createdAt: event.createdAt,
-            updatedAt: event.updatedAt
+            updatedAt: event.updatedAt,
+            lastSeenInFeedAt: event.lastSeenInFeedAt,
+            missingRefreshCount: event.missingRefreshCount,
+            isArchived: event.isArchived,
+            archivedAt: event.archivedAt
         )
+    }
+
+    /// True once a feed refresh has failed to mention this Canvas event, before
+    /// it has been absent often enough to be archived.
+    var isMissingFromFeed: Bool {
+        missingRefreshCount > 0 && !isArchived
     }
 }
 

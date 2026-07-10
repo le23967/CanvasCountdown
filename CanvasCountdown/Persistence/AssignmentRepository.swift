@@ -1,8 +1,36 @@
 import Foundation
 import SwiftData
 
+/// Everything a repository needs to decide what a single successful feed
+/// refresh implies for the stored Canvas rows.
+struct FeedReconciliationRequest: Equatable, Sendable {
+    /// Consecutive authoritative refreshes an event must be absent from before
+    /// it is archived. One incomplete feed must never be enough.
+    static let defaultArchiveThreshold = 3
+
+    var activeExternalIDs: Set<String>
+    var cancelledExternalIDs: Set<String> = []
+    var excludedExternalIDs: Set<String> = []
+    var observedAt: Date
+    var archiveThreshold: Int = defaultArchiveThreshold
+    /// False when the feed parsed but carried no events at all. Such a response
+    /// is treated as suspicious rather than authoritative, so absence is not
+    /// counted against anything already stored.
+    var countsAbsentEventsAsMissing: Bool = true
+}
+
+struct FeedReconciliationOutcome: Equatable, Sendable {
+    var confirmedCount = 0
+    var newlyMissingCount = 0
+    var archivedCount = 0
+    var restoredCount = 0
+
+    static let empty = FeedReconciliationOutcome()
+}
+
 protocol AssignmentRepository: Sendable {
     func fetchAll() async throws -> [AssignmentSnapshot]
+    func fetchAll(includingArchived: Bool) async throws -> [AssignmentSnapshot]
 
     func upsert(
         _ records: [AssignmentImportRecord],
@@ -21,13 +49,13 @@ protocol AssignmentRepository: Sendable {
         now: Date
     ) async throws
 
-    /// Removes Canvas rows that are no longer active in the authoritative
-    /// calendar feed, including source cancellations and explicit preview
-    /// exclusions. Manual events are never affected.
+    /// Records what an authoritative feed refresh said about the stored Canvas
+    /// rows. Rows are archived, never deleted, and only after repeated absence.
+    /// Manual events are never affected.
+    @discardableResult
     func reconcileCanvasFeed(
-        activeExternalIDs: Set<String>,
-        excludedExternalIDs: Set<String>
-    ) async throws
+        _ request: FeedReconciliationRequest
+    ) async throws -> FeedReconciliationOutcome
 
     func delete(id: UUID) async throws
     func deleteAll() async throws
@@ -67,12 +95,17 @@ extension AssignmentRepository {
         try await updateStatus(id: id, isIgnored: isIgnored)
     }
 
+    func fetchAll(includingArchived: Bool) async throws -> [AssignmentSnapshot] {
+        try await fetchAll()
+    }
+
+    @discardableResult
     func reconcileCanvasFeed(
-        activeExternalIDs: Set<String>,
-        excludedExternalIDs: Set<String>
-    ) async throws {
+        _ request: FeedReconciliationRequest
+    ) async throws -> FeedReconciliationOutcome {
         // Test doubles and alternate repositories may opt out. The production
         // SwiftData repository implements authoritative reconciliation.
+        .empty
     }
 }
 
@@ -96,8 +129,15 @@ enum AssignmentRepositoryError: LocalizedError, Equatable {
 @ModelActor
 actor SwiftDataAssignmentRepository: AssignmentRepository {
     func fetchAll() async throws -> [AssignmentSnapshot] {
+        try await fetchAll(includingArchived: false)
+    }
+
+    /// Archived rows are retained on disk but kept out of the working set, so
+    /// nothing the user completed or ignored is ever lost to a feed change.
+    func fetchAll(includingArchived: Bool) async throws -> [AssignmentSnapshot] {
         let events = try modelContext.fetch(FetchDescriptor<AssignmentEvent>())
         return events
+            .filter { includingArchived || !$0.isArchived }
             .map(AssignmentSnapshot.init)
             .sorted(by: AssignmentSnapshot.dueDateOrder)
     }
@@ -174,6 +214,14 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
             }
 
             if let existing {
+                if record.source == .canvasCalendarFeed {
+                    // Presence bookkeeping is not a content change, so it does
+                    // not make the row count as updated.
+                    existing.lastSeenInFeedAt = importedAt
+                    existing.missingRefreshCount = 0
+                    existing.isArchived = false
+                    existing.archivedAt = nil
+                }
                 let changed = Self.apply(record, to: existing)
                 if changed {
                     existing.updatedAt = importedAt
@@ -205,7 +253,10 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
                 source: record.source,
                 sourceURL: record.sourceURL,
                 createdAt: importedAt,
-                updatedAt: importedAt
+                updatedAt: importedAt,
+                lastSeenInFeedAt: record.source == .canvasCalendarFeed
+                    ? importedAt
+                    : nil
             )
             modelContext.insert(event)
             result.insertedCount += 1
@@ -292,31 +343,78 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
         try modelContext.save()
     }
 
+    @discardableResult
     func reconcileCanvasFeed(
-        activeExternalIDs: Set<String>,
-        excludedExternalIDs: Set<String>
-    ) async throws {
-        let active = Set(activeExternalIDs.map(Self.normalizedExternalID))
-        let excluded = Set(
-            excludedExternalIDs.map(Self.normalizedExternalID)
+        _ request: FeedReconciliationRequest
+    ) async throws -> FeedReconciliationOutcome {
+        let active = Set(request.activeExternalIDs.map(Self.normalizedExternalID))
+        let cancelled = Set(
+            request.cancelledExternalIDs.map(Self.normalizedExternalID)
         )
+        let excluded = Set(
+            request.excludedExternalIDs.map(Self.normalizedExternalID)
+        )
+        let threshold = max(1, request.archiveThreshold)
         let events = try modelContext.fetch(
             FetchDescriptor<AssignmentEvent>()
         )
+        var outcome = FeedReconciliationOutcome.empty
 
         for event in events where event.source == .canvasCalendarFeed {
             guard let externalID = event.externalID else {
+                // A legacy row without a stable UID cannot be matched against
+                // the feed, so it is left exactly as it is.
                 continue
             }
             let normalizedID = Self.normalizedExternalID(externalID)
-            if excluded.contains(normalizedID)
-                || !active.contains(normalizedID) {
-                modelContext.delete(event)
+
+            if active.contains(normalizedID) {
+                event.lastSeenInFeedAt = request.observedAt
+                event.missingRefreshCount = 0
+                if event.isArchived {
+                    // Canvas published it again: bring it back with its local
+                    // completed and ignored state intact.
+                    event.isArchived = false
+                    event.archivedAt = nil
+                    outcome.restoredCount += 1
+                }
+                outcome.confirmedCount += 1
+                continue
+            }
+
+            if excluded.contains(normalizedID) || cancelled.contains(normalizedID) {
+                // Explicit signals: the user deselected it during import, or
+                // Canvas published a cancellation tombstone for it.
+                if !event.isArchived {
+                    archive(event, at: request.observedAt)
+                    outcome.archivedCount += 1
+                }
+                continue
+            }
+
+            guard request.countsAbsentEventsAsMissing, !event.isArchived else {
+                continue
+            }
+
+            event.missingRefreshCount += 1
+            outcome.newlyMissingCount += 1
+            if event.missingRefreshCount >= threshold {
+                archive(event, at: request.observedAt)
+                outcome.archivedCount += 1
             }
         }
+
         if modelContext.hasChanges {
             try modelContext.save()
         }
+        return outcome
+    }
+
+    /// Archiving keeps the row, its deadline, and its completed and ignored
+    /// state. Nothing about an absent Canvas event is ever destroyed here.
+    private func archive(_ event: AssignmentEvent, at date: Date) {
+        event.isArchived = true
+        event.archivedAt = date
     }
 
     func delete(id: UUID) async throws {

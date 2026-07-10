@@ -42,6 +42,7 @@
 		C9AC8533F40AEA60491EDF0D /* CountdownCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */; };
 		DF1DBDC5BFBD96445527CCDB /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA728C6E0402225EBF5D05FB /* AppSettings.swift */; };
 		E39AF3707BB8EC345F0B8944 /* DiagnosticsDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EA62592CF58AA32C47D92F /* DiagnosticsDocument.swift */; };
+		E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */; };
 		E8EE34FA5853590E9242C1F3 /* CanvasCountdownApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */; };
 		F4F7F34451640CBFCCD84676 /* IsolatedLaunchServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = F287B2AE40E5AF90FEA7454B /* IsolatedLaunchServices.swift */; };
 		FB33C9AAD41A82689EEB3F69 /* FeedImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039098D8A1700485F7B7E33D /* FeedImportView.swift */; };
@@ -83,6 +84,7 @@
 		69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchIsolationTests.swift; sourceTree = "<group>"; };
 		77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockAndViewModelTests.swift; sourceTree = "<group>"; };
 		81A0EE4153E8C25B319DC86F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedReconciliationTests.swift; sourceTree = "<group>"; };
 		8471A653DB58BEBA6E3E8AD4 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
 		86DCBD89094C54B63F614531 /* CountdownCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownCalculatorTests.swift; sourceTree = "<group>"; };
 		89307B88F02B43EF58286C41 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
@@ -237,6 +239,7 @@
 			children = (
 				D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */,
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
+				827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */,
 				27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */,
 				69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */,
 				22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */,
@@ -405,6 +408,7 @@
 				C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */,
 				FC8400DCCC428468DB844F8C /* CountdownCalculatorTests.swift in Sources */,
 				C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */,
+				E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */,
 				468C50E4CA3946964D02D708 /* ICSParserTests.swift in Sources */,
 				FD39C43E33EF28EB1A1019D4 /* ICSRefreshRegressionTests.swift in Sources */,
 				723BD80A984A3EF5E5052D58 /* LaunchIsolationTests.swift in Sources */,

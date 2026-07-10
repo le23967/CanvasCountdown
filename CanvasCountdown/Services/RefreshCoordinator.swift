@@ -6,6 +6,14 @@ struct FeedPreview: Equatable, Sendable {
     var receivedByteCount: Int
     var excludedEventCount: Int
     var activeExternalIDs: Set<String>
+    var cancelledExternalIDs: Set<String> = []
+
+    /// A feed that parsed cleanly but described no events at all is treated as
+    /// suspicious rather than authoritative. Absence from such a response must
+    /// not count against anything already stored.
+    var carriesAuthoritativeEventList: Bool {
+        !activeExternalIDs.isEmpty || !cancelledExternalIDs.isEmpty
+    }
 }
 
 enum RefreshTrigger: String, Codable, Sendable {
@@ -121,6 +129,7 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
     private let exclusionStore: any FeedExclusionStoring
     private let defaultTimeZone: TimeZone
     private let recentlyOverdueDayLimit: Int
+    private let missingRefreshArchiveThreshold: Int
 
     private var operationInProgress = false
     private var lastDiagnostic: FeedRefreshDiagnostic?
@@ -135,8 +144,14 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
         exclusionStore: any FeedExclusionStoring =
             UserDefaultsFeedExclusionStore(),
         defaultTimeZone: TimeZone = .autoupdatingCurrent,
-        recentlyOverdueDayLimit: Int = 30
+        recentlyOverdueDayLimit: Int = 30,
+        missingRefreshArchiveThreshold: Int =
+            FeedReconciliationRequest.defaultArchiveThreshold
     ) {
+        self.missingRefreshArchiveThreshold = max(
+            1,
+            missingRefreshArchiveThreshold
+        )
         self.fetcher = fetcher
         self.parser = parser
         self.repository = repository
@@ -234,8 +249,16 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
                 ? selectedUIDs
                 : lastPreviewActiveExternalIDs
             try await repository.reconcileCanvasFeed(
-                activeExternalIDs: activeExternalIDs,
-                excludedExternalIDs: exclusions
+                FeedReconciliationRequest(
+                    activeExternalIDs: activeExternalIDs,
+                    excludedExternalIDs: exclusions,
+                    observedAt: date,
+                    archiveThreshold: missingRefreshArchiveThreshold,
+                    // An import describes only what the user chose to bring in,
+                    // so it must not start counting absences against anything
+                    // already stored.
+                    countsAbsentEventsAsMissing: false
+                )
             )
 
             // The onboarding URL is persisted only after the selected preview
@@ -289,8 +312,15 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
                 importedAt: now
             )
             try await repository.reconcileCanvasFeed(
-                activeExternalIDs: preview.activeExternalIDs,
-                excludedExternalIDs: exclusions
+                FeedReconciliationRequest(
+                    activeExternalIDs: preview.activeExternalIDs,
+                    cancelledExternalIDs: preview.cancelledExternalIDs,
+                    excludedExternalIDs: exclusions,
+                    observedAt: now,
+                    archiveThreshold: missingRefreshArchiveThreshold,
+                    countsAbsentEventsAsMissing:
+                        preview.carriesAuthoritativeEventList
+                )
             )
             let result = RefreshResult(
                 importResult: importResult,
@@ -367,7 +397,10 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
             receivedByteCount: data.count,
             excludedEventCount:
                 parsedEvents.count - eligibleEvents.count,
-            activeExternalIDs: Self.externalIDs(in: activeEvents)
+            activeExternalIDs: Self.externalIDs(in: activeEvents),
+            cancelledExternalIDs: Set(
+                parseResult.cancelledEventUIDs.map(Self.normalizedUID)
+            )
         )
     }
 
