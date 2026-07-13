@@ -78,25 +78,24 @@ private final class CountdownDockTileView: NSView {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
 
-        let scaleX = bounds.width / 128
-        let scaleY = bounds.height / 128
-        let tileRect = NSRect(
-            x: 5 * scaleX,
-            y: 5 * scaleY,
-            width: 118 * scaleX,
-            height: 118 * scaleY
+        let layout = DockTileLayout.make(
+            in: bounds,
+            countdownText: DockTileLayout.text(forDaysRemaining: daysRemaining)
         )
-        let cornerRadius = 25 * min(scaleX, scaleY)
-        let clipPath = NSBezierPath(roundedRect: tileRect, xRadius: cornerRadius, yRadius: cornerRadius)
+        let clipPath = NSBezierPath(
+            roundedRect: layout.tileRect,
+            xRadius: layout.cornerRadius,
+            yRadius: layout.cornerRadius
+        )
         clipPath.addClip()
 
-        drawBackground(in: tileRect)
+        drawBackground(in: layout.tileRect)
 
         NSColor.black.withAlphaComponent(0.20).setFill()
-        tileRect.fill()
+        layout.tileRect.fill()
 
-        drawLabel(in: tileRect)
-        drawCountdown(in: tileRect)
+        drawLabel(with: layout)
+        drawCountdown(with: layout)
     }
 
     private func drawBackground(in rect: NSRect) {
@@ -117,65 +116,29 @@ private final class CountdownDockTileView: NSView {
         gradient?.draw(in: rect, angle: -90)
     }
 
-    private func drawLabel(in rect: NSRect) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-
+    private func drawLabel(with layout: DockTileLayout) {
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(
-                ofSize: max(6, rect.height * 0.105),
-                weight: .semibold
-            ),
+            .font: DockTileLayout.labelFont(ofSize: layout.labelFontSize),
             .foregroundColor: NSColor.white.withAlphaComponent(0.92),
-            .paragraphStyle: paragraphStyle,
-            .kern: 0.8,
+            .kern: layout.labelFontSize * 0.05,
         ]
 
         let text = NSAttributedString(string: label, attributes: attributes)
-        let textRect = NSRect(
-            x: rect.minX + 8,
-            y: rect.minY + rect.height * 0.17,
-            width: rect.width - 16,
-            height: rect.height * 0.18
-        )
-        text.draw(in: textRect)
+        // Drawn at a point rather than into a rectangle: `draw(in:)` clips, and
+        // the tile must never lose part of a glyph.
+        text.draw(at: layout.labelOrigin(for: label, measuredSize: text.size()))
     }
 
-    private func drawCountdown(in rect: NSRect) {
-        let value = daysRemaining.map(String.init) ?? "–"
-        let digitCount = value.count
-        let fontScale: CGFloat
-        switch digitCount {
-        case 0...2:
-            fontScale = 0.50
-        case 3:
-            fontScale = 0.41
-        default:
-            fontScale = 0.32
-        }
-
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-
+    private func drawCountdown(with layout: DockTileLayout) {
+        let value = DockTileLayout.text(forDaysRemaining: daysRemaining)
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(
-                ofSize: max(12, rect.height * fontScale),
-                weight: .bold
-            ),
+            .font: DockTileLayout.countdownFont(ofSize: layout.countdownFontSize),
             .foregroundColor: NSColor.white,
-            .paragraphStyle: paragraphStyle,
-            .kern: -1.2,
             .shadow: textShadow,
         ]
 
-        let text = NSAttributedString(string: value, attributes: attributes)
-        let textRect = NSRect(
-            x: rect.minX + 5,
-            y: rect.minY + rect.height * 0.36,
-            width: rect.width - 10,
-            height: rect.height * 0.55
-        )
-        text.draw(in: textRect)
+        NSAttributedString(string: value, attributes: attributes)
+            .draw(at: layout.countdownOrigin(for: value))
     }
 
     private var textShadow: NSShadow {
