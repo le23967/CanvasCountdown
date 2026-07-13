@@ -24,6 +24,7 @@
 		78E7574412F37F9F1012755F /* KeychainFeedURLStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149E8CDBDEB48DECA04640F8 /* KeychainFeedURLStore.swift */; };
 		7CD0391A62302E133B4B93C1 /* ManualEventEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E98E499DB1891628EE75363 /* ManualEventEditorView.swift */; };
 		8383FE4ADBFCBA95D5CBE3CC /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F9E73BCD06077565AA22181 /* AppKit.framework */; };
+		86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */; };
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
 		9C29E48C0B1610E753799035 /* NearestAssignmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */; };
 		9E1869235312809AF07D16A2 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BA7EC3B8DA2FAABFCDCED1 /* LaunchAtLoginController.swift */; };
@@ -94,6 +95,7 @@
 		A6E53D49DEC7CFE3995861D2 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		A7C04D78D65827131BF4B848 /* CanvasCountdown.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CanvasCountdown.entitlements; sourceTree = "<group>"; };
 		AA2876D5254D102642C61016 /* DockTileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileService.swift; sourceTree = "<group>"; };
+		AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcherTests.swift; sourceTree = "<group>"; };
 		BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasCountdownApp.swift; sourceTree = "<group>"; };
 		CF44862D6D66155114DB0551 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentRepositoryTests.swift; sourceTree = "<group>"; };
@@ -238,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */,
+				AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */,
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
 				827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */,
 				27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */,
@@ -406,6 +409,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */,
+				86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */,
 				FC8400DCCC428468DB844F8C /* CountdownCalculatorTests.swift in Sources */,
 				C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */,
 				E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */,

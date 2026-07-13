@@ -449,14 +449,11 @@ final class ICSRefreshRegressionTests: XCTestCase {
         configuration.protocolClasses = [
             ICSRegressionStreamingURLProtocol.self,
         ]
-        let session = URLSession(configuration: configuration)
-        defer { session.invalidateAndCancel() }
-
         let maximumBytes = 1_024
         let totalBytes = ICSRegressionStreamingURLProtocol.totalBytes
         ICSRegressionStreamingURLProtocol.probe.reset()
         let fetcher = URLSessionCanvasFeedFetcher(
-            session: session,
+            configuration: configuration,
             maximumResponseSize: maximumBytes
         )
         let url = try XCTUnwrap(

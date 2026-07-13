@@ -49,31 +49,48 @@ enum CanvasFeedFetchError: LocalizedError, Equatable, Sendable {
     }
 }
 
+/// Downloads a calendar feed over HTTPS, accumulating the body in the chunks
+/// URLSession delivers rather than one asynchronous step per byte.
 final class URLSessionCanvasFeedFetcher: FeedFetching {
     static let defaultMaximumResponseSize = 10 * 1_048_576
 
+    static var defaultConfiguration: URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        configuration.httpCookieAcceptPolicy = .never
+        return configuration
+    }
+
     private let session: URLSession
+    private let collector: FeedResponseCollector
     private let maximumResponseSize: Int
 
     init(
-        session: URLSession? = nil,
+        configuration: URLSessionConfiguration? = nil,
         maximumResponseSize: Int = defaultMaximumResponseSize
     ) {
-        if let session {
-            self.session = session
-        } else {
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-            configuration.timeoutIntervalForRequest = 30
-            configuration.timeoutIntervalForResource = 60
-            configuration.httpCookieAcceptPolicy = .never
-            self.session = URLSession(
-                configuration: configuration,
-                delegate: HTTPSOnlyRedirectDelegate(),
-                delegateQueue: nil
-            )
-        }
-        self.maximumResponseSize = max(1, maximumResponseSize)
+        let limit = max(1, maximumResponseSize)
+        let collector = FeedResponseCollector(maximumResponseSize: limit)
+
+        self.maximumResponseSize = limit
+        self.collector = collector
+        self.session = URLSession(
+            configuration: configuration ?? Self.defaultConfiguration,
+            delegate: collector,
+            delegateQueue: nil
+        )
+    }
+
+    deinit {
+        session.finishTasksAndInvalidate()
+    }
+
+    /// Number of body chunks the last completed download appended. A per-byte
+    /// implementation would report one chunk per byte.
+    var lastResponseChunkCount: Int {
+        collector.lastChunkCount
     }
 
     func fetch(from url: URL) async throws -> Data {
@@ -89,66 +106,127 @@ final class URLSessionCanvasFeedFetcher: FeedFetching {
             forHTTPHeaderField: "Accept"
         )
 
-        do {
-            let (bytes, response) = try await session.bytes(for: request)
-
-            guard let HTTPResponse = response as? HTTPURLResponse else {
-                throw CanvasFeedFetchError.nonHTTPResponse
+        let task = session.dataTask(with: request)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                collector.start(task: task, continuation: continuation)
             }
-            guard HTTPResponse.url?.scheme?.lowercased() == "https" else {
-                throw CanvasFeedFetchError.insecureRedirect
-            }
-            guard (200...299).contains(HTTPResponse.statusCode) else {
-                throw CanvasFeedFetchError.HTTPStatus(
-                    HTTPResponse.statusCode
-                )
-            }
-            if HTTPResponse.expectedContentLength > maximumResponseSize {
-                throw CanvasFeedFetchError.responseTooLarge(
-                    maximumBytes: maximumResponseSize
-                )
-            }
-
-            var data = Data()
-            if HTTPResponse.expectedContentLength > 0 {
-                data.reserveCapacity(
-                    min(
-                        Int(HTTPResponse.expectedContentLength),
-                        maximumResponseSize
-                    )
-                )
-            }
-            for try await byte in bytes {
-                guard data.count < maximumResponseSize else {
-                    throw CanvasFeedFetchError.responseTooLarge(
-                        maximumBytes: maximumResponseSize
-                    )
-                }
-                data.append(byte)
-            }
-            guard !data.isEmpty else {
-                throw CanvasFeedFetchError.emptyResponse
-            }
-            return data
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch let error as CanvasFeedFetchError {
-            throw error
-        } catch let error as URLError {
-            throw CanvasFeedFetchError.networkFailure(
-                code: error.errorCode
-            )
-        } catch {
-            throw CanvasFeedFetchError.networkFailure(code: nil)
+        } onCancel: {
+            task.cancel()
         }
     }
 }
 
-private final class HTTPSOnlyRedirectDelegate:
+/// Session delegate that validates the response, appends delivered chunks, and
+/// stops the transfer as soon as the safety limit would be exceeded.
+private final class FeedResponseCollector:
     NSObject,
-    URLSessionTaskDelegate,
+    URLSessionDataDelegate,
     @unchecked Sendable
 {
+    private struct Transfer {
+        var data = Data()
+        var chunkCount = 0
+        var failure: CanvasFeedFetchError?
+        var continuation: CheckedContinuation<Data, any Error>?
+    }
+
+    private let maximumResponseSize: Int
+    private let lock = NSLock()
+    private var transfers: [Int: Transfer] = [:]
+    private var lastCompletedChunkCount = 0
+
+    init(maximumResponseSize: Int) {
+        self.maximumResponseSize = maximumResponseSize
+    }
+
+    var lastChunkCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastCompletedChunkCount
+    }
+
+    func start(
+        task: URLSessionDataTask,
+        continuation: CheckedContinuation<Data, any Error>
+    ) {
+        lock.lock()
+        var transfer = Transfer()
+        transfer.continuation = continuation
+        transfers[task.taskIdentifier] = transfer
+        lock.unlock()
+
+        task.resume()
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let HTTPResponse = response as? HTTPURLResponse else {
+            fail(dataTask, with: .nonHTTPResponse)
+            completionHandler(.cancel)
+            return
+        }
+        guard HTTPResponse.url?.scheme?.lowercased() == "https" else {
+            fail(dataTask, with: .insecureRedirect)
+            completionHandler(.cancel)
+            return
+        }
+        guard (200...299).contains(HTTPResponse.statusCode) else {
+            fail(dataTask, with: .HTTPStatus(HTTPResponse.statusCode))
+            completionHandler(.cancel)
+            return
+        }
+        if HTTPResponse.expectedContentLength > maximumResponseSize {
+            fail(
+                dataTask,
+                with: .responseTooLarge(maximumBytes: maximumResponseSize)
+            )
+            completionHandler(.cancel)
+            return
+        }
+
+        if HTTPResponse.expectedContentLength > 0 {
+            reserveCapacity(
+                for: dataTask,
+                byteCount: min(
+                    Int(HTTPResponse.expectedContentLength),
+                    maximumResponseSize
+                )
+            )
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive data: Data
+    ) {
+        lock.lock()
+        guard var transfer = transfers[dataTask.taskIdentifier] else {
+            lock.unlock()
+            return
+        }
+        guard transfer.data.count + data.count <= maximumResponseSize else {
+            transfer.failure = .responseTooLarge(
+                maximumBytes: maximumResponseSize
+            )
+            transfers[dataTask.taskIdentifier] = transfer
+            lock.unlock()
+            dataTask.cancel()
+            return
+        }
+
+        transfer.data.append(data)
+        transfer.chunkCount += 1
+        transfers[dataTask.taskIdentifier] = transfer
+        lock.unlock()
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -157,9 +235,61 @@ private final class HTTPSOnlyRedirectDelegate:
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
         guard request.url?.scheme?.lowercased() == "https" else {
+            fail(task, with: .insecureRedirect)
             completionHandler(nil)
             return
         }
         completionHandler(request)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: (any Error)?
+    ) {
+        lock.lock()
+        guard let transfer = transfers.removeValue(forKey: task.taskIdentifier),
+              let continuation = transfer.continuation else {
+            lock.unlock()
+            return
+        }
+        lastCompletedChunkCount = transfer.chunkCount
+        lock.unlock()
+
+        if let failure = transfer.failure {
+            continuation.resume(throwing: failure)
+            return
+        }
+        if let error {
+            continuation.resume(throwing: Self.mapped(error))
+            return
+        }
+        guard !transfer.data.isEmpty else {
+            continuation.resume(throwing: CanvasFeedFetchError.emptyResponse)
+            return
+        }
+        continuation.resume(returning: transfer.data)
+    }
+
+    private static func mapped(_ error: any Error) -> any Error {
+        guard let URLError = error as? URLError else {
+            return CanvasFeedFetchError.networkFailure(code: nil)
+        }
+        if URLError.code == .cancelled {
+            return CancellationError()
+        }
+        return CanvasFeedFetchError.networkFailure(code: URLError.errorCode)
+    }
+
+    private func fail(_ task: URLSessionTask, with error: CanvasFeedFetchError) {
+        lock.lock()
+        transfers[task.taskIdentifier]?.failure = error
+        lock.unlock()
+    }
+
+    private func reserveCapacity(for task: URLSessionTask, byteCount: Int) {
+        lock.lock()
+        transfers[task.taskIdentifier]?.data.reserveCapacity(byteCount)
+        lock.unlock()
     }
 }
