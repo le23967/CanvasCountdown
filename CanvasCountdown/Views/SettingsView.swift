@@ -231,7 +231,7 @@ struct SettingsView: View {
     }
 
     private var dockSection: some View {
-        Section("Dock Countdown") {
+        Section {
             Picker("Label", selection: $settings.dockLabel) {
                 ForEach(DockLabelOption.allCases) { option in
                     Text("\(option.title) — \(option.renderedLabel)").tag(option)
@@ -239,7 +239,7 @@ struct SettingsView: View {
             }
             .pickerStyle(.radioGroup)
 
-            Picker("Count", selection: $settings.dockCourseScope) {
+            Picker("Include", selection: $settings.dockCourseScope) {
                 ForEach(DockCourseScopeOption.allCases) { option in
                     Text(option.title).tag(option)
                 }
@@ -269,6 +269,10 @@ struct SettingsView: View {
                     }
                 }
             }
+        } header: {
+            Text("Upcoming and Dock Countdown")
+        } footer: {
+            Text("The course selection focuses the Upcoming list and the Dock countdown. All Events and Completed always show everything, and events without a course are always included.")
         }
     }
 

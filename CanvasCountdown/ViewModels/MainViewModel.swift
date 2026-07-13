@@ -93,7 +93,7 @@ final class MainViewModel {
     }
 
     var upcomingCount: Int {
-        assignments.filter { item in
+        courseScopedAssignments.filter { item in
             item.dueDate >= currentDate
                 && !item.isCompleted
                 && !item.isIgnored
@@ -102,10 +102,29 @@ final class MainViewModel {
 
     var nearestAssignment: AssignmentListItem? {
         CountdownCalculator.nearestUpcoming(
-            from: assignments,
+            from: courseScopedAssignments,
             now: currentDate,
             calendar: calendar
         )?.event
+    }
+
+    /// Assignments in scope for Upcoming, the nearest-assignment card and the
+    /// Dock countdown. All Events and Completed deliberately ignore this: the
+    /// course selection is a focus filter, never a deletion.
+    var courseScopedAssignments: [AssignmentListItem] {
+        assignments.filter(isInSelectedCourseScope)
+    }
+
+    func isInSelectedCourseScope(_ item: AssignmentListItem) -> Bool {
+        guard settingsStore.dockCountMode == .selectedCourses else {
+            return true
+        }
+        guard let courseName = item.normalizedCourseName else {
+            // Manual entries and imported events without a course are never
+            // silently hidden by a course selection.
+            return true
+        }
+        return settingsStore.selectedCourses.contains(courseName)
     }
 
     var filteredAssignments: [AssignmentListItem] {
@@ -119,7 +138,8 @@ final class MainViewModel {
             .filter { item in
                 switch destination {
                 case .upcoming:
-                    guard item.dueDate >= now else {
+                    guard item.dueDate >= now,
+                          isInSelectedCourseScope(item) else {
                         return false
                     }
                     return showCompletedAndIgnored
@@ -579,15 +599,7 @@ final class MainViewModel {
     }
 
     private var dockEligibleAssignments: [AssignmentListItem] {
-        guard settingsStore.dockCountMode == .selectedCourses else {
-            return assignments
-        }
-        return assignments.filter { item in
-            guard let courseName = item.normalizedCourseName else {
-                return false
-            }
-            return settingsStore.selectedCourses.contains(courseName)
-        }
+        courseScopedAssignments
     }
 
     private func startCountdownTransitionLoop() {
