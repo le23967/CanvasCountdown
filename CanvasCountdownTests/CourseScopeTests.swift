@@ -114,7 +114,7 @@ final class CourseScopeTests: XCTestCase {
         var form = harness.viewModel.settingsForm
         form.dockCourseScope = .selectedCourses
         form.selectedCourses = ["PHYS200"]
-        try await harness.viewModel.saveSettings(form)
+        harness.viewModel.applySettings(form)
 
         XCTAssertEqual(
             harness.dock.renders.last?.daysRemaining,
@@ -136,7 +136,7 @@ final class CourseScopeTests: XCTestCase {
         var form = harness.viewModel.settingsForm
         form.dockCourseScope = .selectedCourses
         form.selectedCourses = ["PHYS200"]
-        try await harness.viewModel.saveSettings(form)
+        harness.viewModel.applySettings(form)
 
         let reloaded = SettingsStore(defaults: defaults)
         XCTAssertEqual(reloaded.dockCountMode, .selectedCourses)

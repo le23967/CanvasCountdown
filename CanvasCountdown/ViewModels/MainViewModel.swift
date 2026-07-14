@@ -52,6 +52,10 @@ final class MainViewModel {
     @ObservationIgnored
     private var countdownTransitionTask: Task<Void, Never>?
     @ObservationIgnored
+    private var notificationDebounceTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var transientStatusTask: Task<Void, Never>?
+    @ObservationIgnored
     private var hasStarted = false
 
     init(
@@ -81,6 +85,8 @@ final class MainViewModel {
     deinit {
         automaticRefreshTask?.cancel()
         countdownTransitionTask?.cancel()
+        notificationDebounceTask?.cancel()
+        transientStatusTask?.cancel()
     }
 
     var hasConfiguredFeed: Bool {
@@ -351,34 +357,74 @@ final class MainViewModel {
         return ImportSummary(result.importResult)
     }
 
-    func saveSettings(_ form: SettingsFormState) async throws {
-        let requestedFeed = form.feedURL.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        if requestedFeed != storedFeedURLString {
-            throw SettingsPresentationError.feedURLRequiresPreview
-        }
-
+    /// Applies a settings change the moment the user makes it.
+    ///
+    /// Persistence and anything cheap happen immediately. Notification
+    /// rescheduling is debounced, because dragging through a picker or editing a
+    /// reminder would otherwise rebuild every pending request on each keystroke.
+    func applySettings(_ form: SettingsFormState) {
+        // The feed URL is Keychain-managed and only ever changes through the
+        // preview and import flow, so the form's copy is never written back.
         if form.launchAtLogin != LaunchAtLoginController.isEnabled {
-            try LaunchAtLoginController.setEnabled(form.launchAtLogin)
+            do {
+                try LaunchAtLoginController.setEnabled(form.launchAtLogin)
+            } catch {
+                present(error)
+                settingsForm.launchAtLogin = LaunchAtLoginController.isEnabled
+                return
+            }
         }
 
         settingsStore.refreshInterval = form.refreshInterval.modelValue
-        settingsStore.notificationOffsets = form.notificationOffsets
         settingsStore.dockDisplayLanguage = form.dockLabel.modelValue
         settingsStore.dockCountMode = form.dockCourseScope.modelValue
         settingsStore.selectedCourses = form.selectedCourses
         settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
 
-        settingsForm = SettingsFormState(
-            settings: settingsStore.snapshot,
-            feedURL: URL(string: storedFeedURLString)
-        )
+        let remindersChanged =
+            settingsStore.notificationOffsets != form.notificationOffsets
+        settingsStore.notificationOffsets = form.notificationOffsets
+
         synchronizeDock()
-        await synchronizeNotifications()
         startAutomaticRefreshLoop()
         startCountdownTransitionLoop()
-        statusMessage = "Settings saved"
+
+        if remindersChanged {
+            scheduleDebouncedNotificationUpdate()
+        } else {
+            showTransientStatus("Settings updated")
+        }
+    }
+
+    /// Briefly confirms a change without leaving a banner sitting on screen.
+    func showTransientStatus(_ message: String) {
+        statusMessage = message
+        transientStatusTask?.cancel()
+        transientStatusTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else {
+                return
+            }
+            guard let self, self.statusMessage == message else {
+                return
+            }
+            self.statusMessage = nil
+        }
+    }
+
+    private func scheduleDebouncedNotificationUpdate() {
+        notificationDebounceTask?.cancel()
+        notificationDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled, let self else {
+                return
+            }
+            await self.synchronizeNotifications()
+            guard !Task.isCancelled else {
+                return
+            }
+            self.showTransientStatus("Notifications rescheduled")
+        }
     }
 
     func removeFeed() async throws {
@@ -692,10 +738,3 @@ final class MainViewModel {
     }
 }
 
-private enum SettingsPresentationError: LocalizedError {
-    case feedURLRequiresPreview
-
-    var errorDescription: String? {
-        "Preview and import the changed Canvas feed URL before saving settings."
-    }
-}

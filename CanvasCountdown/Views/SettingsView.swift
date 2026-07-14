@@ -29,7 +29,7 @@ struct SettingsView: View {
     let onConnectFeed: (String) -> Void
     let onRemoveFeed: @MainActor () async throws -> Void
     let onRequestNotificationPermission: @MainActor () async throws -> Bool
-    let onSave: @MainActor (SettingsFormState) async throws -> Void
+    let onSettingsChanged: @MainActor (SettingsFormState) -> Void
     let onResetData: @MainActor () async throws -> Void
     let onExportDiagnostics: @MainActor () async throws -> String
 
@@ -47,19 +47,16 @@ struct SettingsView: View {
             canvasSection
             refreshSection
             notificationSection
+            courseFilteringSection
             dockSection
             systemSection
             dataSection
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Save Settings") {
-                    saveSettings()
-                }
-                .disabled(isWorking)
-            }
+        // Every control writes straight through: there is no save step.
+        .onChange(of: settings) { _, updated in
+            onSettingsChanged(updated)
         }
         .safeAreaInset(edge: .bottom) {
             if let errorMessage {
@@ -166,7 +163,7 @@ struct SettingsView: View {
     }
 
     private var refreshSection: some View {
-        Section("Refresh") {
+        Section("Automatic Refresh") {
             Picker("Automatic refresh", selection: $settings.refreshInterval) {
                 ForEach(RefreshIntervalOption.allCases) { interval in
                     Text(interval.title).tag(interval)
@@ -231,14 +228,18 @@ struct SettingsView: View {
     }
 
     private var dockSection: some View {
-        Section {
-            Picker("Label", selection: $settings.dockLabel) {
+        Section("Dock Appearance") {
+            Picker("Header label", selection: $settings.dockLabel) {
                 ForEach(DockLabelOption.allCases) { option in
                     Text("\(option.title) — \(option.renderedLabel)").tag(option)
                 }
             }
             .pickerStyle(.radioGroup)
+        }
+    }
 
+    private var courseFilteringSection: some View {
+        Section {
             Picker("Include", selection: $settings.dockCourseScope) {
                 ForEach(DockCourseScopeOption.allCases) { option in
                     Text(option.title).tag(option)
@@ -270,9 +271,9 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Text("Upcoming and Dock Countdown")
+            Text("Course Filtering")
         } footer: {
-            Text("The course selection focuses the Upcoming list and the Dock countdown. All Events and Completed always show everything, and events without a course are always included.")
+            Text("Applies to Upcoming, the nearest deadline card and the Dock countdown. All Events and Completed always show everything, and events without a course are always included.")
         }
     }
 
@@ -294,7 +295,7 @@ struct SettingsView: View {
                 showResetConfirmation = true
             }
         } header: {
-            Text("Data")
+            Text("Data & Privacy")
         } footer: {
             Text("Diagnostics include app state and counts, never the private Canvas feed URL or event descriptions.")
         }
@@ -308,22 +309,6 @@ struct SettingsView: View {
             "1 day before"
         default:
             "\(offset) days before"
-        }
-    }
-
-    private func saveSettings() {
-        guard !isWorking else {
-            return
-        }
-        isWorking = true
-        errorMessage = nil
-        Task {
-            do {
-                try await onSave(settings)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isWorking = false
         }
     }
 

@@ -101,8 +101,8 @@ struct MainView: View {
                 onRequestNotificationPermission: {
                     try await viewModel.requestNotificationPermission()
                 },
-                onSave: { form in
-                    try await viewModel.saveSettings(form)
+                onSettingsChanged: { form in
+                    viewModel.applySettings(form)
                 },
                 onResetData: {
                     try await viewModel.resetLocalData()
