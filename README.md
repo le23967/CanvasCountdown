@@ -52,6 +52,27 @@ The exact Canvas labels can vary by institution. Treat this URL like a
 password: it commonly contains a private token that grants read access to the
 calendar.
 
+## How refreshes treat your data
+
+- A Canvas event that disappears from one refresh is never deleted. It is
+  counted as missing and only archived after three consecutive refreshes that
+  carried a real event list and did not mention it.
+- A failed download, a rejected redirect, an oversized response, a parser
+  error, or a feed that parses but contains no events archives nothing.
+- Archiving keeps the row, its deadline, and its completed and ignored state.
+  If Canvas publishes the event again it returns with that state intact.
+- An explicit `STATUS:CANCELLED` entry, or deselecting an event during import,
+  archives it straight away.
+
+## Upcoming and Dock scope
+
+**Settings → Upcoming and Dock Countdown** chooses between all assignments and
+selected courses. The selection focuses the Upcoming list, its sidebar count,
+the nearest-deadline card and the Dock countdown together. **All Events** and
+**Completed** always show everything, and assignments without a course
+(including manual entries) are always included. Nothing is deleted by this
+setting.
+
 ## Privacy and security
 
 - Assignment data and settings remain on this Mac.
@@ -69,9 +90,19 @@ calendar.
 The test target covers calendar-day countdowns (including midnight and
 daylight-saving boundaries), ICS UTC/all-day/TZID values, folded and escaped
 ICS content, stable-UID merging, preservation of local completed/ignored
-state, and nearest-event selection.
+state, nearest-event selection, feed reconciliation and archiving, the download
+path (chunking, size limits, redirects, cancellation), Dock tile layout at every
+Dock size, and the selected-course scope.
 
 Run tests in Xcode with **Product → Test**, or use the command above.
+
+The test bundle is hosted by the app, so the app process starts for every run.
+An automated launch is detected and composed from isolated dependencies: an
+in-memory store, an in-memory feed URL store, an offline fetcher, inert
+notifications and an inert Dock renderer, with no refresh or countdown loops and
+no login-item changes. A test run therefore cannot read the Keychain feed URL,
+contact Canvas, or touch the production database. `LaunchIsolationTests` guards
+each of those properties.
 
 ## Known limitations
 
