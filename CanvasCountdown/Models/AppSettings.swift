@@ -71,6 +71,7 @@ enum DockCountMode: String, CaseIterable, Codable, Identifiable, Sendable {
 struct AppSettings: Equatable, Sendable {
     var refreshInterval: RefreshInterval
     var reminderSchedule: ReminderSchedule
+    var dockAppearance: DockAppearance
     var dockDisplayLanguage: DockDisplayLanguage
     var dockCountMode: DockCountMode
     var selectedCourses: Set<String>
@@ -79,6 +80,7 @@ struct AppSettings: Equatable, Sendable {
     static let defaults = AppSettings(
         refreshInterval: .everySixHours,
         reminderSchedule: .defaults,
+        dockAppearance: .defaults,
         dockDisplayLanguage: .english,
         dockCountMode: .allAssignments,
         selectedCourses: [],
@@ -96,6 +98,10 @@ final class SettingsStore {
     }
 
     var reminderSchedule: ReminderSchedule {
+        didSet { persist() }
+    }
+
+    var dockAppearance: DockAppearance {
         didSet { persist() }
     }
 
@@ -130,6 +136,11 @@ final class SettingsStore {
             from: defaults,
             fallback: fallback.reminderSchedule
         )
+        dockAppearance = Self.decode(
+            DockAppearance.self,
+            from: defaults,
+            key: Key.dockAppearance
+        ) ?? fallback.dockAppearance
         dockDisplayLanguage = defaults
             .string(forKey: Key.dockDisplayLanguage)
             .flatMap(DockDisplayLanguage.init(rawValue:))
@@ -148,6 +159,7 @@ final class SettingsStore {
         AppSettings(
             refreshInterval: refreshInterval,
             reminderSchedule: reminderSchedule,
+            dockAppearance: dockAppearance,
             dockDisplayLanguage: dockDisplayLanguage,
             dockCountMode: dockCountMode,
             selectedCourses: selectedCourses,
@@ -163,11 +175,23 @@ final class SettingsStore {
         let fallback = AppSettings.defaults
         refreshInterval = fallback.refreshInterval
         reminderSchedule = fallback.reminderSchedule
+        dockAppearance = fallback.dockAppearance
         dockDisplayLanguage = fallback.dockDisplayLanguage
         dockCountMode = fallback.dockCountMode
         selectedCourses = fallback.selectedCourses
         launchAtLogin = fallback.launchAtLogin
         persist()
+    }
+
+    private static func decode<Value: Decodable>(
+        _ type: Value.Type,
+        from defaults: UserDefaults,
+        key: String
+    ) -> Value? {
+        guard let data = defaults.data(forKey: key) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(type, from: data)
     }
 
     private static func loadReminderSchedule(
@@ -193,6 +217,9 @@ final class SettingsStore {
         if let data = try? JSONEncoder().encode(reminderSchedule) {
             defaults.set(data, forKey: Key.reminderSchedule)
         }
+        if let data = try? JSONEncoder().encode(dockAppearance) {
+            defaults.set(data, forKey: Key.dockAppearance)
+        }
         defaults.set(
             dockDisplayLanguage.rawValue,
             forKey: Key.dockDisplayLanguage
@@ -207,6 +234,7 @@ final class SettingsStore {
         static let refreshInterval = prefix + "refreshInterval"
         static let notificationOffsets = prefix + "notificationOffsets"
         static let reminderSchedule = prefix + "reminderSchedule"
+        static let dockAppearance = prefix + "dockAppearance"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"
         static let dockCountMode = prefix + "dockCountMode"
         static let selectedCourses = prefix + "selectedCourses"

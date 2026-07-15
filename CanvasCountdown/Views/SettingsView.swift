@@ -40,7 +40,10 @@ struct SettingsView: View {
     let onRemoveReminder: @MainActor (UUID) -> Void
     let onSetReminderEnabled: @MainActor (Bool, UUID) -> Void
     let onResetReminders: @MainActor () -> Void
+    let onApplyDockTheme: @MainActor (DockThemePreset) -> Void
+    let onResetDockAppearance: @MainActor () -> Void
 
+    @State private var previewDays = 7
     @State private var editingRule: ReminderRule?
     @State private var draftAmount = 1
     @State private var draftUnit: ReminderUnit = .days
@@ -323,14 +326,129 @@ struct SettingsView: View {
     }
 
     private var dockSection: some View {
-        Section("Dock Appearance") {
+        Section {
+            dockPreview
+
             Picker("Header label", selection: $settings.dockLabel) {
                 ForEach(DockLabelOption.allCases) { option in
                     Text("\(option.title) — \(option.renderedLabel)").tag(option)
                 }
             }
-            .pickerStyle(.radioGroup)
+
+            Picker("Number size", selection: $settings.dockAppearance.numberSize) {
+                ForEach(DockNumberSize.allCases) { size in
+                    Text(size.title).tag(size)
+                }
+            }
+
+            Picker("Number weight", selection: $settings.dockAppearance.numberWeight) {
+                ForEach(DockNumberWeight.allCases) { weight in
+                    Text(weight.title).tag(weight)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Picker("Theme", selection: Binding(
+                get: { settings.dockAppearance.preset },
+                set: { onApplyDockTheme($0) }
+            )) {
+                ForEach(DockThemePreset.selectable) { preset in
+                    Text(preset.title).tag(preset)
+                }
+                if settings.dockAppearance.preset == .custom {
+                    Text(DockThemePreset.custom.title)
+                        .tag(DockThemePreset.custom)
+                }
+            }
+
+            ColorPicker(
+                "Background top",
+                selection: hexBinding(\.backgroundTop),
+                supportsOpacity: false
+            )
+            ColorPicker(
+                "Background bottom",
+                selection: hexBinding(\.backgroundBottom),
+                supportsOpacity: false
+            )
+            ColorPicker(
+                "Number",
+                selection: hexBinding(\.number),
+                supportsOpacity: false
+            )
+            ColorPicker(
+                "Header label",
+                selection: hexBinding(\.label),
+                supportsOpacity: false
+            )
+
+            if !settings.dockAppearance.hasSufficientContrast {
+                Label(
+                    "Those colours are hard to read on this background, so the text colour is corrected automatically.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
+            Button("Reset to Defaults") {
+                onResetDockAppearance()
+            }
+        } header: {
+            Text("Dock Appearance")
+        } footer: {
+            Text("The countdown is drawn live while Canvas Countdown is running.")
         }
+    }
+
+    /// Shown at roughly the sizes macOS asks the Dock for.
+    private var dockPreview: some View {
+        HStack(alignment: .bottom, spacing: 14) {
+            ForEach([96.0, 64.0, 40.0], id: \.self) { size in
+                VStack(spacing: 4) {
+                    Image(
+                        nsImage: DockTileRenderer.image(
+                            size: size,
+                            daysRemaining: previewDays,
+                            label: settings.dockLabel.renderedLabel,
+                            appearance: settings.dockAppearance
+                        )
+                    )
+                    .accessibilityLabel(
+                        "Dock preview at \(Int(size)) points showing \(previewDays) days"
+                    )
+                    Text("\(Int(size))pt")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Picker("Preview value", selection: $previewDays) {
+                ForEach([0, 7, 21, 157, 1_024], id: \.self) { value in
+                    Text("\(value)").tag(value)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 90)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func hexBinding(
+        _ keyPath: WritableKeyPath<DockAppearance.Colours, String>
+    ) -> Binding<Color> {
+        Binding(
+            get: {
+                Color(nsColor: NSColor(hex: settings.dockAppearance.colours[keyPath: keyPath]) ?? .white)
+            },
+            set: { newValue in
+                settings.dockAppearance.colours[keyPath: keyPath] =
+                    NSColor(newValue).hexString
+                settings.dockAppearance.preset = .custom
+            }
+        )
     }
 
     private var courseFilteringSection: some View {

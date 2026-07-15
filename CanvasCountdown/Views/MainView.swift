@@ -131,6 +131,12 @@ struct MainView: View {
                 },
                 onResetReminders: {
                     viewModel.resetRemindersToDefaults()
+                },
+                onApplyDockTheme: { preset in
+                    viewModel.applyDockTheme(preset)
+                },
+                onResetDockAppearance: {
+                    viewModel.resetDockAppearance()
                 }
             )
         } else {

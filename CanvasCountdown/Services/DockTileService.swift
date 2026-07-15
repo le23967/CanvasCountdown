@@ -6,6 +6,11 @@ import AppKit
 protocol DockRendering: AnyObject {
     /// Renders the current countdown. Pass `nil` when there is no eligible event.
     func render(daysRemaining: Int?, label: String)
+    func apply(appearance: DockAppearance)
+}
+
+extension DockRendering {
+    func apply(appearance: DockAppearance) {}
 }
 
 /// The subset of `NSDockTile` the countdown needs.
@@ -27,10 +32,14 @@ final class DockTileService: DockRendering {
     private let dockTile: any DockTileSurface
     private let tileView: CountdownDockTileView
 
-    init(dockTile: any DockTileSurface = NSApplication.shared.dockTile) {
+    init(
+        dockTile: any DockTileSurface = NSApplication.shared.dockTile,
+        appearance: DockAppearance = .defaults
+    ) {
         self.dockTile = dockTile
         self.tileView = CountdownDockTileView(
-            frame: NSRect(x: 0, y: 0, width: 128, height: 128)
+            frame: NSRect(x: 0, y: 0, width: 128, height: 128),
+            appearance: appearance
         )
 
         dockTile.contentView = tileView
@@ -45,14 +54,22 @@ final class DockTileService: DockRendering {
         )
         dockTile.display()
     }
+
+    func apply(appearance: DockAppearance) {
+        tileView.apply(appearance: appearance)
+        dockTile.display()
+    }
 }
 
 @MainActor
 private final class CountdownDockTileView: NSView {
     private var daysRemaining: Int?
     private var label = "DAYS"
+    /// Named to avoid colliding with `NSView.appearance`.
+    private var tileAppearance: DockAppearance
 
-    override init(frame frameRect: NSRect) {
+    init(frame frameRect: NSRect, appearance: DockAppearance) {
+        self.tileAppearance = appearance
         super.init(frame: frameRect)
         wantsLayer = true
     }
@@ -68,6 +85,11 @@ private final class CountdownDockTileView: NSView {
         needsDisplay = true
     }
 
+    func apply(appearance: DockAppearance) {
+        tileAppearance = appearance
+        needsDisplay = true
+    }
+
     override var isFlipped: Bool {
         true
     }
@@ -75,77 +97,11 @@ private final class CountdownDockTileView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        NSGraphicsContext.saveGraphicsState()
-        defer { NSGraphicsContext.restoreGraphicsState() }
-
-        let layout = DockTileLayout.make(
+        DockTileRenderer.draw(
             in: bounds,
-            countdownText: DockTileLayout.text(forDaysRemaining: daysRemaining)
+            daysRemaining: daysRemaining,
+            label: label,
+            appearance: tileAppearance
         )
-        let clipPath = NSBezierPath(
-            roundedRect: layout.tileRect,
-            xRadius: layout.cornerRadius,
-            yRadius: layout.cornerRadius
-        )
-        clipPath.addClip()
-
-        drawBackground(in: layout.tileRect)
-
-        NSColor.black.withAlphaComponent(0.20).setFill()
-        layout.tileRect.fill()
-
-        drawLabel(with: layout)
-        drawCountdown(with: layout)
-    }
-
-    private func drawBackground(in rect: NSRect) {
-        let gradient = NSGradient(
-            starting: NSColor(
-                calibratedRed: 0.13,
-                green: 0.27,
-                blue: 0.55,
-                alpha: 1
-            ),
-            ending: NSColor(
-                calibratedRed: 0.24,
-                green: 0.48,
-                blue: 0.82,
-                alpha: 1
-            )
-        )
-        gradient?.draw(in: rect, angle: -90)
-    }
-
-    private func drawLabel(with layout: DockTileLayout) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: DockTileLayout.labelFont(ofSize: layout.labelFontSize),
-            .foregroundColor: NSColor.white.withAlphaComponent(0.92),
-            .kern: layout.labelFontSize * 0.05,
-        ]
-
-        let text = NSAttributedString(string: label, attributes: attributes)
-        // Drawn at a point rather than into a rectangle: `draw(in:)` clips, and
-        // the tile must never lose part of a glyph.
-        text.draw(at: layout.labelOrigin(for: label, measuredSize: text.size()))
-    }
-
-    private func drawCountdown(with layout: DockTileLayout) {
-        let value = DockTileLayout.text(forDaysRemaining: daysRemaining)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: DockTileLayout.countdownFont(ofSize: layout.countdownFontSize),
-            .foregroundColor: NSColor.white,
-            .shadow: textShadow,
-        ]
-
-        NSAttributedString(string: value, attributes: attributes)
-            .draw(at: layout.countdownOrigin(for: value))
-    }
-
-    private var textShadow: NSShadow {
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-        shadow.shadowBlurRadius = 2
-        shadow.shadowOffset = NSSize(width: 0, height: -1)
-        return shadow
     }
 }

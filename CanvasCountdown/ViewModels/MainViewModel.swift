@@ -211,6 +211,7 @@ final class MainViewModel {
                 feedURL: feedURL
             )
             notificationPermission = NotificationPermissionState(permission)
+            dockRenderer.apply(appearance: settingsStore.dockAppearance)
             synchronizeDock()
 
             if automaticActivityEnabled, feedURL == nil, assignments.isEmpty {
@@ -385,6 +386,14 @@ final class MainViewModel {
             settingsStore.reminderSchedule != form.reminderSchedule
         settingsStore.reminderSchedule = form.reminderSchedule
 
+        // Colours the user cannot read are corrected rather than stored.
+        let appearance = form.dockAppearance.correctedForContrast()
+        if settingsStore.dockAppearance != appearance {
+            settingsStore.dockAppearance = appearance
+            settingsForm.dockAppearance = appearance
+            dockRenderer.apply(appearance: appearance)
+        }
+
         synchronizeDock()
         startAutomaticRefreshLoop()
         startCountdownTransitionLoop()
@@ -394,6 +403,26 @@ final class MainViewModel {
         } else {
             showTransientStatus("Settings updated")
         }
+    }
+
+    // MARK: - Dock appearance
+
+    func applyDockTheme(_ preset: DockThemePreset) {
+        settingsForm.dockAppearance = DockAppearance.applying(
+            preset,
+            to: settingsForm.dockAppearance
+        )
+        applySettings(settingsForm)
+    }
+
+    func resetDockAppearance() {
+        settingsForm.dockAppearance = .defaults
+        applySettings(settingsForm)
+    }
+
+    /// True when the chosen colours would be hard to read and were corrected.
+    var dockAppearanceHadContrastCorrection: Bool {
+        !settingsForm.dockAppearance.hasSufficientContrast
     }
 
     // MARK: - Reminder schedule
@@ -550,6 +579,8 @@ final class MainViewModel {
             "enabledReminderOffsetsMinutes="
                 + "\(settingsStore.reminderSchedule.enabledRules.map(\.offsetMinutes).sorted())",
             "dockLanguage=\(settingsStore.dockDisplayLanguage.rawValue)",
+            "dockNumberSize=\(settingsStore.dockAppearance.numberSize.rawValue)",
+            "dockTheme=\(settingsStore.dockAppearance.preset.rawValue)",
             "dockCountMode=\(settingsStore.dockCountMode.rawValue)",
             "selectedCourseCount=\(settingsStore.selectedCourses.count)",
             "launchAtLogin=\(LaunchAtLoginController.isEnabled)",

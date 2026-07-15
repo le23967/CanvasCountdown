@@ -33,6 +33,7 @@ struct DockTileLayout: Equatable {
     let labelFontSize: CGFloat
     let countdownRect: CGRect
     let countdownFontSize: CGFloat
+    let numberWeight: DockNumberWeight
 
     /// The em dash shown when nothing is counting down.
     static let placeholder = "–"
@@ -41,27 +42,46 @@ struct DockTileLayout: Equatable {
         daysRemaining.map(String.init) ?? placeholder
     }
 
-    static func make(in bounds: CGRect, countdownText: String) -> DockTileLayout {
+    static func make(
+        in bounds: CGRect,
+        countdownText: String,
+        numberSize: DockNumberSize = .medium,
+        numberWeight: DockNumberWeight = .heavy
+    ) -> DockTileLayout {
         let inset = min(bounds.width, bounds.height) * Proportion.inset
         let tileRect = bounds.insetBy(dx: inset, dy: inset)
         let height = tileRect.height
         let horizontalPadding = tileRect.width * Proportion.horizontalPadding
 
+        // A larger size preference grows the number band downwards and trims the
+        // header band, while the tile itself stays put.
+        let scale = numberSize.bandScale
+        let countdownHeight = min(
+            height * Proportion.countdownHeight * scale,
+            height * 0.78
+        )
+        let labelHeight = height * Proportion.labelHeight / max(1, scale)
+        let countdownTop = min(
+            height * Proportion.countdownTop / max(1, scale),
+            height - countdownHeight
+        )
+
         let labelRect = CGRect(
             x: tileRect.minX + horizontalPadding,
             y: tileRect.minY + height * Proportion.labelTop,
             width: tileRect.width - horizontalPadding * 2,
-            height: height * Proportion.labelHeight
+            height: labelHeight
         )
         let countdownRect = CGRect(
             x: tileRect.minX + horizontalPadding,
-            y: tileRect.minY + height * Proportion.countdownTop,
+            y: tileRect.minY + countdownTop,
             width: tileRect.width - horizontalPadding * 2,
-            height: height * Proportion.countdownHeight
+            height: countdownHeight
         )
         let countdownFontSize = countdownFontSize(
             for: countdownText,
-            in: countdownRect
+            in: countdownRect,
+            weight: numberWeight
         )
 
         return DockTileLayout(
@@ -73,7 +93,8 @@ struct DockTileLayout: Equatable {
                 countdownFontSize * Proportion.labelToCountdownCeiling
             ),
             countdownRect: countdownRect,
-            countdownFontSize: countdownFontSize
+            countdownFontSize: countdownFontSize,
+            numberWeight: numberWeight
         )
     }
 
@@ -83,7 +104,8 @@ struct DockTileLayout: Equatable {
         labelRect: CGRect,
         labelFontSize: CGFloat,
         countdownRect: CGRect,
-        countdownFontSize: CGFloat
+        countdownFontSize: CGFloat,
+        numberWeight: DockNumberWeight
     ) {
         self.tileRect = tileRect
         self.cornerRadius = cornerRadius
@@ -91,11 +113,21 @@ struct DockTileLayout: Equatable {
         self.labelFontSize = labelFontSize
         self.countdownRect = countdownRect
         self.countdownFontSize = countdownFontSize
+        self.numberWeight = numberWeight
     }
 
-    /// A heavy rounded numeral, matching the large-number calendar countdown look.
-    static func countdownFont(ofSize size: CGFloat) -> NSFont {
-        rounded(NSFont.monospacedDigitSystemFont(ofSize: size, weight: .heavy), size: size)
+    /// A rounded numeral, matching the large-number calendar countdown look.
+    static func countdownFont(
+        ofSize size: CGFloat,
+        weight: DockNumberWeight = .heavy
+    ) -> NSFont {
+        rounded(
+            NSFont.monospacedDigitSystemFont(
+                ofSize: size,
+                weight: weight.fontWeight
+            ),
+            size: size
+        )
     }
 
     static func labelFont(ofSize size: CGFloat) -> NSFont {
@@ -111,8 +143,12 @@ struct DockTileLayout: Equatable {
     }
 
     /// The space the glyphs actually occupy: advance width by cap height.
-    static func countdownInkSize(_ text: String, fontSize: CGFloat) -> CGSize {
-        let font = countdownFont(ofSize: fontSize)
+    static func countdownInkSize(
+        _ text: String,
+        fontSize: CGFloat,
+        weight: DockNumberWeight = .heavy
+    ) -> CGSize {
+        let font = countdownFont(ofSize: fontSize, weight: weight)
         let width = NSAttributedString(
             string: text,
             attributes: [.font: font]
@@ -123,8 +159,15 @@ struct DockTileLayout: Equatable {
     /// Top-left point for drawing the countdown in a flipped view, chosen so the
     /// digits are optically centred on their cap height inside the number band.
     func countdownOrigin(for text: String) -> CGPoint {
-        let font = Self.countdownFont(ofSize: countdownFontSize)
-        let ink = Self.countdownInkSize(text, fontSize: countdownFontSize)
+        let font = Self.countdownFont(
+            ofSize: countdownFontSize,
+            weight: numberWeight
+        )
+        let ink = Self.countdownInkSize(
+            text,
+            fontSize: countdownFontSize,
+            weight: numberWeight
+        )
         return CGPoint(
             x: countdownRect.midX - ink.width / 2,
             y: countdownRect.midY + font.capHeight / 2 - font.ascender
@@ -143,13 +186,14 @@ struct DockTileLayout: Equatable {
     /// Dock size or the value.
     private static func countdownFontSize(
         for text: String,
-        in band: CGRect
+        in band: CGRect,
+        weight: DockNumberWeight = .heavy
     ) -> CGFloat {
         guard band.height > 0, band.width > 0 else {
             return 1
         }
 
-        let probe = countdownFont(ofSize: 100)
+        let probe = countdownFont(ofSize: 100, weight: weight)
         let capRatio = max(0.4, probe.capHeight / 100)
         let fill = text == placeholder
             ? Proportion.placeholderCapFill
@@ -158,7 +202,7 @@ struct DockTileLayout: Equatable {
         var size = max(4, band.height * fill / capRatio)
         let minimumSize: CGFloat = 4
         while size > minimumSize {
-            let ink = countdownInkSize(text, fontSize: size)
+            let ink = countdownInkSize(text, fontSize: size, weight: weight)
             if ink.width <= band.width, ink.height <= band.height {
                 break
             }
