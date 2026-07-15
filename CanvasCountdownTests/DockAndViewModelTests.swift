@@ -581,7 +581,7 @@ private actor NotificationSchedulerStub: NotificationScheduling {
 
     func reschedule(
         candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
+        schedule: ReminderSchedule,
         now: Date,
         calendar: Calendar
     ) {}

@@ -70,7 +70,7 @@ enum DockCountMode: String, CaseIterable, Codable, Identifiable, Sendable {
 
 struct AppSettings: Equatable, Sendable {
     var refreshInterval: RefreshInterval
-    var notificationOffsets: Set<Int>
+    var reminderSchedule: ReminderSchedule
     var dockDisplayLanguage: DockDisplayLanguage
     var dockCountMode: DockCountMode
     var selectedCourses: Set<String>
@@ -78,7 +78,7 @@ struct AppSettings: Equatable, Sendable {
 
     static let defaults = AppSettings(
         refreshInterval: .everySixHours,
-        notificationOffsets: [7, 3, 1, 0],
+        reminderSchedule: .defaults,
         dockDisplayLanguage: .english,
         dockCountMode: .allAssignments,
         selectedCourses: [],
@@ -95,7 +95,7 @@ final class SettingsStore {
         didSet { persist() }
     }
 
-    var notificationOffsets: Set<Int> {
+    var reminderSchedule: ReminderSchedule {
         didSet { persist() }
     }
 
@@ -126,9 +126,9 @@ final class SettingsStore {
             .integerValue(forKey: Key.refreshInterval)
             .flatMap(RefreshInterval.init(rawValue:))
             ?? fallback.refreshInterval
-        notificationOffsets = Set(
-            defaults.array(forKey: Key.notificationOffsets) as? [Int]
-                ?? Array(fallback.notificationOffsets)
+        reminderSchedule = Self.loadReminderSchedule(
+            from: defaults,
+            fallback: fallback.reminderSchedule
         )
         dockDisplayLanguage = defaults
             .string(forKey: Key.dockDisplayLanguage)
@@ -147,7 +147,7 @@ final class SettingsStore {
     var snapshot: AppSettings {
         AppSettings(
             refreshInterval: refreshInterval,
-            notificationOffsets: notificationOffsets,
+            reminderSchedule: reminderSchedule,
             dockDisplayLanguage: dockDisplayLanguage,
             dockCountMode: dockCountMode,
             selectedCourses: selectedCourses,
@@ -162,7 +162,7 @@ final class SettingsStore {
     func reset() {
         let fallback = AppSettings.defaults
         refreshInterval = fallback.refreshInterval
-        notificationOffsets = fallback.notificationOffsets
+        reminderSchedule = fallback.reminderSchedule
         dockDisplayLanguage = fallback.dockDisplayLanguage
         dockCountMode = fallback.dockCountMode
         selectedCourses = fallback.selectedCourses
@@ -170,12 +170,29 @@ final class SettingsStore {
         persist()
     }
 
+    private static func loadReminderSchedule(
+        from defaults: UserDefaults,
+        fallback: ReminderSchedule
+    ) -> ReminderSchedule {
+        if let data = defaults.data(forKey: Key.reminderSchedule),
+           let decoded = try? JSONDecoder().decode(
+               ReminderSchedule.self,
+               from: data
+           ) {
+            return decoded
+        }
+        // Migration from the original whole-day offset list.
+        if let legacy = defaults.array(forKey: Key.notificationOffsets) as? [Int] {
+            return .fromLegacyDayOffsets(Set(legacy))
+        }
+        return fallback
+    }
+
     private func persist() {
         defaults.set(refreshInterval.rawValue, forKey: Key.refreshInterval)
-        defaults.set(
-            notificationOffsets.sorted(),
-            forKey: Key.notificationOffsets
-        )
+        if let data = try? JSONEncoder().encode(reminderSchedule) {
+            defaults.set(data, forKey: Key.reminderSchedule)
+        }
         defaults.set(
             dockDisplayLanguage.rawValue,
             forKey: Key.dockDisplayLanguage
@@ -189,6 +206,7 @@ final class SettingsStore {
         static let prefix = "CanvasCountdown.settings."
         static let refreshInterval = prefix + "refreshInterval"
         static let notificationOffsets = prefix + "notificationOffsets"
+        static let reminderSchedule = prefix + "reminderSchedule"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"
         static let dockCountMode = prefix + "dockCountMode"
         static let selectedCourses = prefix + "selectedCourses"

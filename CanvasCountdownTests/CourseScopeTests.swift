@@ -283,7 +283,27 @@ actor ScopeRepositoryStub: AssignmentRepository {
         _ draft: ManualAssignmentDraft,
         now: Date
     ) throws -> AssignmentSnapshot {
-        throw AssignmentRepositoryError.assignmentNotFound
+        if let id = draft.id {
+            guard let index = snapshots.firstIndex(where: { $0.id == id }) else {
+                throw AssignmentRepositoryError.assignmentNotFound
+            }
+            snapshots[index].title = draft.title
+            snapshots[index].courseName = draft.courseName
+            snapshots[index].dueDate = draft.dueDate
+            snapshots[index].updatedAt = now
+            return snapshots[index]
+        }
+
+        let saved = AssignmentSnapshot(
+            title: draft.title,
+            courseName: draft.courseName,
+            dueDate: draft.dueDate,
+            source: .manual,
+            createdAt: now,
+            updatedAt: now
+        )
+        snapshots.append(saved)
+        return saved
     }
 
     func updateStatus(
@@ -321,7 +341,7 @@ private actor ScopeNotificationStub: NotificationScheduling {
     func requestAuthorization() -> Bool { false }
     func reschedule(
         candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
+        schedule: ReminderSchedule,
         now: Date,
         calendar: Calendar
     ) {}

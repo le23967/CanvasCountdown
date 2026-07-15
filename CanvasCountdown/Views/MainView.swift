@@ -109,10 +109,43 @@ struct MainView: View {
                 },
                 onExportDiagnostics: {
                     try await viewModel.exportDiagnostics()
+                },
+                canAddReminder: viewModel.canAddReminder,
+                canRequestNotificationPermission:
+                    viewModel.canRequestNotificationPermission,
+                onAddReminder: { amount, unit in
+                    reminderFailure {
+                        try viewModel.addReminder(amount: amount, unit: unit)
+                    }
+                },
+                onUpdateReminder: { rule in
+                    reminderFailure {
+                        try viewModel.updateReminder(rule)
+                    }
+                },
+                onRemoveReminder: { id in
+                    viewModel.removeReminder(id: id)
+                },
+                onSetReminderEnabled: { isEnabled, id in
+                    viewModel.setReminderEnabled(isEnabled, for: id)
+                },
+                onResetReminders: {
+                    viewModel.resetRemindersToDefaults()
                 }
             )
         } else {
             assignmentDashboard
+        }
+    }
+
+    /// Turns a thrown schedule-validation error into a message the reminder
+    /// editor can show inline, rather than a modal alert for a typo.
+    private func reminderFailure(_ work: () throws -> Void) -> String? {
+        do {
+            try work()
+            return nil
+        } catch {
+            return error.localizedDescription
         }
     }
 

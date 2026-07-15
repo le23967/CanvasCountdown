@@ -205,7 +205,7 @@ enum DockCourseScopeOption: String, CaseIterable, Identifiable, Sendable {
 struct SettingsFormState: Equatable, Sendable {
     var feedURL = ""
     var refreshInterval: RefreshIntervalOption = .sixHours
-    var notificationOffsets: Set<Int> = [7, 3, 1, 0]
+    var reminderSchedule: ReminderSchedule = .defaults
     var dockLabel: DockLabelOption = .english
     var dockCourseScope: DockCourseScopeOption = .allAssignments
     var selectedCourses: Set<String> = []
@@ -273,7 +273,7 @@ extension SettingsFormState {
         self.init(
             feedURL: feedURL?.absoluteString ?? "",
             refreshInterval: RefreshIntervalOption(settings.refreshInterval),
-            notificationOffsets: settings.notificationOffsets,
+            reminderSchedule: settings.reminderSchedule,
             dockLabel: DockLabelOption(settings.dockDisplayLanguage),
             dockCourseScope: DockCourseScopeOption(settings.dockCountMode),
             selectedCourses: settings.selectedCourses,

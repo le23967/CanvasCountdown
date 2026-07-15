@@ -382,8 +382,8 @@ final class MainViewModel {
         settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
 
         let remindersChanged =
-            settingsStore.notificationOffsets != form.notificationOffsets
-        settingsStore.notificationOffsets = form.notificationOffsets
+            settingsStore.reminderSchedule != form.reminderSchedule
+        settingsStore.reminderSchedule = form.reminderSchedule
 
         synchronizeDock()
         startAutomaticRefreshLoop()
@@ -394,6 +394,60 @@ final class MainViewModel {
         } else {
             showTransientStatus("Settings updated")
         }
+    }
+
+    // MARK: - Reminder schedule
+
+    var canAddReminder: Bool {
+        settingsForm.reminderSchedule.canAddRule
+    }
+
+    func addReminder(amount: Int, unit: ReminderUnit) throws {
+        var schedule = settingsForm.reminderSchedule
+        try schedule.add(ReminderRule(amount: amount, unit: unit))
+        applyReminderSchedule(schedule)
+    }
+
+    func updateReminder(_ rule: ReminderRule) throws {
+        var schedule = settingsForm.reminderSchedule
+        try schedule.update(rule)
+        applyReminderSchedule(schedule)
+    }
+
+    func removeReminder(id: UUID) {
+        var schedule = settingsForm.reminderSchedule
+        schedule.remove(id: id)
+        applyReminderSchedule(schedule)
+    }
+
+    func setReminderEnabled(_ isEnabled: Bool, for id: UUID) {
+        var schedule = settingsForm.reminderSchedule
+        schedule.setEnabled(isEnabled, for: id)
+        applyReminderSchedule(schedule)
+    }
+
+    func moveReminders(fromOffsets source: IndexSet, toOffset destination: Int) {
+        var schedule = settingsForm.reminderSchedule
+        schedule.move(fromOffsets: source, toOffset: destination)
+        applyReminderSchedule(schedule)
+    }
+
+    func resetRemindersToDefaults() {
+        var schedule = settingsForm.reminderSchedule
+        schedule.resetToDefaults()
+        applyReminderSchedule(schedule)
+    }
+
+    private func applyReminderSchedule(_ schedule: ReminderSchedule) {
+        settingsForm.reminderSchedule = schedule
+        applySettings(settingsForm)
+    }
+
+    /// True only while macOS would actually show a permission prompt. Once the
+    /// user has denied notifications, asking again does nothing, so the UI sends
+    /// them to System Settings instead.
+    var canRequestNotificationPermission: Bool {
+        notificationPermission == .notDetermined
     }
 
     /// Briefly confirms a change without leaving a banner sitting on screen.
@@ -437,6 +491,11 @@ final class MainViewModel {
     }
 
     func requestNotificationPermission() async throws -> Bool {
+        // Never ask again after a denial: macOS shows nothing, and repeating the
+        // request would look like the button is broken.
+        guard canRequestNotificationPermission else {
+            return notificationPermission == .authorized
+        }
         let granted = try await notificationScheduler.requestAuthorization()
         notificationPermission = NotificationPermissionState(
             await notificationScheduler.authorizationStatus()
@@ -487,7 +546,9 @@ final class MainViewModel {
             "ignoredCount=\(ignoredCount)",
             "manualCount=\(manualCount)",
             "refreshInterval=\(settingsStore.refreshInterval.rawValue)",
-            "notificationOffsets=\(settingsStore.notificationOffsets.sorted())",
+            "reminderRuleCount=\(settingsStore.reminderSchedule.rules.count)",
+            "enabledReminderOffsetsMinutes="
+                + "\(settingsStore.reminderSchedule.enabledRules.map(\.offsetMinutes).sorted())",
             "dockLanguage=\(settingsStore.dockDisplayLanguage.rawValue)",
             "dockCountMode=\(settingsStore.dockCountMode.rawValue)",
             "selectedCourseCount=\(settingsStore.selectedCourses.count)",
@@ -596,7 +657,7 @@ final class MainViewModel {
     ) async throws {
         try await notificationScheduler.reschedule(
             candidates: snapshots.map(NotificationCandidate.init(snapshot:)),
-            reminderOffsets: settingsStore.notificationOffsets,
+            schedule: settingsStore.reminderSchedule,
             now: .now,
             calendar: calendar
         )

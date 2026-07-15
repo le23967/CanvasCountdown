@@ -89,9 +89,11 @@ final class ImmediateSettingsTests: XCTestCase {
         await context.viewModel.start()
         await context.notifications.resetCounts()
 
-        for offsets in [Set([7, 3]), Set([7]), Set([7, 1]), Set([7, 1, 0])] {
+        for hours in [2, 4, 6, 8] {
             var form = context.viewModel.settingsForm
-            form.notificationOffsets = offsets
+            var schedule = ReminderSchedule(rules: [])
+            try schedule.add(ReminderRule(amount: hours, unit: .hours))
+            form.reminderSchedule = schedule
             context.viewModel.applySettings(form)
         }
 
@@ -104,8 +106,9 @@ final class ImmediateSettingsTests: XCTestCase {
             "Rapid edits must collapse into one reschedule, not one per keystroke"
         )
         XCTAssertEqual(
-            SettingsStore(defaults: context.defaults).notificationOffsets,
-            [7, 1, 0],
+            SettingsStore(defaults: context.defaults)
+                .reminderSchedule.rules.map(\.offsetMinutes),
+            [480],
             "The final selection is still persisted immediately"
         )
     }
@@ -191,7 +194,7 @@ actor CountingNotificationScheduler: NotificationScheduling {
 
     func reschedule(
         candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
+        schedule: ReminderSchedule,
         now: Date,
         calendar: Calendar
     ) {

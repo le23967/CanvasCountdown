@@ -18,7 +18,7 @@ protocol NotificationScheduling: Sendable {
     /// refreshes idempotent and removes stale reminders when a due date changes.
     func reschedule(
         candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
+        schedule: ReminderSchedule,
         now: Date,
         calendar: Calendar
     ) async throws
@@ -26,21 +26,10 @@ protocol NotificationScheduling: Sendable {
     func cancelAll() async
 }
 
-extension NotificationScheduling {
-    func reschedule(
-        candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
-        now: Date = .now,
-        calendar: Calendar = .current
-    ) async throws {
-        try await reschedule(
-            candidates: candidates,
-            reminderOffsets: reminderOffsets,
-            now: now,
-            calendar: calendar
-        )
-    }
-}
+// There is deliberately no defaulted-argument extension for `reschedule`.
+// A protocol extension with the same name recurses into itself whenever a
+// conformer forgets to implement the requirement, turning a compile-time
+// mistake into a hang. Callers pass `now` and `calendar` explicitly.
 
 actor NotificationService: NotificationScheduling {
     private static let identifierPrefix = "canvas-countdown.assignment."
@@ -63,7 +52,7 @@ actor NotificationService: NotificationScheduling {
 
     func reschedule(
         candidates: [NotificationCandidate],
-        reminderOffsets: Set<Int>,
+        schedule: ReminderSchedule,
         now: Date,
         calendar: Calendar
     ) async throws {
@@ -77,27 +66,35 @@ actor NotificationService: NotificationScheduling {
             return
         }
 
-        let offsets = reminderOffsets
-            .filter { $0 >= 0 }
-            .sorted(by: >)
+        let rules = schedule.enabledRules.sorted {
+            $0.offsetMinutes > $1.offsetMinutes
+        }
 
         for candidate in candidates where !candidate.isCompleted && !candidate.isIgnored {
-            for offset in offsets {
+            // Two rules can never describe the same instant, but a feed change
+            // could still land two candidates on one identifier, so the set is
+            // an extra guarantee that no duplicate request is submitted.
+            var scheduledOffsets: Set<Int> = []
+
+            for rule in rules {
+                guard !scheduledOffsets.contains(rule.offsetMinutes) else {
+                    continue
+                }
                 guard let fireDate = calendar.date(
-                    byAdding: .day,
-                    value: -offset,
+                    byAdding: .minute,
+                    value: -rule.offsetMinutes,
                     to: candidate.dueDate
                 ), fireDate > now else {
                     continue
                 }
 
                 let content = UNMutableNotificationContent()
-                content.title = notificationTitle(offset: offset)
-                content.body = notificationBody(candidate: candidate, offset: offset)
+                content.title = notificationTitle(for: rule)
+                content.body = notificationBody(candidate: candidate)
                 content.sound = .default
                 content.userInfo = [
                     "assignmentID": candidate.id.uuidString,
-                    "reminderOffset": offset,
+                    "reminderOffsetMinutes": rule.offsetMinutes,
                 ]
 
                 let components = calendar.dateComponents(
@@ -111,12 +108,13 @@ actor NotificationService: NotificationScheduling {
                 let request = UNNotificationRequest(
                     identifier: Self.identifier(
                         assignmentID: candidate.id,
-                        offset: offset
+                        offsetMinutes: rule.offsetMinutes
                     ),
                     content: content,
                     trigger: trigger
                 )
                 try await center.add(request)
+                scheduledOffsets.insert(rule.offsetMinutes)
             }
         }
     }
@@ -156,24 +154,33 @@ actor NotificationService: NotificationScheduling {
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
-    private static func identifier(assignmentID: UUID, offset: Int) -> String {
-        "\(identifierPrefix)\(assignmentID.uuidString).\(offset)"
+    private static func identifier(
+        assignmentID: UUID,
+        offsetMinutes: Int
+    ) -> String {
+        "\(identifierPrefix)\(assignmentID.uuidString).\(offsetMinutes)"
     }
 
-    private func notificationTitle(offset: Int) -> String {
-        switch offset {
-        case 0:
-            "Assignment due today"
-        case 1:
-            "Assignment due tomorrow"
-        default:
-            "Assignment due in \(offset) days"
+    private func notificationTitle(for rule: ReminderRule) -> String {
+        switch rule.unit {
+        case .days:
+            switch rule.amount {
+            case 0:
+                "Assignment due today"
+            case 1:
+                "Assignment due tomorrow"
+            default:
+                "Assignment due in \(rule.amount) days"
+            }
+        case .hours:
+            rule.amount == 1
+                ? "Assignment due in 1 hour"
+                : "Assignment due in \(rule.amount) hours"
         }
     }
 
     private func notificationBody(
-        candidate: NotificationCandidate,
-        offset: Int
+        candidate: NotificationCandidate
     ) -> String {
         if let courseName = candidate.courseName?
             .trimmingCharacters(in: .whitespacesAndNewlines),

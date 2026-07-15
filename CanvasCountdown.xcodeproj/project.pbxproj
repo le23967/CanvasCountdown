@@ -21,11 +21,13 @@
 		4A3C9328B7FE3B6B7783F4C6 /* FeedExclusionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */; };
 		4B19C4F14552EDE139926B41 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4EA2450F0BF5C12E1A3D720D /* Preview Assets.xcassets */; };
 		5A8A98B82182A95BE9DA0309 /* CanvasFeedFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DADDF014908B17CA6199D2D /* CanvasFeedFetcher.swift */; };
+		6D2185C2E69D3FE65F38B041 /* ReminderRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77030799B2DA28706F2F6C2D /* ReminderRule.swift */; };
 		723BD80A984A3EF5E5052D58 /* LaunchIsolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */; };
 		78E7574412F37F9F1012755F /* KeychainFeedURLStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149E8CDBDEB48DECA04640F8 /* KeychainFeedURLStore.swift */; };
 		7CD0391A62302E133B4B93C1 /* ManualEventEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E98E499DB1891628EE75363 /* ManualEventEditorView.swift */; };
 		8383FE4ADBFCBA95D5CBE3CC /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F9E73BCD06077565AA22181 /* AppKit.framework */; };
 		86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */; };
+		8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */; };
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
 		9B47B94F2FE60BCAC73AA55A /* DockTileLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722BC99654E82DFC600CF02B /* DockTileLayout.swift */; };
 		9C29E48C0B1610E753799035 /* NearestAssignmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */; };
@@ -91,6 +93,7 @@
 		66EA62592CF58AA32C47D92F /* DiagnosticsDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsDocument.swift; sourceTree = "<group>"; };
 		69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchIsolationTests.swift; sourceTree = "<group>"; };
 		722BC99654E82DFC600CF02B /* DockTileLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileLayout.swift; sourceTree = "<group>"; };
+		77030799B2DA28706F2F6C2D /* ReminderRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderRule.swift; sourceTree = "<group>"; };
 		77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockAndViewModelTests.swift; sourceTree = "<group>"; };
 		81A0EE4153E8C25B319DC86F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedReconciliationTests.swift; sourceTree = "<group>"; };
@@ -105,6 +108,7 @@
 		AA2876D5254D102642C61016 /* DockTileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileService.swift; sourceTree = "<group>"; };
 		AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcherTests.swift; sourceTree = "<group>"; };
 		BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasCountdownApp.swift; sourceTree = "<group>"; };
+		CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduleTests.swift; sourceTree = "<group>"; };
 		CF44862D6D66155114DB0551 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentRepositoryTests.swift; sourceTree = "<group>"; };
 		D7BFB7D37A5B236476760DEB /* ICSParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICSParserTests.swift; sourceTree = "<group>"; };
@@ -195,6 +199,7 @@
 			children = (
 				FA728C6E0402225EBF5D05FB /* AppSettings.swift */,
 				5ABDEF05D9E2174EB73A68B2 /* AssignmentEvent.swift */,
+				77030799B2DA28706F2F6C2D /* ReminderRule.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -258,6 +263,7 @@
 				313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */,
 				69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */,
 				22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */,
+				CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */,
 				E4DBC9BE28737C1AE1BE022D /* CoreTests */,
 				F2C1A75C8A8FEEA70D28E090 /* Fixtures */,
 			);
@@ -432,6 +438,7 @@
 				D88CBFBD1048289F3BCC5147 /* ImmediateSettingsTests.swift in Sources */,
 				723BD80A984A3EF5E5052D58 /* LaunchIsolationTests.swift in Sources */,
 				B360C603B0A811EC158A3BA9 /* RefreshCoordinatorTests.swift in Sources */,
+				8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -464,6 +471,7 @@
 				B8B433A900556A044BB747E9 /* NotificationService.swift in Sources */,
 				BB9AF632D8B290AAAE2AB220 /* PresentationModels.swift in Sources */,
 				40711829F2493E315B650325 /* RefreshCoordinator.swift in Sources */,
+				6D2185C2E69D3FE65F38B041 /* ReminderRule.swift in Sources */,
 				2C2EB95EEFDD77419A2B9306 /* SettingsView.swift in Sources */,
 				10566BFC7E72DA5AFBA70F95 /* SidebarView.swift in Sources */,
 			);

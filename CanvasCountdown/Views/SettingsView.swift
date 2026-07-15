@@ -33,6 +33,18 @@ struct SettingsView: View {
     let onResetData: @MainActor () async throws -> Void
     let onExportDiagnostics: @MainActor () async throws -> String
 
+    let canAddReminder: Bool
+    let canRequestNotificationPermission: Bool
+    let onAddReminder: @MainActor (Int, ReminderUnit) -> String?
+    let onUpdateReminder: @MainActor (ReminderRule) -> String?
+    let onRemoveReminder: @MainActor (UUID) -> Void
+    let onSetReminderEnabled: @MainActor (Bool, UUID) -> Void
+    let onResetReminders: @MainActor () -> Void
+
+    @State private var editingRule: ReminderRule?
+    @State private var draftAmount = 1
+    @State private var draftUnit: ReminderUnit = .days
+    @State private var reminderError: String?
     @State private var revealFeedURL = false
     @State private var isWorking = false
     @State private var errorMessage: String?
@@ -181,23 +193,105 @@ struct SettingsView: View {
         Section {
             permissionRow
 
-            ForEach([7, 3, 1, 0], id: \.self) { offset in
-                Toggle(notificationLabel(offset), isOn: Binding(
-                    get: { settings.notificationOffsets.contains(offset) },
-                    set: { enabled in
-                        if enabled {
-                            settings.notificationOffsets.insert(offset)
-                        } else {
-                            settings.notificationOffsets.remove(offset)
-                        }
+            ForEach(settings.reminderSchedule.rules) { rule in
+                HStack {
+                    Toggle(rule.title, isOn: Binding(
+                        get: { rule.isEnabled },
+                        set: { onSetReminderEnabled($0, rule.id) }
+                    ))
+
+                    Spacer()
+
+                    Button {
+                        editingRule = rule
+                        draftAmount = rule.amount
+                        draftUnit = rule.unit
+                    } label: {
+                        Image(systemName: "pencil")
                     }
-                ))
+                    .buttonStyle(.borderless)
+                    .help("Edit this reminder")
+                    .accessibilityLabel("Edit \(rule.title)")
+
+                    Button(role: .destructive) {
+                        onRemoveReminder(rule.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Delete this reminder")
+                    .accessibilityLabel("Delete \(rule.title)")
+                }
             }
-            .disabled(notificationPermission != .authorized)
+            .disabled(notificationPermission == .denied)
+
+            reminderEditor
+
+            HStack {
+                Button("Reset Reminders") {
+                    onResetReminders()
+                }
+                Spacer()
+                Text("\(settings.reminderSchedule.rules.count) of \(ReminderRule.maximumRuleCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let reminderError {
+                Label(reminderError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("Notifications")
         } footer: {
-            Text("Reminders are scheduled locally and replaced whenever an imported due date changes, preventing duplicates.")
+            Text("Reminders are scheduled locally and rebuilt whenever a due date or the schedule changes, so no duplicate arrives.")
+        }
+    }
+
+    @ViewBuilder
+    private var reminderEditor: some View {
+        HStack {
+            if let editingRule {
+                Text("Editing \(editingRule.title)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Stepper(value: $draftAmount, in: 0...maximumDraftAmount) {
+                Text("\(draftAmount)")
+                    .monospacedDigit()
+                    .frame(minWidth: 34, alignment: .trailing)
+            }
+            .accessibilityLabel("Reminder amount")
+
+            Picker("", selection: $draftUnit) {
+                ForEach(ReminderUnit.allCases) { unit in
+                    Text(unit.title).tag(unit)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 96)
+            .accessibilityLabel("Reminder unit")
+
+            Text("before")
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            if editingRule != nil {
+                Button("Cancel") {
+                    clearReminderDraft()
+                }
+            }
+
+            Button(editingRule == nil ? "Add" : "Save") {
+                commitReminderDraft()
+            }
+            .disabled(editingRule == nil && !canAddReminder)
+        }
+        .onChange(of: draftUnit) { _, _ in
+            draftAmount = min(draftAmount, maximumDraftAmount)
         }
     }
 
@@ -214,6 +308,7 @@ struct SettingsView: View {
                 Button("Learn & Allow…") {
                     showNotificationExplanation = true
                 }
+                .disabled(!canRequestNotificationPermission)
             }
         case .denied:
             HStack {
@@ -301,15 +396,29 @@ struct SettingsView: View {
         }
     }
 
-    private func notificationLabel(_ offset: Int) -> String {
-        switch offset {
-        case 0:
-            "On the due day"
-        case 1:
-            "1 day before"
-        default:
-            "\(offset) days before"
+    private var maximumDraftAmount: Int {
+        draftUnit == .days ? ReminderRule.maximumDays : ReminderRule.maximumHours
+    }
+
+    private func commitReminderDraft() {
+        if let editingRule {
+            var updated = editingRule
+            updated.amount = draftAmount
+            updated.unit = draftUnit
+            reminderError = onUpdateReminder(updated)
+        } else {
+            reminderError = onAddReminder(draftAmount, draftUnit)
         }
+        if reminderError == nil {
+            clearReminderDraft()
+        }
+    }
+
+    private func clearReminderDraft() {
+        editingRule = nil
+        draftAmount = 1
+        draftUnit = .days
+        reminderError = nil
     }
 
     private func requestNotificationPermission() {
