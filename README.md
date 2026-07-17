@@ -52,6 +52,22 @@ The exact Canvas labels can vary by institution. Treat this URL like a
 password: it commonly contains a private token that grants read access to the
 calendar.
 
+## The Dock icon
+
+The application icon and the running Dock tile share one renderer, so they look
+like the same object:
+
+- **Not running:** the static icon shows the header and an em dash placeholder.
+- **Running:** the same tile shows the live countdown to your nearest deadline.
+
+The countdown is dynamic only while Canvas Countdown is running. macOS draws the
+static icon from the app bundle when the app is closed, and no application can
+change that image without running.
+
+**Settings → Dock Appearance** adjusts the number size and weight, the
+background, number and header colours, and offers four presets. Colours that
+would be unreadable are corrected automatically.
+
 ## How refreshes treat your data
 
 - A Canvas event that disappears from one refresh is never deleted. It is
