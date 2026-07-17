@@ -114,15 +114,18 @@ struct DockTileLayout: Equatable {
     }
 
     /// A rounded numeral, matching the large-number calendar countdown look.
+    ///
+    /// Proportional rather than monospaced digits. Monospaced digits pad every
+    /// glyph out to the width of the widest one, which left a conspicuous gap
+    /// either side of a narrow "1" — "17" read as two separate characters. The
+    /// tile is redrawn at most once a day, so the column stability monospacing
+    /// buys is not worth that gap.
     static func countdownFont(
         ofSize size: CGFloat,
         weight: DockNumberWeight = .heavy
     ) -> NSFont {
         rounded(
-            NSFont.monospacedDigitSystemFont(
-                ofSize: size,
-                weight: weight.fontWeight
-            ),
+            NSFont.systemFont(ofSize: size, weight: weight.fontWeight),
             size: size
         )
     }
