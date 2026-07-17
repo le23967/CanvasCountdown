@@ -21,19 +21,25 @@ enum DockNumberSize: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// A bounded scale preference, never a fixed point size: the layout still
-    /// shrinks the glyphs to fit, so no choice here can clip a value.
-    var bandScale: CGFloat {
+    /// Fraction of the largest size that still fits the tile for the value being
+    /// drawn. Applied after fitting, so digit-count adaptation is preserved and
+    /// nothing can clip, while the choice stays visually obvious.
+    var fontScale: CGFloat {
         switch self {
         case .small:
-            0.86
+            0.58
         case .medium:
-            1.0
+            0.72
         case .large:
-            1.08
+            0.88
         case .extraLarge:
-            1.14
+            1.0
         }
+    }
+
+    /// Short description used by the preview tiles and accessibility labels.
+    var accessibilityDescription: String {
+        "Select \(title.lowercased()) Dock countdown"
     }
 }
 

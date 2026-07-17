@@ -43,7 +43,8 @@ struct SettingsView: View {
     let onApplyDockTheme: @MainActor (DockThemePreset) -> Void
     let onResetDockAppearance: @MainActor () -> Void
 
-    @State private var previewDays = 7
+    @State private var previewValue: Int? = 7
+    @State private var hoveredSize: DockNumberSize?
     @State private var editingRule: ReminderRule?
     @State private var draftAmount = 1
     @State private var draftUnit: ReminderUnit = .days
@@ -335,12 +336,6 @@ struct SettingsView: View {
                 }
             }
 
-            Picker("Number size", selection: $settings.dockAppearance.numberSize) {
-                ForEach(DockNumberSize.allCases) { size in
-                    Text(size.title).tag(size)
-                }
-            }
-
             Picker("Number weight", selection: $settings.dockAppearance.numberWeight) {
                 ForEach(DockNumberWeight.allCases) { weight in
                     Text(weight.title).tag(weight)
@@ -401,39 +396,123 @@ struct SettingsView: View {
         }
     }
 
-    /// Shown at roughly the sizes macOS asks the Dock for.
+    /// Each tile is the real renderer at the size it would draw, and choosing
+    /// one selects that size. There is no separate size picker.
     private var dockPreview: some View {
-        HStack(alignment: .bottom, spacing: 14) {
-            ForEach([96.0, 64.0, 40.0], id: \.self) { size in
-                VStack(spacing: 4) {
-                    Image(
-                        nsImage: DockTileRenderer.image(
-                            size: size,
-                            daysRemaining: previewDays,
-                            label: settings.dockLabel.renderedLabel,
-                            appearance: settings.dockAppearance
-                        )
-                    )
-                    .accessibilityLabel(
-                        "Dock preview at \(Int(size)) points showing \(previewDays) days"
-                    )
-                    Text("\(Int(size))pt")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Preview value")
+                Picker("Preview value", selection: $previewValue) {
+                    ForEach(Self.previewValues, id: \.self) { value in
+                        Text(Self.previewValueTitle(value)).tag(value)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 96)
+                .accessibilityLabel("Preview value")
+
+                Spacer(minLength: 0)
+            }
+
+            // Wraps instead of scrolling when the window is narrow.
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(minimum: 92, maximum: 132),
+                        spacing: 10,
+                        alignment: .top
+                    ),
+                ],
+                alignment: .leading,
+                spacing: 10
+            ) {
+                ForEach(DockNumberSize.allCases) { size in
+                    sizeTile(size)
                 }
             }
 
-            Spacer()
-
-            Picker("Preview value", selection: $previewDays) {
-                ForEach([0, 7, 21, 157, 1_024], id: \.self) { value in
-                    Text("\(value)").tag(value)
-                }
-            }
-            .labelsHidden()
-            .frame(width: 90)
+            Text("Preview uses the same renderer as the live Dock icon.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+
+    private func sizeTile(_ size: DockNumberSize) -> some View {
+        let isSelected = settings.dockAppearance.numberSize == size
+
+        return Button {
+            settings.dockAppearance.numberSize = size
+        } label: {
+            VStack(spacing: 6) {
+                Image(
+                    nsImage: DockTileRenderer.image(
+                        size: 76,
+                        daysRemaining: previewValue,
+                        label: settings.dockLabel.renderedLabel,
+                        appearance: previewAppearance(for: size)
+                    )
+                )
+                .frame(width: 76, height: 76)
+
+                HStack(spacing: 4) {
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.tint)
+                            .accessibilityHidden(true)
+                    }
+                    Text(size.title)
+                        .font(.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                }
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        isSelected
+                            ? Color.accentColor.opacity(0.14)
+                            : (hoveredSize == size
+                                ? Color.primary.opacity(0.06)
+                                : Color.clear)
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : Color.clear,
+                        lineWidth: 2
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .focusable()
+        .onHover { isInside in
+            hoveredSize = isInside ? size : nil
+        }
+        .help("\(size.title) Dock countdown")
+        .accessibilityLabel(size.accessibilityDescription)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// The tile draws with the real appearance, differing only in the size being
+    /// offered, so what is shown is what the Dock will draw.
+    private func previewAppearance(for size: DockNumberSize) -> DockAppearance {
+        var appearance = settings.dockAppearance
+        appearance.numberSize = size
+        return appearance
+    }
+
+    /// Sample values for the preview only. Nil renders the em dash placeholder.
+    private static let previewValues: [Int?] = [0, 7, 21, 157, 1_024, nil]
+
+    private static func previewValueTitle(_ value: Int?) -> String {
+        guard let value else {
+            return "\(DockTileLayout.placeholder) (none)"
+        }
+        return "\(value)"
     }
 
     private func hexBinding(

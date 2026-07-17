@@ -53,35 +53,32 @@ struct DockTileLayout: Equatable {
         let height = tileRect.height
         let horizontalPadding = tileRect.width * Proportion.horizontalPadding
 
-        // A larger size preference grows the number band downwards and trims the
-        // header band, while the tile itself stays put.
-        let scale = numberSize.bandScale
-        let countdownHeight = min(
-            height * Proportion.countdownHeight * scale,
-            height * 0.78
-        )
-        let labelHeight = height * Proportion.labelHeight / max(1, scale)
-        let countdownTop = min(
-            height * Proportion.countdownTop / max(1, scale),
-            height - countdownHeight
-        )
-
+        // The bands are fixed, so the header always keeps its room and the
+        // number always sits in the same region whatever size is chosen.
         let labelRect = CGRect(
             x: tileRect.minX + horizontalPadding,
             y: tileRect.minY + height * Proportion.labelTop,
             width: tileRect.width - horizontalPadding * 2,
-            height: labelHeight
+            height: height * Proportion.labelHeight
         )
         let countdownRect = CGRect(
             x: tileRect.minX + horizontalPadding,
-            y: tileRect.minY + countdownTop,
+            y: tileRect.minY + height * Proportion.countdownTop,
             width: tileRect.width - horizontalPadding * 2,
-            height: countdownHeight
+            height: height * Proportion.countdownHeight
         )
-        let countdownFontSize = countdownFontSize(
+
+        // Fit first, then scale. Fitting alone would push every size preference
+        // back to the same visual result, which is what made Small look no
+        // different from Large.
+        let safeFontSize = maximumSafeFontSize(
             for: countdownText,
             in: countdownRect,
             weight: numberWeight
+        )
+        let countdownFontSize = max(
+            Self.minimumFontSize,
+            safeFontSize * numberSize.fontScale
         )
 
         return DockTileLayout(
@@ -181,10 +178,14 @@ struct DockTileLayout: Equatable {
         )
     }
 
-    /// Starts from the size that fills the band vertically, then shrinks until
-    /// the glyphs also fit horizontally. Nothing is ever clipped, whatever the
-    /// Dock size or the value.
-    private static func countdownFontSize(
+    static let minimumFontSize: CGFloat = 4
+
+    /// The largest size at which this value still fits the band in both
+    /// directions, before the user's size preference is applied.
+    ///
+    /// This is where digit-count adaptation happens: "1024" runs out of width
+    /// long before "7" does, so it yields a smaller safe size.
+    static func maximumSafeFontSize(
         for text: String,
         in band: CGRect,
         weight: DockNumberWeight = .heavy
@@ -199,15 +200,14 @@ struct DockTileLayout: Equatable {
             ? Proportion.placeholderCapFill
             : Proportion.digitCapFill
 
-        var size = max(4, band.height * fill / capRatio)
-        let minimumSize: CGFloat = 4
-        while size > minimumSize {
+        var size = max(minimumFontSize, band.height * fill / capRatio)
+        while size > minimumFontSize {
             let ink = countdownInkSize(text, fontSize: size, weight: weight)
             if ink.width <= band.width, ink.height <= band.height {
                 break
             }
             size *= 0.96
         }
-        return max(minimumSize, size)
+        return max(minimumFontSize, size)
     }
 }

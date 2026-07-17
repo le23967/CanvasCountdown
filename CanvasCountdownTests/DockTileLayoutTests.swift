@@ -126,14 +126,29 @@ final class DockTileLayoutTests: XCTestCase {
         }
     }
 
-    func testCountdownIsSubstantiallyLargerThanTheOldFixedScale() {
-        // The previous implementation drew two digits at 0.50 of the tile height.
-        let layout = layout(size: 128, text: "21")
+    func testExtraLargeUsesMostOfTheAvailableSpace() {
+        // The original implementation drew two digits at a fixed 0.50 of the
+        // tile height. Extra Large is the setting that now claims the full safe
+        // size; the smaller settings deliberately sit below it.
+        let layout = DockTileLayout.make(
+            in: CGRect(x: 0, y: 0, width: 128, height: 128),
+            countdownText: "21",
+            numberSize: .extraLarge
+        )
 
         XCTAssertGreaterThan(
             layout.countdownFontSize,
             layout.tileRect.height * 0.60,
-            "Two digits should now be far larger than the old 0.50 scale"
+            "Two digits at Extra Large should be far larger than the old 0.50 scale"
+        )
+        XCTAssertEqual(
+            layout.countdownFontSize,
+            DockTileLayout.maximumSafeFontSize(
+                for: "21",
+                in: layout.countdownRect
+            ),
+            accuracy: 0.001,
+            "Extra Large is exactly the largest size that still fits"
         )
     }
 

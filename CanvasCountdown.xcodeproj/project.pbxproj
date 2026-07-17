@@ -28,6 +28,7 @@
 		78E7574412F37F9F1012755F /* KeychainFeedURLStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149E8CDBDEB48DECA04640F8 /* KeychainFeedURLStore.swift */; };
 		7CD0391A62302E133B4B93C1 /* ManualEventEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E98E499DB1891628EE75363 /* ManualEventEditorView.swift */; };
 		8383FE4ADBFCBA95D5CBE3CC /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F9E73BCD06077565AA22181 /* AppKit.framework */; };
+		860861B6C0D84E5C649EBDFD /* DockSizeSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95902093C69B7D56B46A3DBE /* DockSizeSelectionTests.swift */; };
 		86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */; };
 		8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */; };
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
@@ -108,6 +109,7 @@
 		86DCBD89094C54B63F614531 /* CountdownCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownCalculatorTests.swift; sourceTree = "<group>"; };
 		89307B88F02B43EF58286C41 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		8CB23E4A7453EB83A9551245 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		95902093C69B7D56B46A3DBE /* DockSizeSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockSizeSelectionTests.swift; sourceTree = "<group>"; };
 		9A9BD01296587DD6B0C91641 /* representative.ics */ = {isa = PBXFileReference; path = representative.ics; sourceTree = "<group>"; };
 		9F9E73BCD06077565AA22181 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		9FF309911A3913EA914850F0 /* DockAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockAppearanceTests.swift; sourceTree = "<group>"; };
@@ -271,6 +273,7 @@
 				282F4005FAF96A677845EDC4 /* CourseScopeTests.swift */,
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
 				9FF309911A3913EA914850F0 /* DockAppearanceTests.swift */,
+				95902093C69B7D56B46A3DBE /* DockSizeSelectionTests.swift */,
 				36E0D9F768688445C44FF690 /* DockTileLayoutTests.swift */,
 				7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */,
 				827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */,
@@ -447,6 +450,7 @@
 				F7DB77F45A451F93DB60B92C /* CourseScopeTests.swift in Sources */,
 				C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */,
 				9ECA4478F3861710E63C2F42 /* DockAppearanceTests.swift in Sources */,
+				860861B6C0D84E5C649EBDFD /* DockSizeSelectionTests.swift in Sources */,
 				317C1AD7B70137166D6066C7 /* DockTileLayoutTests.swift in Sources */,
 				4524E510E23EF70ABDD68742 /* EventInteractionTests.swift in Sources */,
 				E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */,
