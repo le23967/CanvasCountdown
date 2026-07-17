@@ -17,6 +17,7 @@
 		34138A103A3EE5577656AF0C /* DockAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354D08732371A4156B46E57D /* DockAppearance.swift */; };
 		3C95666807557DF0AC2BAB00 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF44862D6D66155114DB0551 /* AppEnvironment.swift */; };
 		40711829F2493E315B650325 /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2792182D2C91DAEF8CA975CC /* RefreshCoordinator.swift */; };
+		4524E510E23EF70ABDD68742 /* EventInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */; };
 		468C50E4CA3946964D02D708 /* ICSParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7BFB7D37A5B236476760DEB /* ICSParserTests.swift */; };
 		481366BF3368F9F0C2EC27CA /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 40668D8C1FAC47414991A26D /* Security.framework */; };
 		4A3C9328B7FE3B6B7783F4C6 /* FeedExclusionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */; };
@@ -52,6 +53,7 @@
 		DFD3F852058A150207DE7E16 /* DockTileRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF51BDD6974B71B245AAE12C /* DockTileRenderer.swift */; };
 		E39AF3707BB8EC345F0B8944 /* DiagnosticsDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EA62592CF58AA32C47D92F /* DiagnosticsDocument.swift */; };
 		E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */; };
+		E8DF34C7D2F4D53258CBD25D /* ImportedEventDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8405352AB9D291A1D57D03C /* ImportedEventDetailsView.swift */; };
 		E8EE34FA5853590E9242C1F3 /* CanvasCountdownApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */; };
 		F4F7F34451640CBFCCD84676 /* IsolatedLaunchServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = F287B2AE40E5AF90FEA7454B /* IsolatedLaunchServices.swift */; };
 		F7DB77F45A451F93DB60B92C /* CourseScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 282F4005FAF96A677845EDC4 /* CourseScopeTests.swift */; };
@@ -99,6 +101,7 @@
 		722BC99654E82DFC600CF02B /* DockTileLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileLayout.swift; sourceTree = "<group>"; };
 		77030799B2DA28706F2F6C2D /* ReminderRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderRule.swift; sourceTree = "<group>"; };
 		77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockAndViewModelTests.swift; sourceTree = "<group>"; };
+		7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventInteractionTests.swift; sourceTree = "<group>"; };
 		81A0EE4153E8C25B319DC86F /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedReconciliationTests.swift; sourceTree = "<group>"; };
 		8471A653DB58BEBA6E3E8AD4 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
@@ -113,6 +116,7 @@
 		AA2876D5254D102642C61016 /* DockTileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileService.swift; sourceTree = "<group>"; };
 		AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcherTests.swift; sourceTree = "<group>"; };
 		BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasCountdownApp.swift; sourceTree = "<group>"; };
+		C8405352AB9D291A1D57D03C /* ImportedEventDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedEventDetailsView.swift; sourceTree = "<group>"; };
 		CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduleTests.swift; sourceTree = "<group>"; };
 		CF44862D6D66155114DB0551 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentRepositoryTests.swift; sourceTree = "<group>"; };
@@ -146,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				039098D8A1700485F7B7E33D /* FeedImportView.swift */,
+				C8405352AB9D291A1D57D03C /* ImportedEventDetailsView.swift */,
 				5EEFE4DBCCA8C08167AC19EE /* MainView.swift */,
 				0E98E499DB1891628EE75363 /* ManualEventEditorView.swift */,
 				81A0EE4153E8C25B319DC86F /* SettingsView.swift */,
@@ -267,6 +272,7 @@
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
 				9FF309911A3913EA914850F0 /* DockAppearanceTests.swift */,
 				36E0D9F768688445C44FF690 /* DockTileLayoutTests.swift */,
+				7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */,
 				827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */,
 				27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */,
 				313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */,
@@ -442,6 +448,7 @@
 				C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */,
 				9ECA4478F3861710E63C2F42 /* DockAppearanceTests.swift in Sources */,
 				317C1AD7B70137166D6066C7 /* DockTileLayoutTests.swift in Sources */,
+				4524E510E23EF70ABDD68742 /* EventInteractionTests.swift in Sources */,
 				E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */,
 				468C50E4CA3946964D02D708 /* ICSParserTests.swift in Sources */,
 				FD39C43E33EF28EB1A1019D4 /* ICSRefreshRegressionTests.swift in Sources */,
@@ -473,6 +480,7 @@
 				4A3C9328B7FE3B6B7783F4C6 /* FeedExclusionStore.swift in Sources */,
 				FB33C9AAD41A82689EEB3F69 /* FeedImportView.swift in Sources */,
 				AA5276B7683D872920ED9B84 /* ICSParser.swift in Sources */,
+				E8DF34C7D2F4D53258CBD25D /* ImportedEventDetailsView.swift in Sources */,
 				F4F7F34451640CBFCCD84676 /* IsolatedLaunchServices.swift in Sources */,
 				78E7574412F37F9F1012755F /* KeychainFeedURLStore.swift in Sources */,
 				9E1869235312809AF07D16A2 /* LaunchAtLoginController.swift in Sources */,

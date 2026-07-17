@@ -4,6 +4,7 @@ struct MainView: View {
     @Bindable var viewModel: MainViewModel
 
     @State private var eventPendingDeletion: AssignmentListItem?
+    @State private var hoveredEventID: UUID?
 
     var body: some View {
         NavigationSplitView {
@@ -22,6 +23,16 @@ struct MainView: View {
         .sheet(isPresented: $viewModel.isShowingManualEditor) {
             ManualEventEditorView(draft: viewModel.manualEventDraft) { draft in
                 try await viewModel.saveManualEvent(draft)
+            }
+        }
+        .sheet(isPresented: $viewModel.isShowingImportedDetails) {
+            if let item = viewModel.currentImportedEventDetails {
+                ImportedEventDetailsView(
+                    item: item,
+                    now: viewModel.currentDate,
+                    onToggleCompleted: { viewModel.toggleCompleted($0) },
+                    onToggleIgnored: { viewModel.toggleIgnored($0) }
+                )
             }
         }
         .sheet(isPresented: $viewModel.isShowingFeedImport) {
@@ -269,7 +280,10 @@ struct MainView: View {
             emptyState
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List(viewModel.filteredAssignments) { item in
+            List(
+                viewModel.filteredAssignments,
+                selection: $viewModel.selectedEventID
+            ) { item in
                 HStack(spacing: 8) {
                     AssignmentRowView(
                         item: item,
@@ -278,6 +292,8 @@ struct MainView: View {
 
                     Spacer(minLength: 0)
 
+                    // The whole row opens the editor, so the row's own tap
+                    // handler stops here: the menu must not also edit.
                     Menu {
                         eventActions(for: item)
                     } label: {
@@ -286,15 +302,50 @@ struct MainView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
+                    .help("Quick actions")
+                }
+                .contentShape(Rectangle())
+                .padding(.vertical, 2)
+                .background {
+                    if hoveredEventID == item.id {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.primary.opacity(0.06))
+                    }
+                }
+                .onHover { isInside in
+                    hoveredEventID = isInside ? item.id : nil
+                }
+                // A single click on the row opens it. `onTapGesture` does not
+                // fire while a scroll is in progress, so scrolling cannot open
+                // an editor by accident.
+                .onTapGesture {
+                    viewModel.selectedEventID = item.id
+                    viewModel.presentEditor(for: item)
                 }
                 .contextMenu {
                     eventActions(for: item)
                 }
+                .accessibilityHint(
+                    item.isManual
+                        ? "Opens the event editor"
+                        : "Opens details for this Canvas assignment"
+                )
+                .tag(item.id)
             }
             .listStyle(.inset)
             .accessibilityLabel(
                 (viewModel.sidebarSelection ?? .upcoming).title
             )
+            .onKeyPress(.return) {
+                guard viewModel.selectedItem != nil else {
+                    return .ignored
+                }
+                viewModel.openSelectedEvent()
+                return .handled
+            }
+            .onDeleteCommand {
+                eventPendingDeletion = viewModel.deletionCandidate()
+            }
         }
     }
 
@@ -390,14 +441,15 @@ struct MainView: View {
             )
         }
 
-        if item.isManual {
-            Divider()
+        Divider()
 
-            Button {
-                viewModel.presentEditor(for: item)
-            } label: {
-                Label("Edit…", systemImage: "pencil")
-            }
+        Button {
+            viewModel.presentEditor(for: item)
+        } label: {
+            Label(item.isManual ? "Edit…" : "Details…", systemImage: "pencil")
+        }
+
+        if item.isManual {
 
             Button(role: .destructive) {
                 eventPendingDeletion = item

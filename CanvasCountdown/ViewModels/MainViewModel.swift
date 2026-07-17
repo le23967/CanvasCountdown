@@ -19,7 +19,11 @@ final class MainViewModel {
     var feedImportIsOnboarding = false
     var feedImportInitialURL = ""
     var isShowingManualEditor = false
+    var isShowingImportedDetails = false
+    var importedEventDetails: AssignmentListItem?
     var manualEventDraft = ManualEventDraft()
+    /// Row the list has focus on, used for keyboard actions.
+    var selectedEventID: UUID?
     var errorMessage: String?
     var statusMessage: String?
     var lastRefreshDate: Date?
@@ -257,12 +261,26 @@ final class MainViewModel {
         isShowingManualEditor = true
     }
 
+    /// Opens the right surface for a row: full editing for a manual event, and
+    /// a details sheet limited to local state for anything Canvas owns.
     func presentEditor(for item: AssignmentListItem) {
-        guard item.isManual else {
-            return
+        if item.isManual {
+            manualEventDraft = ManualEventDraft(item: item)
+            isShowingManualEditor = true
+        } else {
+            importedEventDetails = item
+            isShowingImportedDetails = true
         }
-        manualEventDraft = ManualEventDraft(item: item)
-        isShowingManualEditor = true
+    }
+
+    /// The imported event currently open in the details sheet, refreshed from
+    /// the latest snapshot so its toggles reflect reality.
+    var currentImportedEventDetails: AssignmentListItem? {
+        guard let importedEventDetails else {
+            return nil
+        }
+        return assignments.first { $0.id == importedEventDetails.id }
+            ?? importedEventDetails
     }
 
     func saveManualEvent(_ draft: ManualEventDraft) async throws {
@@ -301,6 +319,30 @@ final class MainViewModel {
                 present(error)
             }
         }
+    }
+
+    /// Keyboard Return on the focused row.
+    func openSelectedEvent() {
+        guard let item = selectedItem else {
+            return
+        }
+        presentEditor(for: item)
+    }
+
+    /// Keyboard Delete on the focused row. Only manual events can be deleted;
+    /// imported ones are Canvas's to remove.
+    func deletionCandidate() -> AssignmentListItem? {
+        guard let item = selectedItem, item.isManual else {
+            return nil
+        }
+        return item
+    }
+
+    var selectedItem: AssignmentListItem? {
+        guard let selectedEventID else {
+            return nil
+        }
+        return assignments.first { $0.id == selectedEventID }
     }
 
     func deleteManualEvent(_ item: AssignmentListItem) {
