@@ -4,9 +4,23 @@ import Observation
 @MainActor
 @Observable
 final class MainViewModel {
-    var sidebarSelection: SidebarDestination? = .upcoming
+    var sidebarSelection: SidebarDestination? = .upcoming {
+        didSet {
+            guard sidebarSelection != oldValue else {
+                return
+            }
+            // Moving to another section leaves search behind rather than
+            // carrying a stale query and a focused field into it.
+            dismissSearch()
+        }
+    }
     var assignments: [AssignmentListItem] = []
     var searchText = ""
+    /// Whether the toolbar is showing the search field rather than its icon.
+    var isSearchPresented = false
+    /// Mirrors the field's `FocusState`, so focus is testable and can be
+    /// released from anywhere without the view owning the decision.
+    var isSearchFieldFocused = false
     var selectedCourse: String?
     var showCompletedAndIgnored = false
     var currentDate = Date.now
@@ -139,6 +153,64 @@ final class MainViewModel {
     /// Nil selects every course.
     func selectCourse(_ course: String?) {
         selectedCourse = course
+    }
+
+    // MARK: - Search
+
+    enum SearchEscapeOutcome: Equatable {
+        case releasedFocus
+        case collapsed
+    }
+
+    func presentSearch() {
+        isSearchPresented = true
+        isSearchFieldFocused = true
+    }
+
+    func toggleSearch() {
+        if isSearchPresented {
+            dismissSearch()
+        } else {
+            presentSearch()
+        }
+    }
+
+    /// Releases keyboard focus but leaves the field and its query in place.
+    /// Used when a click lands outside the field, or another toolbar control is
+    /// pressed, so the click still reaches its target.
+    func dismissSearchFocus() {
+        isSearchFieldFocused = false
+    }
+
+    /// Collapses search entirely and clears the query, restoring the full list.
+    func dismissSearch() {
+        isSearchFieldFocused = false
+        isSearchPresented = false
+        if !searchText.isEmpty {
+            searchText = ""
+        }
+    }
+
+    /// Escape releases focus first. Pressing it again on an empty field
+    /// collapses search back to its icon.
+    @discardableResult
+    func handleSearchEscape() -> SearchEscapeOutcome {
+        if isSearchFieldFocused, !searchText.isEmpty {
+            isSearchFieldFocused = false
+            return .releasedFocus
+        }
+        dismissSearch()
+        return .collapsed
+    }
+
+    func clearSearchQuery() {
+        searchText = ""
+    }
+
+    /// Called before a toolbar action runs, so the field gives up focus and the
+    /// action still happens on the same click.
+    func prepareForToolbarAction() {
+        dismissSearchFocus()
     }
 
     /// Kept short so a long Canvas course title cannot stretch the toolbar.

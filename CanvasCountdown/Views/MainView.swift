@@ -5,6 +5,7 @@ struct MainView: View {
 
     @State private var eventPendingDeletion: AssignmentListItem?
     @State private var hoveredEventID: UUID?
+    @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
         NavigationSplitView {
@@ -19,6 +20,17 @@ struct MainView: View {
         }
         .task {
             await viewModel.start()
+        }
+        .background(ToolbarDisplayModeConfigurator())
+        // The field's focus and the view model's copy of it are kept in step so
+        // any part of the app can release focus without reaching into the view.
+        .onChange(of: isSearchFieldFocused) { _, isFocused in
+            viewModel.isSearchFieldFocused = isFocused
+        }
+        .onChange(of: viewModel.isSearchFieldFocused) { _, isFocused in
+            if isSearchFieldFocused != isFocused {
+                isSearchFieldFocused = isFocused
+            }
         }
         .sheet(isPresented: $viewModel.isShowingManualEditor) {
             ManualEventEditorView(draft: viewModel.manualEventDraft) { draft in
@@ -188,59 +200,123 @@ struct MainView: View {
             }
         }
         .navigationTitle("Canvas Countdown")
-        .searchable(
-            text: $viewModel.searchText,
-            placement: .toolbar,
-            prompt: "Search assignments or courses"
+        // A click anywhere in the content releases search focus. Simultaneous
+        // rather than exclusive, so the click still reaches the row, menu or
+        // button underneath it.
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                viewModel.dismissSearchFocus()
+            }
         )
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 courseFilter
 
-                Toggle(isOn: $viewModel.showCompletedAndIgnored) {
-                    Label(
-                        "Show completed and ignored",
-                        systemImage: viewModel.showCompletedAndIgnored
-                            ? "eye"
-                            : "eye.slash"
-                    )
+                toolbarButton(
+                    systemImage: viewModel.showCompletedAndIgnored
+                        ? "eye"
+                        : "eye.slash",
+                    title: viewModel.showCompletedAndIgnored
+                        ? "Hide completed and ignored"
+                        : "Show completed and ignored"
+                ) {
+                    viewModel.showCompletedAndIgnored.toggle()
                 }
-                .toggleStyle(.button)
-                .help(
-                    viewModel.showCompletedAndIgnored
-                        ? "Hide completed and ignored events"
-                        : "Show completed and ignored events"
-                )
-                .accessibilityLabel(
-                    viewModel.showCompletedAndIgnored
-                        ? "Hide completed and ignored events"
-                        : "Show completed and ignored events"
-                )
 
-                Button {
+                toolbarButton(
+                    systemImage: "arrow.clockwise",
+                    title: "Refresh Canvas feed"
+                ) {
                     viewModel.refreshManually()
-                } label: {
-                    Label("Refresh Canvas feed", systemImage: "arrow.clockwise")
                 }
                 .disabled(
                     viewModel.isRefreshing || !viewModel.hasConfiguredFeed
                 )
-                .help("Refresh Canvas feed")
 
-                Button {
+                toolbarButton(
+                    systemImage: "plus",
+                    title: "Add manual event"
+                ) {
                     viewModel.presentNewManualEvent()
-                } label: {
-                    Label("Add manual event", systemImage: "plus")
                 }
                 .keyboardShortcut("n", modifiers: .command)
-                .help("Add manual event")
 
-                Button {
+                toolbarButton(
+                    systemImage: "gearshape",
+                    title: "Settings"
+                ) {
                     viewModel.sidebarSelection = .settings
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
                 }
-                .help("Settings")
+
+                searchControl
+            }
+        }
+    }
+
+    /// Icon-only by construction: the label is an image, so no toolbar display
+    /// mode can introduce a text label and reflow the row.
+    private func toolbarButton(
+        systemImage: String,
+        title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            // Give up search focus first, then act, so one click does both.
+            viewModel.prepareForToolbarAction()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+        }
+        .help(title)
+        .accessibilityLabel(title)
+    }
+
+    @ViewBuilder
+    private var searchControl: some View {
+        if viewModel.isSearchPresented {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+
+                TextField(
+                    "Search assignments or courses",
+                    text: $viewModel.searchText
+                )
+                .textFieldStyle(.plain)
+                .focused($isSearchFieldFocused)
+                .onSubmit {
+                    // Return must not trap focus in the field.
+                    isSearchFieldFocused = false
+                }
+                .accessibilityLabel("Search assignments or courses")
+
+                if !viewModel.searchText.isEmpty {
+                    Button {
+                        viewModel.clearSearchQuery()
+                        isSearchFieldFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear search")
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+            .frame(minWidth: 220, idealWidth: 300, maxWidth: 360)
+            .onExitCommand {
+                viewModel.handleSearchEscape()
+            }
+        } else {
+            toolbarButton(
+                systemImage: "magnifyingglass",
+                title: "Search assignments or courses"
+            ) {
+                viewModel.presentSearch()
             }
         }
     }
@@ -413,10 +489,11 @@ struct MainView: View {
                 }
             }
         } label: {
-            Label(
-                viewModel.courseFilterButtonTitle,
-                systemImage: "line.3.horizontal.decrease.circle"
-            )
+            // Icon only: a selected Canvas course title would otherwise set the
+            // width of this control and push the rest of the toolbar apart.
+            Image(systemName: viewModel.selectedCourse == nil
+                ? "line.3.horizontal.decrease.circle"
+                : "line.3.horizontal.decrease.circle.fill")
         }
         .menuIndicator(.hidden)
         .help(viewModel.courseFilterDescription)

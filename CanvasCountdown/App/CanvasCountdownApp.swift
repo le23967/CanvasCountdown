@@ -66,6 +66,13 @@ struct CanvasCountdownApp: App {
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(viewModel == nil)
             }
+            CommandGroup(after: .textEditing) {
+                Button("Find") {
+                    viewModel?.presentSearch()
+                }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(viewModel == nil)
+            }
         }
     }
 }
