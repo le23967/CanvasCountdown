@@ -399,24 +399,47 @@ struct MainView: View {
         }
     }
 
+    /// One flat native menu. A `Picker` here would render as a labelled
+    /// submenu, which pushed the course list out sideways.
     private var courseFilter: some View {
         Menu {
-            Picker("Course", selection: $viewModel.selectedCourse) {
-                Text("All Courses").tag(nil as String?)
+            courseFilterItem(for: nil)
+
+            if !viewModel.availableCourses.isEmpty {
+                Divider()
+
                 ForEach(viewModel.availableCourses, id: \.self) { course in
-                    Text(course).tag(course as String?)
+                    courseFilterItem(for: course)
                 }
             }
         } label: {
             Label(
-                viewModel.selectedCourse ?? "All Courses",
+                viewModel.courseFilterButtonTitle,
                 systemImage: "line.3.horizontal.decrease.circle"
             )
         }
-        .help("Filter by course")
-        .accessibilityLabel(
-            "Course filter, \(viewModel.selectedCourse ?? "all courses")"
-        )
+        .menuIndicator(.hidden)
+        .help(viewModel.courseFilterDescription)
+        .accessibilityLabel(viewModel.courseFilterDescription)
+    }
+
+    /// A `Toggle` gives the native checkmark, keyboard handling and VoiceOver
+    /// state for free; a plain button would need all three rebuilt by hand.
+    private func courseFilterItem(for course: String?) -> some View {
+        Toggle(
+            isOn: Binding(
+                get: { viewModel.selectedCourse == course },
+                set: { isSelected in
+                    if isSelected {
+                        viewModel.selectCourse(course)
+                    }
+                }
+            )
+        ) {
+            Text(MainViewModel.menuTitle(for: course))
+        }
+        .help(course ?? "Show assignments from every course")
+        .accessibilityLabel(course ?? "All Courses")
     }
 
     @ViewBuilder

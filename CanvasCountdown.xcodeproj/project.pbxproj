@@ -40,6 +40,7 @@
 		9FADE4ABA16E4D8EEC1B1176 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 32AA2CD44F2D8FD2D44B7EDF /* Assets.xcassets */; };
 		A08CC38651352FF532B4E7AF /* UserNotifications.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26F90425C17FF762BF4D06E /* UserNotifications.framework */; };
 		AA5276B7683D872920ED9B84 /* ICSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099CBA2FB3FF6F3E078E3056 /* ICSParser.swift */; };
+		B07D431C640241F7C8EC2D70 /* CourseFilterMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */; };
 		B0FCA0D0BFD1BB1C2824ED33 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7473B249AF5056BAC114A76 /* ServiceManagement.framework */; };
 		B360C603B0A811EC158A3BA9 /* RefreshCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */; };
 		B8B433A900556A044BB747E9 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB23E4A7453EB83A9551245 /* NotificationService.swift */; };
@@ -130,6 +131,7 @@
 		DF51BDD6974B71B245AAE12C /* DockTileRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileRenderer.swift; sourceTree = "<group>"; };
 		E26F90425C17FF762BF4D06E /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
 		EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedExclusionStore.swift; sourceTree = "<group>"; };
+		EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseFilterMenuTests.swift; sourceTree = "<group>"; };
 		F287B2AE40E5AF90FEA7454B /* IsolatedLaunchServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatedLaunchServices.swift; sourceTree = "<group>"; };
 		F7473B249AF5056BAC114A76 /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		FA728C6E0402225EBF5D05FB /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
@@ -272,6 +274,7 @@
 			children = (
 				D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */,
 				AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */,
+				EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */,
 				282F4005FAF96A677845EDC4 /* CourseScopeTests.swift */,
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
 				9FF309911A3913EA914850F0 /* DockAppearanceTests.swift */,
@@ -450,6 +453,7 @@
 				C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */,
 				86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */,
 				FC8400DCCC428468DB844F8C /* CountdownCalculatorTests.swift in Sources */,
+				B07D431C640241F7C8EC2D70 /* CourseFilterMenuTests.swift in Sources */,
 				F7DB77F45A451F93DB60B92C /* CourseScopeTests.swift in Sources */,
 				C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */,
 				9ECA4478F3861710E63C2F42 /* DockAppearanceTests.swift in Sources */,

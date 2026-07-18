@@ -103,7 +103,7 @@ final class MainViewModel {
     }
 
     var upcomingCount: Int {
-        courseScopedAssignments.filter { item in
+        visibleUpcomingAssignments.filter { item in
             item.dueDate >= currentDate
                 && !item.isCompleted
                 && !item.isIgnored
@@ -112,10 +112,64 @@ final class MainViewModel {
 
     var nearestAssignment: AssignmentListItem? {
         CountdownCalculator.nearestUpcoming(
-            from: courseScopedAssignments,
+            from: visibleUpcomingAssignments,
             now: currentDate,
             calendar: calendar
         )?.event
+    }
+
+    /// What Upcoming is actually showing: the persistent course scope from
+    /// Settings, narrowed further by the toolbar filter.
+    ///
+    /// The Dock deliberately does not follow the toolbar filter. That filter is
+    /// a transient way to look through the list and is not persisted, so having
+    /// the Dock jump around while browsing, then revert on the next launch,
+    /// would be surprising. The Dock follows the saved Settings scope.
+    var visibleUpcomingAssignments: [AssignmentListItem] {
+        courseScopedAssignments.filter(matchesSelectedCourse)
+    }
+
+    private func matchesSelectedCourse(_ item: AssignmentListItem) -> Bool {
+        guard let selectedCourse else {
+            return true
+        }
+        return item.normalizedCourseName == selectedCourse
+    }
+
+    /// Nil selects every course.
+    func selectCourse(_ course: String?) {
+        selectedCourse = course
+    }
+
+    /// Kept short so a long Canvas course title cannot stretch the toolbar.
+    var courseFilterButtonTitle: String {
+        guard let selectedCourse else {
+            return "All Courses"
+        }
+        return Self.menuTitle(for: selectedCourse, maximumLength: 18)
+    }
+
+    var courseFilterDescription: String {
+        guard let selectedCourse else {
+            return "Filter by course, showing all courses"
+        }
+        return "Filter by course, showing \(selectedCourse)"
+    }
+
+    /// Truncates a long course title for display. The full title stays
+    /// available through the tooltip and accessibility label.
+    static func menuTitle(
+        for course: String?,
+        maximumLength: Int = 44
+    ) -> String {
+        guard let course else {
+            return "All Courses"
+        }
+        guard course.count > maximumLength else {
+            return course
+        }
+        return course.prefix(maximumLength - 1)
+            .trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 
     /// Assignments in scope for Upcoming, the nearest-assignment card and the
