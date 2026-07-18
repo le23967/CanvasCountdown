@@ -239,6 +239,29 @@ final class ToolbarSearchTests: XCTestCase {
         )
     }
 
+    // MARK: - The field must not compete for toolbar width
+
+    func testSearchFieldIsLaidOutInTheContentAreaNotTheToolbar() {
+        // Regression: the field used to be a toolbar item. A field wide enough
+        // to type in could not be fitted beside the other controls in a normal
+        // window, so macOS moved it into the toolbar's overflow menu and
+        // clicking search appeared to do nothing at all. The placement is now
+        // declared here and read by the view, so the two cannot disagree.
+        XCTAssertEqual(
+            SearchFieldPlacement.container,
+            .contentArea,
+            "A text field in the toolbar gets evicted into the overflow menu"
+        )
+        XCTAssertFalse(SearchFieldPlacement.isToolbarItem)
+    }
+
+    func testSearchFieldWidthCannotStretchTheToolbar() {
+        // The field is bounded and lives outside the toolbar, so it can neither
+        // push the icons apart nor be pushed out itself.
+        XCTAssertGreaterThan(SearchFieldPlacement.maximumWidth, 220)
+        XCTAssertLessThanOrEqual(SearchFieldPlacement.maximumWidth, 640)
+    }
+
     // MARK: - Toolbar presentation
 
     func testToolbarStateCarriesNoDisplayModeDependency() async throws {

@@ -186,6 +186,8 @@ struct MainView: View {
                 ProgressView("Loading assignments…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                searchBar
+
                 if (viewModel.sidebarSelection ?? .upcoming) == .upcoming,
                    let nearest = viewModel.nearestAssignment {
                     NearestAssignmentCard(
@@ -248,7 +250,7 @@ struct MainView: View {
                     viewModel.sidebarSelection = .settings
                 }
 
-                searchControl
+                searchToggle
             }
         }
     }
@@ -271,10 +273,30 @@ struct MainView: View {
         .accessibilityLabel(title)
     }
 
+    /// The toolbar only ever holds a compact toggle.
+    ///
+    /// A text field lived here before, and a field wide enough to type in could
+    /// not be fitted alongside the other controls in a normal window: macOS
+    /// moved it into the toolbar's overflow menu, so clicking search made the
+    /// field disappear. The field now lives in the content area, where nothing
+    /// competes with it for width.
+    private var searchToggle: some View {
+        toolbarButton(
+            systemImage: viewModel.isSearchPresented
+                ? "magnifyingglass.circle.fill"
+                : "magnifyingglass",
+            title: viewModel.isSearchPresented
+                ? "Hide search"
+                : "Search assignments or courses"
+        ) {
+            viewModel.toggleSearch()
+        }
+    }
+
     @ViewBuilder
-    private var searchControl: some View {
+    private var searchBar: some View {
         if viewModel.isSearchPresented {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -303,21 +325,31 @@ struct MainView: View {
                     .help("Clear search")
                     .accessibilityLabel("Clear search")
                 }
+
+                Button {
+                    viewModel.dismissSearch()
+                } label: {
+                    Text("Done")
+                }
+                .buttonStyle(.link)
+                .help("Close search")
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
-            .frame(minWidth: 220, idealWidth: 300, maxWidth: 360)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                .quaternary.opacity(0.5),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .frame(
+                maxWidth: SearchFieldPlacement.maximumWidth,
+                alignment: .leading
+            )
+            .padding(.horizontal, 22)
+            .padding(.bottom, 12)
             .onExitCommand {
                 viewModel.handleSearchEscape()
             }
-        } else {
-            toolbarButton(
-                systemImage: "magnifyingglass",
-                title: "Search assignments or courses"
-            ) {
-                viewModel.presentSearch()
-            }
+            .transition(.opacity)
         }
     }
 
