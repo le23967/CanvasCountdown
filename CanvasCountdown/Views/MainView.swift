@@ -6,6 +6,7 @@ struct MainView: View {
     @State private var eventPendingDeletion: AssignmentListItem?
     @State private var hoveredEventID: UUID?
     @FocusState private var isSearchFieldFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationSplitView {
@@ -186,8 +187,6 @@ struct MainView: View {
                 ProgressView("Loading assignments…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                searchBar
-
                 if (viewModel.sidebarSelection ?? .upcoming) == .upcoming,
                    let nearest = viewModel.nearestAssignment {
                     NearestAssignmentCard(
@@ -207,53 +206,156 @@ struct MainView: View {
         // button underneath it.
         .simultaneousGesture(
             TapGesture().onEnded {
-                viewModel.dismissSearchFocus()
+                // Observing, not consuming: the row, menu or button under the
+                // pointer still receives the same click.
+                if viewModel.isSearchModeActive {
+                    exitSearchMode()
+                }
             }
         )
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                courseFilter
-
-                toolbarButton(
-                    systemImage: viewModel.showCompletedAndIgnored
-                        ? "eye"
-                        : "eye.slash",
-                    title: viewModel.showCompletedAndIgnored
-                        ? "Hide completed and ignored"
-                        : "Show completed and ignored"
-                ) {
-                    viewModel.showCompletedAndIgnored.toggle()
+            // Two complete layouts chosen by one switch. Each item carries a
+            // stable id: without them SwiftUI could not tell which item became
+            // which when the mode flipped, and it removed the old items without
+            // installing the new ones.
+            if viewModel.isSearchModeActive {
+                ToolbarItem(id: "search.field", placement: .primaryAction) {
+                    toolbarSearchField
                 }
-
-                toolbarButton(
-                    systemImage: "arrow.clockwise",
-                    title: "Refresh Canvas feed"
-                ) {
-                    viewModel.refreshManually()
+                ToolbarItem(id: "search.cancel", placement: .primaryAction) {
+                    cancelSearchButton
                 }
-                .disabled(
-                    viewModel.isRefreshing || !viewModel.hasConfiguredFeed
-                )
-
-                toolbarButton(
-                    systemImage: "plus",
-                    title: "Add manual event"
-                ) {
-                    viewModel.presentNewManualEvent()
+            } else {
+                ToolbarItem(id: "action.courseFilter", placement: .primaryAction) {
+                    courseFilter
                 }
-                .keyboardShortcut("n", modifiers: .command)
-
-                toolbarButton(
-                    systemImage: "gearshape",
-                    title: "Settings"
-                ) {
-                    viewModel.sidebarSelection = .settings
+                ToolbarItem(id: "action.visibility", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: viewModel.showCompletedAndIgnored
+                            ? "eye"
+                            : "eye.slash",
+                        title: viewModel.showCompletedAndIgnored
+                            ? "Hide completed and ignored"
+                            : "Show completed and ignored"
+                    ) {
+                        viewModel.showCompletedAndIgnored.toggle()
+                    }
                 }
-
-                searchToggle
+                ToolbarItem(id: "action.refresh", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: "arrow.clockwise",
+                        title: "Refresh Canvas feed"
+                    ) {
+                        viewModel.refreshManually()
+                    }
+                    .disabled(
+                        viewModel.isRefreshing || !viewModel.hasConfiguredFeed
+                    )
+                }
+                ToolbarItem(id: "action.add", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: "plus",
+                        title: "Add manual event"
+                    ) {
+                        viewModel.presentNewManualEvent()
+                    }
+                    .keyboardShortcut("n", modifiers: .command)
+                }
+                ToolbarItem(id: "action.settings", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: "gearshape",
+                        title: "Settings"
+                    ) {
+                        viewModel.sidebarSelection = .settings
+                    }
+                }
+                ToolbarItem(id: "action.search", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: "magnifyingglass",
+                        title: "Search assignments or courses"
+                    ) {
+                        enterSearchMode()
+                    }
+                }
             }
         }
     }
+
+    /// The search field, shown only in search mode.
+    ///
+    /// It shares the toolbar with nothing but Cancel, so unlike the earlier
+    /// attempt to sit it beside the five ordinary actions, there is room for it
+    /// and macOS has no reason to move it into the overflow menu.
+    private var toolbarSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            TextField(
+                "Search assignments or courses",
+                text: $viewModel.searchText
+            )
+            .textFieldStyle(.plain)
+            .focused($isSearchFieldFocused)
+            .onSubmit {
+                // Return must not trap focus in the field.
+                isSearchFieldFocused = false
+            }
+            .accessibilityLabel("Search assignments or courses")
+
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.clearSearchQuery()
+                    isSearchFieldFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(
+            .quaternary.opacity(0.5),
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        // Bounded so Cancel always keeps its place beside the field; letting
+        // the field grow further pushed Cancel into the overflow menu.
+        .frame(minWidth: 180, idealWidth: 280, maxWidth: 340)
+        .onExitCommand {
+            exitSearchMode()
+        }
+    }
+
+    private var cancelSearchButton: some View {
+        Button("Cancel") {
+            exitSearchMode()
+        }
+        .help("Close search")
+        .accessibilityLabel("Close search")
+    }
+
+    /// Short and flat, and skipped entirely under Reduce Motion.
+    private var searchAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.18)
+    }
+
+    private func enterSearchMode() {
+        withAnimation(searchAnimation) {
+            viewModel.presentSearch()
+        }
+    }
+
+    private func exitSearchMode() {
+        withAnimation(searchAnimation) {
+            viewModel.dismissSearch()
+        }
+    }
+
 
     /// Icon-only by construction: the label is an image, so no toolbar display
     /// mode can introduce a text label and reflow the row.
@@ -271,86 +373,6 @@ struct MainView: View {
         }
         .help(title)
         .accessibilityLabel(title)
-    }
-
-    /// The toolbar only ever holds a compact toggle.
-    ///
-    /// A text field lived here before, and a field wide enough to type in could
-    /// not be fitted alongside the other controls in a normal window: macOS
-    /// moved it into the toolbar's overflow menu, so clicking search made the
-    /// field disappear. The field now lives in the content area, where nothing
-    /// competes with it for width.
-    private var searchToggle: some View {
-        toolbarButton(
-            systemImage: viewModel.isSearchPresented
-                ? "magnifyingglass.circle.fill"
-                : "magnifyingglass",
-            title: viewModel.isSearchPresented
-                ? "Hide search"
-                : "Search assignments or courses"
-        ) {
-            viewModel.toggleSearch()
-        }
-    }
-
-    @ViewBuilder
-    private var searchBar: some View {
-        if viewModel.isSearchPresented {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-
-                TextField(
-                    "Search assignments or courses",
-                    text: $viewModel.searchText
-                )
-                .textFieldStyle(.plain)
-                .focused($isSearchFieldFocused)
-                .onSubmit {
-                    // Return must not trap focus in the field.
-                    isSearchFieldFocused = false
-                }
-                .accessibilityLabel("Search assignments or courses")
-
-                if !viewModel.searchText.isEmpty {
-                    Button {
-                        viewModel.clearSearchQuery()
-                        isSearchFieldFocused = true
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Clear search")
-                    .accessibilityLabel("Clear search")
-                }
-
-                Button {
-                    viewModel.dismissSearch()
-                } label: {
-                    Text("Done")
-                }
-                .buttonStyle(.link)
-                .help("Close search")
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                .quaternary.opacity(0.5),
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .frame(
-                maxWidth: SearchFieldPlacement.maximumWidth,
-                alignment: .leading
-            )
-            .padding(.horizontal, 22)
-            .padding(.bottom, 12)
-            .onExitCommand {
-                viewModel.handleSearchEscape()
-            }
-            .transition(.opacity)
-        }
     }
 
     private var dashboardHeader: some View {

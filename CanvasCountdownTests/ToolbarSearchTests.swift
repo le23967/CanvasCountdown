@@ -13,7 +13,7 @@ final class ToolbarSearchTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
 
-        XCTAssertFalse(context.viewModel.isSearchPresented)
+        XCTAssertFalse(context.viewModel.isSearchModeActive)
         XCTAssertFalse(context.viewModel.isSearchFieldFocused)
         XCTAssertTrue(context.viewModel.searchText.isEmpty)
     }
@@ -24,7 +24,7 @@ final class ToolbarSearchTests: XCTestCase {
 
         context.viewModel.presentSearch()
 
-        XCTAssertTrue(context.viewModel.isSearchPresented)
+        XCTAssertTrue(context.viewModel.isSearchModeActive)
         XCTAssertTrue(
             context.viewModel.isSearchFieldFocused,
             "The field must take focus when it appears"
@@ -36,63 +36,56 @@ final class ToolbarSearchTests: XCTestCase {
         await context.viewModel.start()
 
         context.viewModel.toggleSearch()
-        XCTAssertTrue(context.viewModel.isSearchPresented)
+        XCTAssertTrue(context.viewModel.isSearchModeActive)
 
         context.viewModel.toggleSearch()
-        XCTAssertFalse(context.viewModel.isSearchPresented)
+        XCTAssertFalse(context.viewModel.isSearchModeActive)
         XCTAssertFalse(context.viewModel.isSearchFieldFocused)
     }
 
     // MARK: - Dismissal
 
-    func testClickingOutsideReleasesFocusButKeepsTheQuery() async throws {
+    func testClickingBlankContentExitsSearchMode() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.presentSearch()
         context.viewModel.searchText = "lab"
 
         // What the content-area gesture calls.
-        context.viewModel.dismissSearchFocus()
+        context.viewModel.dismissSearch()
 
+        XCTAssertFalse(context.viewModel.isSearchFieldFocused)
         XCTAssertFalse(
-            context.viewModel.isSearchFieldFocused,
-            "A click outside must release keyboard focus"
+            context.viewModel.isSearchModeActive,
+            "The ordinary toolbar comes back"
         )
-        XCTAssertTrue(
-            context.viewModel.isSearchPresented,
-            "The field stays visible so the query is not lost by a stray click"
-        )
-        XCTAssertEqual(context.viewModel.searchText, "lab")
+        XCTAssertTrue(context.viewModel.searchText.isEmpty)
     }
 
-    func testEscapeReleasesFocusFirstThenCollapses() async throws {
+    func testEscapeExitsSearchModeAndClearsTheQuery() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.presentSearch()
         context.viewModel.searchText = "lab"
 
-        XCTAssertEqual(
-            context.viewModel.handleSearchEscape(),
-            .releasedFocus
-        )
-        XCTAssertFalse(context.viewModel.isSearchFieldFocused)
-        XCTAssertTrue(context.viewModel.isSearchPresented)
+        context.viewModel.handleSearchEscape()
 
-        XCTAssertEqual(
-            context.viewModel.handleSearchEscape(),
-            .collapsed
+        XCTAssertFalse(context.viewModel.isSearchModeActive)
+        XCTAssertFalse(context.viewModel.isSearchFieldFocused)
+        XCTAssertTrue(
+            context.viewModel.searchText.isEmpty,
+            "Escape and Cancel leave search the same way"
         )
-        XCTAssertFalse(context.viewModel.isSearchPresented)
-        XCTAssertTrue(context.viewModel.searchText.isEmpty)
     }
 
-    func testEscapeOnAnEmptyFieldCollapsesImmediately() async throws {
+    func testEscapeOnAnEmptyFieldExitsImmediately() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.presentSearch()
 
-        XCTAssertEqual(context.viewModel.handleSearchEscape(), .collapsed)
-        XCTAssertFalse(context.viewModel.isSearchPresented)
+        context.viewModel.handleSearchEscape()
+
+        XCTAssertFalse(context.viewModel.isSearchModeActive)
         XCTAssertFalse(context.viewModel.isSearchFieldFocused)
     }
 
@@ -124,7 +117,7 @@ final class ToolbarSearchTests: XCTestCase {
 
         context.viewModel.sidebarSelection = .allEvents
 
-        XCTAssertFalse(context.viewModel.isSearchPresented)
+        XCTAssertFalse(context.viewModel.isSearchModeActive)
         XCTAssertFalse(context.viewModel.isSearchFieldFocused)
         XCTAssertTrue(
             context.viewModel.searchText.isEmpty,
@@ -140,7 +133,7 @@ final class ToolbarSearchTests: XCTestCase {
 
         context.viewModel.sidebarSelection = .upcoming
 
-        XCTAssertTrue(context.viewModel.isSearchPresented)
+        XCTAssertTrue(context.viewModel.isSearchModeActive)
     }
 
     // MARK: - Query behaviour
@@ -164,7 +157,7 @@ final class ToolbarSearchTests: XCTestCase {
             "Clearing the query restores the full list at once"
         )
         XCTAssertTrue(
-            context.viewModel.isSearchPresented,
+            context.viewModel.isSearchModeActive,
             "Clearing is not the same as dismissing"
         )
     }
@@ -241,25 +234,57 @@ final class ToolbarSearchTests: XCTestCase {
 
     // MARK: - The field must not compete for toolbar width
 
-    func testSearchFieldIsLaidOutInTheContentAreaNotTheToolbar() {
-        // Regression: the field used to be a toolbar item. A field wide enough
-        // to type in could not be fitted beside the other controls in a normal
-        // window, so macOS moved it into the toolbar's overflow menu and
-        // clicking search appeared to do nothing at all. The placement is now
-        // declared here and read by the view, so the two cannot disagree.
-        XCTAssertEqual(
-            SearchFieldPlacement.container,
-            .contentArea,
-            "A text field in the toolbar gets evicted into the overflow menu"
+    func testSearchModeReplacesTheOrdinaryToolbarActions() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        XCTAssertTrue(context.viewModel.showsOrdinaryToolbarActions)
+        XCTAssertFalse(context.viewModel.showsToolbarSearchField)
+
+        context.viewModel.presentSearch()
+
+        XCTAssertFalse(
+            context.viewModel.showsOrdinaryToolbarActions,
+            "The five actions and the search icon are gone, not merely hidden"
         )
-        XCTAssertFalse(SearchFieldPlacement.isToolbarItem)
+        XCTAssertTrue(context.viewModel.showsToolbarSearchField)
     }
 
-    func testSearchFieldWidthCannotStretchTheToolbar() {
-        // The field is bounded and lives outside the toolbar, so it can neither
-        // push the icons apart nor be pushed out itself.
-        XCTAssertGreaterThan(SearchFieldPlacement.maximumWidth, 220)
-        XCTAssertLessThanOrEqual(SearchFieldPlacement.maximumWidth, 640)
+    func testLeavingSearchModeRestoresEveryToolbarAction() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+
+        context.viewModel.dismissSearch()
+
+        XCTAssertTrue(context.viewModel.showsOrdinaryToolbarActions)
+        XCTAssertFalse(context.viewModel.showsToolbarSearchField)
+    }
+
+    func testHiddenToolbarActionsCannotBeDrivenWhileSearching() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+
+        // The ordinary actions are not built at all in this mode, so the view
+        // has nothing to route a click to.
+        XCTAssertFalse(context.viewModel.showsOrdinaryToolbarActions)
+        XCTAssertTrue(
+            context.viewModel.isSearchModeActive,
+            "Only the field and Cancel occupy the toolbar"
+        )
+    }
+
+    func testSearchModeKeepsTheToolbarWithinTwoItems() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+
+        // Two items instead of six is what keeps the field out of the overflow
+        // menu at the supported minimum window width.
+        XCTAssertEqual(context.viewModel.toolbarItemCount, 2)
+
+        context.viewModel.dismissSearch()
+        XCTAssertEqual(context.viewModel.toolbarItemCount, 6)
     }
 
     // MARK: - Toolbar presentation

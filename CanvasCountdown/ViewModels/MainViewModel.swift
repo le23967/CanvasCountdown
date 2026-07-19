@@ -16,8 +16,10 @@ final class MainViewModel {
     }
     var assignments: [AssignmentListItem] = []
     var searchText = ""
-    /// Whether the toolbar is showing the search field rather than its icon.
-    var isSearchPresented = false
+    /// The one switch the toolbar reads. Search mode replaces the ordinary
+    /// actions with a field and a Cancel button; it is never inferred from
+    /// whether the query happens to be empty.
+    var isSearchModeActive = false
     /// Mirrors the field's `FocusState`, so focus is testable and can be
     /// released from anywhere without the view owning the decision.
     var isSearchFieldFocused = false
@@ -157,18 +159,13 @@ final class MainViewModel {
 
     // MARK: - Search
 
-    enum SearchEscapeOutcome: Equatable {
-        case releasedFocus
-        case collapsed
-    }
-
     func presentSearch() {
-        isSearchPresented = true
+        isSearchModeActive = true
         isSearchFieldFocused = true
     }
 
     func toggleSearch() {
-        if isSearchPresented {
+        if isSearchModeActive {
             dismissSearch()
         } else {
             presentSearch()
@@ -182,25 +179,37 @@ final class MainViewModel {
         isSearchFieldFocused = false
     }
 
-    /// Collapses search entirely and clears the query, restoring the full list.
+    /// Leaves search mode, releases focus and clears the query so the full list
+    /// comes back. Escape, Cancel, a click on empty content and a section change
+    /// all land here, so leaving search always means the same thing.
     func dismissSearch() {
         isSearchFieldFocused = false
-        isSearchPresented = false
+        isSearchModeActive = false
         if !searchText.isEmpty {
             searchText = ""
         }
     }
 
-    /// Escape releases focus first. Pressing it again on an empty field
-    /// collapses search back to its icon.
-    @discardableResult
-    func handleSearchEscape() -> SearchEscapeOutcome {
-        if isSearchFieldFocused, !searchText.isEmpty {
-            isSearchFieldFocused = false
-            return .releasedFocus
-        }
+    func handleSearchEscape() {
         dismissSearch()
-        return .collapsed
+    }
+
+    /// What the toolbar builds. The two are mutually exclusive: the ordinary
+    /// actions are not constructed at all in search mode, so none of them is
+    /// left invisible but still able to take a click.
+    var showsOrdinaryToolbarActions: Bool {
+        !isSearchModeActive
+    }
+
+    var showsToolbarSearchField: Bool {
+        isSearchModeActive
+    }
+
+    /// Six compact actions normally, or the field plus Cancel while searching.
+    /// Keeping the search layout down to two items is what stops the field
+    /// being pushed into the toolbar's overflow menu.
+    var toolbarItemCount: Int {
+        isSearchModeActive ? 2 : 6
     }
 
     func clearSearchQuery() {
