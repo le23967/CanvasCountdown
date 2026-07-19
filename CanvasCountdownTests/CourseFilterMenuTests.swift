@@ -220,6 +220,8 @@ final class CourseFilterMenuTests: XCTestCase {
                 ?? day
         }
 
+        // A synthetic title of the length Canvas can produce, used to check the
+        // toolbar stays compact. Never a real course.
         let physicsCourse = longCourseName
             ? "99999 88888 Example Long Course Title For Layout Testing Only"
             : "PHYS200"
