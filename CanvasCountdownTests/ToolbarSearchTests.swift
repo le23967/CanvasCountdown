@@ -289,27 +289,33 @@ final class ToolbarSearchTests: XCTestCase {
 
     // MARK: - Toolbar presentation
 
-    func testToolbarStateCarriesNoDisplayModeDependency() async throws {
-        let context = try makeContext()
+    func testToolbarTitlesStayShortEnoughForIconAndText() async throws {
+        let context = try makeContext(longCourseName: true)
         await context.viewModel.start()
+        let longCourse = try XCTUnwrap(
+            context.viewModel.availableCourses.first { $0.count > 40 }
+        )
+        context.viewModel.selectCourse(longCourse)
 
-        // Every toolbar control is described by an icon plus a help and
-        // accessibility string. Nothing in the view model supplies a visible
-        // toolbar title that a Text Only mode could lay out.
+        // "Icon and Text" lays out each control's title, so a long Canvas course
+        // name must never become one. The filter's visible title is a fixed
+        // word; the selection lives in the tooltip and the menu checkmark.
+        XCTAssertLessThanOrEqual(
+            context.viewModel.courseFilterButtonTitle.count,
+            18,
+            "A long course title must not become a toolbar label"
+        )
+        XCTAssertTrue(
+            context.viewModel.courseFilterDescription.contains(longCourse),
+            "The full name is still available to VoiceOver and the tooltip"
+        )
+
         let names = Mirror(reflecting: context.viewModel)
             .children
             .compactMap(\.label)
-        XCTAssertFalse(names.contains("toolbarDisplayMode"))
-        XCTAssertFalse(names.contains("usesTextToolbar"))
-
-        XCTAssertEqual(
-            context.viewModel.courseFilterButtonTitle,
-            "All Courses",
-            "Still available for the tooltip, never rendered in the toolbar"
-        )
-        XCTAssertTrue(
-            context.viewModel.courseFilterDescription
-                .hasPrefix("Filter by course")
+        XCTAssertFalse(
+            names.contains("toolbarDisplayMode"),
+            "The display mode is the user's choice, not app state"
         )
     }
 
@@ -331,7 +337,7 @@ final class ToolbarSearchTests: XCTestCase {
         let viewModel: MainViewModel
     }
 
-    private func makeContext() throws -> Context {
+    private func makeContext(longCourseName: Bool = false) throws -> Context {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
 
@@ -352,7 +358,9 @@ final class ToolbarSearchTests: XCTestCase {
                 ),
                 AssignmentSnapshot(
                     title: "Physics lab",
-                    courseName: "PHYS200",
+                    courseName: longCourseName
+                        ? "99999 88888 Example Long Course Title For Layout Testing Only"
+                        : "PHYS200",
                     dueDate: due(inDays: 3),
                     source: .canvasCalendarFeed
                 ),

@@ -204,15 +204,11 @@ struct MainView: View {
         // A click anywhere in the content releases search focus. Simultaneous
         // rather than exclusive, so the click still reaches the row, menu or
         // button underneath it.
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                // Observing, not consuming: the row, menu or button under the
-                // pointer still receives the same click.
-                if viewModel.isSearchModeActive {
-                    exitSearchMode()
-                }
-            }
-        )
+        .dismissesSearchOnContentClick(
+            isActive: viewModel.isSearchModeActive
+        ) {
+            exitSearchMode()
+        }
         .toolbar {
             // Two complete layouts chosen by one switch. Each item carries a
             // stable id: without them SwiftUI could not tell which item became
@@ -234,7 +230,8 @@ struct MainView: View {
                         systemImage: viewModel.showCompletedAndIgnored
                             ? "eye"
                             : "eye.slash",
-                        title: viewModel.showCompletedAndIgnored
+                        title: viewModel.showCompletedAndIgnored ? "Hide" : "Show",
+                        description: viewModel.showCompletedAndIgnored
                             ? "Hide completed and ignored"
                             : "Show completed and ignored"
                     ) {
@@ -244,7 +241,8 @@ struct MainView: View {
                 ToolbarItem(id: "action.refresh", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "arrow.clockwise",
-                        title: "Refresh Canvas feed"
+                        title: "Refresh",
+                        description: "Refresh Canvas feed"
                     ) {
                         viewModel.refreshManually()
                     }
@@ -255,7 +253,8 @@ struct MainView: View {
                 ToolbarItem(id: "action.add", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "plus",
-                        title: "Add manual event"
+                        title: "Add",
+                        description: "Add manual event"
                     ) {
                         viewModel.presentNewManualEvent()
                     }
@@ -264,7 +263,8 @@ struct MainView: View {
                 ToolbarItem(id: "action.settings", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "gearshape",
-                        title: "Settings"
+                        title: "Settings",
+                        description: "Settings"
                     ) {
                         viewModel.sidebarSelection = .settings
                     }
@@ -272,7 +272,8 @@ struct MainView: View {
                 ToolbarItem(id: "action.search", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "magnifyingglass",
-                        title: "Search assignments or courses"
+                        title: "Search",
+                        description: "Search assignments or courses"
                     ) {
                         enterSearchMode()
                     }
@@ -323,9 +324,10 @@ struct MainView: View {
             .quaternary.opacity(0.5),
             in: RoundedRectangle(cornerRadius: 6)
         )
-        // Bounded so Cancel always keeps its place beside the field; letting
-        // the field grow further pushed Cancel into the overflow menu.
-        .frame(minWidth: 180, idealWidth: 280, maxWidth: 340)
+        // A small minimum so the field gives up width first. Cancel is the last
+        // item, and the last item is what macOS pushes into the overflow menu,
+        // so the field must be the one that shrinks in a narrow window.
+        .frame(minWidth: 90, idealWidth: 280, maxWidth: 340)
         .onExitCommand {
             exitSearchMode()
         }
@@ -357,11 +359,15 @@ struct MainView: View {
     }
 
 
-    /// Icon-only by construction: the label is an image, so no toolbar display
-    /// mode can introduce a text label and reflow the row.
+    /// A toolbar control with a short visible title and a fuller description.
+    ///
+    /// The title is what "Icon and Text" shows, so it is kept to one word: long
+    /// titles are what made that mode stretch the row. The description stays the
+    /// tooltip and the VoiceOver label.
     private func toolbarButton(
         systemImage: String,
         title: String,
+        description: String,
         action: @escaping () -> Void
     ) -> some View {
         Button {
@@ -369,10 +375,10 @@ struct MainView: View {
             viewModel.prepareForToolbarAction()
             action()
         } label: {
-            Image(systemName: systemImage)
+            Label(title, systemImage: systemImage)
         }
-        .help(title)
-        .accessibilityLabel(title)
+        .help(description)
+        .accessibilityLabel(description)
     }
 
     private var dashboardHeader: some View {
@@ -543,11 +549,14 @@ struct MainView: View {
                 }
             }
         } label: {
-            // Icon only: a selected Canvas course title would otherwise set the
-            // width of this control and push the rest of the toolbar apart.
-            Image(systemName: viewModel.selectedCourse == nil
-                ? "line.3.horizontal.decrease.circle"
-                : "line.3.horizontal.decrease.circle.fill")
+            // A one-word title, never the selected course: a long Canvas course
+            // name here would set this control's width and push the rest apart.
+            Label(
+                "Filter",
+                systemImage: viewModel.selectedCourse == nil
+                    ? "line.3.horizontal.decrease.circle"
+                    : "line.3.horizontal.decrease.circle.fill"
+            )
         }
         .menuIndicator(.hidden)
         .help(viewModel.courseFilterDescription)
