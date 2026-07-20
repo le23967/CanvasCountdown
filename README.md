@@ -52,6 +52,40 @@ The exact Canvas labels can vary by institution. Treat this URL like a
 password: it commonly contains a private token that grants read access to the
 calendar.
 
+## Import from a Canvas screenshot
+
+The Canvas Calendar Feed is the recommended way to import deadlines: it stays
+current by itself and refreshes automatically. Screenshot import is a secondary
+method for when a feed is not available.
+
+**File → Import from Canvas Screenshot…** accepts PNG, JPEG, HEIC and TIFF, by
+file picker, drag and drop, or paste.
+
+Text recognition runs locally on this Mac using Apple Vision. Screenshots are
+never uploaded, and there is no cloud service, AI API or external backend
+involved at any point.
+
+Every screenshot goes through a review screen before anything is saved. Nothing
+detected is imported automatically. For each row you can correct the title, the
+course and the date and time, see the text exactly as it was recognised, and
+choose whether to include it at all.
+
+### What it does not do well
+
+Recognition is imperfect, and the review step exists because of that:
+
+- A title or date may be read incorrectly and need correcting.
+- If the year is not visible on screen, it is inferred and marked as inferred.
+- Canvas layout varies by institution and theme, which can reduce accuracy.
+- A row with no visible "Due" line is kept for review rather than given an
+  invented deadline.
+- Availability lines such as "Not available until" are never treated as
+  deadlines.
+
+Screenshots are held in memory only for the length of the review and are
+discarded when the sheet closes. No image, image path or recognised text is
+written to the database or to exported diagnostics.
+
 ## The Dock icon
 
 The application icon and the running Dock tile share one renderer, so they look
@@ -100,6 +134,11 @@ setting.
 - Logs and exported diagnostics never include the feed URL, its query string,
   or embedded credentials.
 - Notifications are scheduled locally with macOS.
+- Screenshot text recognition runs on this Mac. Screenshots are not uploaded,
+  not stored after the review session, and never appear in diagnostics.
+
+When reporting a bug on GitHub, do not attach your private Canvas feed URL or a
+screenshot containing personal information.
 
 ## Tests
 
