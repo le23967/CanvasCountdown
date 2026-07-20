@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainView: View {
     @Bindable var viewModel: MainViewModel
+    let screenshotImportViewModel: ScreenshotImportViewModel
 
     @State private var eventPendingDeletion: AssignmentListItem?
     @State private var hoveredEventID: UUID?
@@ -36,6 +37,14 @@ struct MainView: View {
         .sheet(isPresented: $viewModel.isShowingManualEditor) {
             ManualEventEditorView(draft: viewModel.manualEventDraft) { draft in
                 try await viewModel.saveManualEvent(draft)
+            }
+        }
+        .sheet(isPresented: $viewModel.isShowingScreenshotImport) {
+            ScreenshotImportView(
+                viewModel: screenshotImportViewModel,
+                existingCourseNames: viewModel.availableCourses
+            ) {
+                await viewModel.screenshotImportDidFinish()
             }
         }
         .sheet(isPresented: $viewModel.isShowingImportedDetails) {
@@ -515,6 +524,9 @@ struct MainView: View {
                     }
                     Button("Add Manual Event") {
                         viewModel.presentNewManualEvent()
+                    }
+                    Button("Import from Screenshot…") {
+                        viewModel.presentScreenshotImport()
                     }
                 }
             case .allEvents:

@@ -35,6 +35,7 @@ final class MainViewModel {
     var feedImportIsOnboarding = false
     var feedImportInitialURL = ""
     var isShowingManualEditor = false
+    var isShowingScreenshotImport = false
     var isShowingImportedDetails = false
     var importedEventDetails: AssignmentListItem?
     var manualEventDraft = ManualEventDraft()
@@ -389,6 +390,29 @@ final class MainViewModel {
         feedImportIsOnboarding = onboarding
         parsedPreviewEvents.removeAll()
         isShowingFeedImport = true
+    }
+
+    /// Opens the screenshot import sheet. A secondary method: the Canvas
+    /// Calendar Feed stays the recommended way to keep deadlines current.
+    func presentScreenshotImport() {
+        prepareForToolbarAction()
+        isShowingScreenshotImport = true
+    }
+
+    /// Called once a screenshot import commits, so the list, the card, the
+    /// sidebar count, the Dock and reminders all catch up at once.
+    func screenshotImportDidFinish() async {
+        do {
+            try await reloadAssignmentsAndSynchronize()
+            statusMessage = "Screenshot import complete"
+        } catch {
+            present(error)
+        }
+    }
+
+    /// Snapshot used for duplicate checking during screenshot review.
+    func currentSnapshots() async throws -> [AssignmentSnapshot] {
+        try await repository.fetchAll()
     }
 
     func presentNewManualEvent() {

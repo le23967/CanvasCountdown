@@ -89,3 +89,13 @@ actor IsolatedFeedExclusionStore: FeedExclusionStoring {
         excludedUIDs.removeAll()
     }
 }
+
+/// Recognition stub for automated runs.
+///
+/// Vision output changes between operating-system revisions, so no test is
+/// allowed to depend on it. Tests supply their own observation fixtures.
+struct InertScreenshotOCRService: ScreenshotOCRServicing {
+    func recognizeText(in source: ScreenshotSource) async throws -> [OCRTextObservation] {
+        []
+    }
+}

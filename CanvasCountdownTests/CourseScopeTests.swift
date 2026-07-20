@@ -272,11 +272,52 @@ actor ScopeRepositoryStub: AssignmentRepository {
         snapshots
     }
 
+    /// Behaves like the real repository: matches on external identifier, then
+    /// inserts or updates, leaving local completed and ignored state alone.
     func upsert(
         _ records: [AssignmentImportRecord],
         importedAt: Date
     ) -> ImportResult {
-        .empty
+        var result = ImportResult.empty
+        for record in records {
+            let existingIndex = snapshots.firstIndex { stored in
+                guard let key = record.externalID, let storedKey = stored.externalID else {
+                    return false
+                }
+                return key == storedKey && stored.source == record.source
+            }
+
+            if let index = existingIndex {
+                let unchanged = snapshots[index].title == record.title
+                    && snapshots[index].dueDate == record.dueDate
+                    && snapshots[index].courseName == record.courseName
+                snapshots[index].title = record.title
+                snapshots[index].courseName = record.courseName
+                snapshots[index].dueDate = record.dueDate
+                snapshots[index].updatedAt = importedAt
+                if unchanged {
+                    result.unchangedCount += 1
+                } else {
+                    result.updatedCount += 1
+                }
+                continue
+            }
+
+            snapshots.append(
+                AssignmentSnapshot(
+                    externalID: record.externalID,
+                    title: record.title,
+                    courseName: record.courseName,
+                    dueDate: record.dueDate,
+                    source: record.source,
+                    sourceURL: record.sourceURL,
+                    createdAt: importedAt,
+                    updatedAt: importedAt
+                )
+            )
+            result.insertedCount += 1
+        }
+        return result
     }
 
     func saveManual(

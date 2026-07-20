@@ -18,6 +18,7 @@ struct AppDependencies {
     let dockRenderer: any DockRendering
     let settingsStore: SettingsStore
     let viewModel: MainViewModel
+    let screenshotImportCoordinator: any ScreenshotImportCoordinating
 
     static func make(
         environment: AppEnvironment = .current
@@ -48,6 +49,20 @@ struct AppDependencies {
             dockRenderer = InertDockRenderer()
         }
 
+        // Recognition is local either way; an automated run uses a stub so no
+        // test depends on Vision output, which varies between OS revisions.
+        let ocrService: any ScreenshotOCRServicing
+        switch environment {
+        case .production:
+            ocrService = VisionScreenshotOCRService()
+        case .automatedTesting:
+            ocrService = InertScreenshotOCRService()
+        }
+        let screenshotImportCoordinator = ScreenshotImportCoordinator(
+            ocr: ocrService,
+            repository: repository
+        )
+
         let refreshCoordinator = RefreshCoordinator(
             fetcher: feedFetcher,
             parser: ICSParser(),
@@ -76,7 +91,8 @@ struct AppDependencies {
             notificationScheduler: notificationScheduler,
             dockRenderer: dockRenderer,
             settingsStore: settingsStore,
-            viewModel: viewModel
+            viewModel: viewModel,
+            screenshotImportCoordinator: screenshotImportCoordinator
         )
     }
 
