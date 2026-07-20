@@ -50,6 +50,7 @@
 		B07D431C640241F7C8EC2D70 /* CourseFilterMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */; };
 		B0FCA0D0BFD1BB1C2824ED33 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7473B249AF5056BAC114A76 /* ServiceManagement.framework */; };
 		B360C603B0A811EC158A3BA9 /* RefreshCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */; };
+		B5083DB1028BE9682BCB0511 /* CanvasScreenshotParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */; };
 		B8B433A900556A044BB747E9 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB23E4A7453EB83A9551245 /* NotificationService.swift */; };
 		BB369EA6E3C95E2F099BCF5C /* DockTileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2876D5254D102642C61016 /* DockTileService.swift */; };
 		BB9AF632D8B290AAAE2AB220 /* PresentationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA552A954169CE213739BA4 /* PresentationModels.swift */; };
@@ -105,6 +106,7 @@
 		40668D8C1FAC47414991A26D /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		49A3FB276155C9EA3C774E19 /* CanvasCountdown.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CanvasCountdown.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4EA2450F0BF5C12E1A3D720D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScreenshotParserTests.swift; sourceTree = "<group>"; };
 		56F304E836C57FB3DB040EE5 /* ScreenshotOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotOCRService.swift; sourceTree = "<group>"; };
 		5ABDEF05D9E2174EB73A68B2 /* AssignmentEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentEvent.swift; sourceTree = "<group>"; };
 		5DADDF014908B17CA6199D2D /* CanvasFeedFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcher.swift; sourceTree = "<group>"; };
@@ -296,6 +298,7 @@
 				D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */,
 				BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */,
 				AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */,
+				55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */,
 				EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */,
 				282F4005FAF96A677845EDC4 /* CourseScopeTests.swift */,
 				77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */,
@@ -480,6 +483,7 @@
 				C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */,
 				D819A504296ACA82DC7FCA12 /* CanvasDateTextParserTests.swift in Sources */,
 				86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */,
+				B5083DB1028BE9682BCB0511 /* CanvasScreenshotParserTests.swift in Sources */,
 				FC8400DCCC428468DB844F8C /* CountdownCalculatorTests.swift in Sources */,
 				B07D431C640241F7C8EC2D70 /* CourseFilterMenuTests.swift in Sources */,
 				F7DB77F45A451F93DB60B92C /* CourseScopeTests.swift in Sources */,
