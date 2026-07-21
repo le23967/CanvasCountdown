@@ -260,14 +260,7 @@ struct MainView: View {
                     )
                 }
                 ToolbarItem(id: "action.add", placement: .primaryAction) {
-                    toolbarButton(
-                        systemImage: "plus",
-                        title: "Add",
-                        description: "Add manual event"
-                    ) {
-                        viewModel.presentNewManualEvent()
-                    }
-                    .keyboardShortcut("n", modifiers: .command)
+                    addMenu
                 }
                 ToolbarItem(id: "action.settings", placement: .primaryAction) {
                     toolbarButton(
@@ -289,6 +282,45 @@ struct MainView: View {
                 }
             }
         }
+    }
+
+    /// The three ways to get an event in, gathered under the one control a
+    /// person actually reaches for.
+    ///
+    /// Screenshot import used to live only in the File menu, where nobody found
+    /// it. A menu here costs no toolbar width, so it cannot bring back the
+    /// crowding that pushed items into the overflow.
+    private var addMenu: some View {
+        Menu {
+            Button {
+                viewModel.prepareForToolbarAction()
+                viewModel.presentNewManualEvent()
+            } label: {
+                Label("Add Manual Event…", systemImage: "calendar.badge.plus")
+            }
+            .keyboardShortcut("n", modifiers: .command)
+
+            Divider()
+
+            Button {
+                viewModel.prepareForToolbarAction()
+                viewModel.presentFeedImport()
+            } label: {
+                Label("Import Canvas Feed…", systemImage: "link")
+            }
+
+            Button {
+                viewModel.presentScreenshotImport()
+            } label: {
+                Label("Import from Screenshot…", systemImage: "text.viewfinder")
+            }
+            .keyboardShortcut("i", modifiers: [.command, .shift])
+        } label: {
+            Label("Add", systemImage: "plus")
+        }
+        .menuIndicator(.hidden)
+        .help("Add an event, or import from Canvas")
+        .accessibilityLabel("Add or import events")
     }
 
     /// The search field, shown only in search mode.
