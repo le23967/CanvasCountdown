@@ -37,19 +37,21 @@ final class AssistantTests: XCTestCase {
 
     // MARK: - Defaults and privacy posture
 
-    func testAssistantIsOffByDefaultAndLocalWhenFirstTurnedOn() {
+    func testDefaultsAreAvailableButNeverSendAnythingAway() {
         let defaults = AssistantSettings.defaults
 
-        XCTAssertFalse(
-            defaults.isEnabled,
-            "Nothing may leave this Mac until the user turns it on"
+        // Available out of the box, so the toolbar button does something when
+        // pressed rather than leading to a dead end.
+        XCTAssertTrue(defaults.isEnabled)
+
+        // What must never drift: the default configuration cannot upload
+        // anything. Choosing a cloud provider is a separate, deliberate act.
+        XCTAssertEqual(defaults.provider, .local)
+        XCTAssertTrue(
+            defaults.staysOnThisMac,
+            "The default must never reach off this Mac"
         )
-        XCTAssertEqual(
-            defaults.provider,
-            .local,
-            "The private option is the starting point"
-        )
-        XCTAssertTrue(defaults.staysOnThisMac)
+        XCTAssertFalse(defaults.provider.requiresAPIKey)
     }
 
     func testSwitchingProviderCarriesItsOwnEndpointAndModel() {
@@ -235,8 +237,10 @@ final class AssistantTests: XCTestCase {
     // MARK: - Errors
 
     func testDisabledAssistantRefusesBeforeAnyRequest() async {
+        var settings = AssistantSettings.defaults
+        settings.isEnabled = false
         let service = ChatCompletionsAssistantService(
-            settings: .defaults,
+            settings: settings,
             apiKey: nil,
             session: Self.refusingSession(),
             calendar: calendar

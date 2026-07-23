@@ -170,9 +170,96 @@ final class MainViewModel {
 
     // MARK: - Assistant
 
+    var isAssistantPanelShown = false
+    private(set) var assistantSummary: String?
+    private(set) var assistantDrafts: [AssistantDraftTask] = []
+    private(set) var isAssistantBusy = false
+    private(set) var assistantErrorMessage: String?
+
     /// Read back so the field can show what is stored without the key ever
     /// touching preferences or diagnostics.
     private(set) var assistantAPIKey = ""
+
+    var hasSaveableDrafts: Bool {
+        assistantDrafts.contains { $0.include && $0.canBeSaved }
+    }
+
+    private func makeAssistant() -> any AssistantServicing {
+        ChatCompletionsAssistantService(
+            settings: settingsStore.assistant,
+            apiKey: assistantAPIKey.isEmpty ? nil : assistantAPIKey,
+            calendar: calendar
+        )
+    }
+
+    func summariseWorkload() async {
+        isAssistantBusy = true
+        assistantErrorMessage = nil
+        defer { isAssistantBusy = false }
+        do {
+            assistantSummary = try await makeAssistant().summarise(
+                assistantDigests(),
+                now: .now
+            )
+        } catch {
+            assistantSummary = nil
+            assistantErrorMessage = error.localizedDescription
+        }
+    }
+
+    func draftTask(from text: String) async {
+        isAssistantBusy = true
+        assistantErrorMessage = nil
+        defer { isAssistantBusy = false }
+        do {
+            let drafts = try await makeAssistant().draftTasks(from: text, now: .now)
+            if drafts.isEmpty {
+                assistantErrorMessage =
+                    "Nothing could be read from that. Try naming the task and when it is due."
+            }
+            assistantDrafts = drafts
+        } catch {
+            assistantErrorMessage = error.localizedDescription
+        }
+    }
+
+    func updateAssistantDraft(_ draft: AssistantDraftTask) {
+        guard let index = assistantDrafts.firstIndex(where: { $0.id == draft.id }) else {
+            return
+        }
+        assistantDrafts[index] = draft
+    }
+
+    func clearAssistantDrafts() {
+        assistantDrafts = []
+    }
+
+    /// Saves only the drafts the user kept, through the ordinary manual-event
+    /// path, so nothing the model produced bypasses validation.
+    func saveAssistantDrafts(_ drafts: [AssistantDraftTask]) async {
+        var saved = 0
+        for draft in drafts where draft.include && draft.canBeSaved {
+            guard let dueDate = draft.dueDate else {
+                continue
+            }
+            do {
+                try await saveManualEvent(
+                    ManualEventDraft(
+                        title: draft.title,
+                        courseName: draft.courseName ?? "",
+                        dueDate: dueDate
+                    )
+                )
+                saved += 1
+            } catch {
+                present(error)
+            }
+        }
+        assistantDrafts = []
+        if saved > 0 {
+            showTransientStatus(saved == 1 ? "1 task added" : "\(saved) tasks added")
+        }
+    }
 
     func loadAssistantKey() async {
         assistantAPIKey = (try? await assistantKeyStore.load()) ?? ""
@@ -301,7 +388,7 @@ final class MainViewModel {
     /// Keeping the search layout down to two items is what stops the field
     /// being pushed into the toolbar's overflow menu.
     var toolbarItemCount: Int {
-        isSearchModeActive ? 2 : 6
+        isSearchModeActive ? 2 : 7
     }
 
     func clearSearchQuery() {
@@ -443,6 +530,7 @@ final class MainViewModel {
             )
             notificationPermission = NotificationPermissionState(permission)
             dockRenderer.apply(appearance: settingsStore.dockAppearance)
+            await loadAssistantKey()
             synchronizeDock()
 
             if automaticActivityEnabled, feedURL == nil, assignments.isEmpty {

@@ -23,6 +23,12 @@ struct MainView: View {
         .task {
             await viewModel.start()
         }
+        .inspector(isPresented: $viewModel.isAssistantPanelShown) {
+            AssistantPanelView(viewModel: viewModel) { drafts in
+                await viewModel.saveAssistantDrafts(drafts)
+            }
+            .inspectorColumnWidth(min: 280, ideal: 340, max: 420)
+        }
         .background(ToolbarDisplayModeConfigurator())
         // The field's focus and the view model's copy of it are kept in step so
         // any part of the app can release focus without reaching into the view.
@@ -202,12 +208,19 @@ struct MainView: View {
             } else {
                 if (viewModel.sidebarSelection ?? .upcoming) == .upcoming,
                    let nearest = viewModel.nearestAssignment {
-                    NearestAssignmentCard(
-                        item: nearest,
-                        now: viewModel.currentDate
-                    )
-                        .padding(.horizontal, 22)
-                        .padding(.bottom, 14)
+                    // The full card is worth its height above a list. Above a
+                    // month grid it repeats what the grid already shows and
+                    // pushes the weeks off the window, so it shrinks to a line.
+                    if viewModel.assignmentViewMode == .calendar {
+                        compactNextDeadline(nearest)
+                    } else {
+                        NearestAssignmentCard(
+                            item: nearest,
+                            now: viewModel.currentDate
+                        )
+                            .padding(.horizontal, 22)
+                            .padding(.bottom, 14)
+                    }
                 }
 
                 if viewModel.assignmentViewMode == .calendar {
@@ -280,6 +293,20 @@ struct MainView: View {
                     ) {
                         viewModel.sidebarSelection = .settings
                     }
+                }
+                ToolbarItem(id: "action.assistant", placement: .primaryAction) {
+                    toolbarButton(
+                        systemImage: viewModel.isAssistantPanelShown
+                            ? "sparkles.rectangle.stack.fill"
+                            : "sparkles",
+                        title: "Assistant",
+                        description: viewModel.isAssistantPanelShown
+                            ? "Hide the assistant"
+                            : "Show the assistant"
+                    ) {
+                        viewModel.isAssistantPanelShown.toggle()
+                    }
+                    .keyboardShortcut("a", modifiers: [.command, .option])
                 }
                 ToolbarItem(id: "action.search", placement: .primaryAction) {
                     toolbarButton(
@@ -430,6 +457,29 @@ struct MainView: View {
         }
         .help(description)
         .accessibilityLabel(description)
+    }
+
+    private func compactNextDeadline(_ item: AssignmentListItem) -> some View {
+        HStack(spacing: 8) {
+            Text("\(item.remainingDays(relativeTo: viewModel.currentDate))")
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+            Text("days left")
+                .foregroundStyle(.secondary)
+            Text("·")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(item.title)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .font(.callout)
+        .padding(.horizontal, 22)
+        .padding(.bottom, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Next deadline, \(item.title), \(item.remainingDays(relativeTo: viewModel.currentDate)) days left"
+        )
     }
 
     private var dashboardHeader: some View {

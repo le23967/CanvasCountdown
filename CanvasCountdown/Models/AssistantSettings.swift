@@ -68,14 +68,17 @@ enum AssistantProvider: String, Codable, CaseIterable, Identifiable, Sendable {
 
 /// Everything about the assistant except the API key, which lives in Keychain.
 struct AssistantSettings: Equatable, Codable, Sendable {
-    /// Off until the user turns it on and sees what would be sent.
+    /// On by default, but only ever local by default: a model on this Mac
+    /// uploads nothing, so the feature can be available without the app quietly
+    /// deciding to send anything anywhere. Choosing Groq is a separate,
+    /// deliberate act.
     var isEnabled: Bool
     var provider: AssistantProvider
     var baseURL: String
     var model: String
 
     static let defaults = AssistantSettings(
-        isEnabled: false,
+        isEnabled: true,
         provider: .local,
         baseURL: AssistantProvider.local.defaultBaseURL,
         model: AssistantProvider.local.defaultModel

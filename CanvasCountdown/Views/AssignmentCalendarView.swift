@@ -19,20 +19,17 @@ struct AssignmentCalendarView: View {
             monthBar
             weekdayHeader
 
-            LazyVGrid(columns: columns, spacing: 1) {
-                ForEach(viewModel.calendarDays) { day in
-                    dayCell(day)
+            // Scrolls, so a tall month can never push the page header off the
+            // top of the window or hide what is below it.
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 1) {
+                    ForEach(viewModel.calendarDays) { day in
+                        dayCell(day)
+                    }
                 }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 22)
-
-            if viewModel.selectedCalendarDay != nil {
-                Divider()
-                    .padding(.top, 12)
-                selectedDayList
-            }
-
-            Spacer(minLength: 0)
         }
     }
 
@@ -145,6 +142,21 @@ struct AssignmentCalendarView: View {
         .onTapGesture {
             viewModel.selectCalendarDay(isSelected ? nil : day.date)
         }
+        // Anchored to the day that was clicked, so the answer appears where the
+        // question was asked instead of somewhere below the fold.
+        .popover(
+            isPresented: Binding(
+                get: { isSelected },
+                set: { shown in
+                    if !shown {
+                        viewModel.selectCalendarDay(nil)
+                    }
+                }
+            ),
+            arrowEdge: .bottom
+        ) {
+            dayPopover(day)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel(day))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -169,17 +181,18 @@ struct AssignmentCalendarView: View {
             + day.items.map(\.title).joined(separator: ", ")
     }
 
-    private var selectedDayList: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if viewModel.selectedDayItems.isEmpty {
-                Text("No assignments on this day")
-                    .font(.callout)
+    private func dayPopover(_ day: CalendarDay) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(day.date.formatted(date: .complete, time: .omitted))
+                .font(.headline)
+
+            if day.items.isEmpty {
+                Text("Nothing due on this day")
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 22)
-                    .padding(.top, 10)
             } else {
-                ForEach(viewModel.selectedDayItems) { item in
+                ForEach(day.items) { item in
                     Button {
+                        viewModel.selectCalendarDay(nil)
                         onOpen(item)
                     } label: {
                         AssignmentRowView(item: item, now: viewModel.currentDate)
@@ -187,10 +200,14 @@ struct AssignmentCalendarView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 22)
+
+                    if item.id != day.items.last?.id {
+                        Divider()
+                    }
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(16)
+        .frame(minWidth: 320, maxWidth: 420)
     }
 }

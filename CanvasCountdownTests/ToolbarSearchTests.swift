@@ -279,12 +279,12 @@ final class ToolbarSearchTests: XCTestCase {
         await context.viewModel.start()
         context.viewModel.presentSearch()
 
-        // Two items instead of six is what keeps the field out of the overflow
-        // menu at the supported minimum window width.
+        // Two items instead of seven is what keeps the field out of the
+        // overflow menu at the supported minimum window width.
         XCTAssertEqual(context.viewModel.toolbarItemCount, 2)
 
         context.viewModel.dismissSearch()
-        XCTAssertEqual(context.viewModel.toolbarItemCount, 6)
+        XCTAssertEqual(context.viewModel.toolbarItemCount, 7)
     }
 
     // MARK: - Toolbar presentation
