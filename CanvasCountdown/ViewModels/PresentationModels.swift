@@ -35,6 +35,31 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum AssignmentViewMode: String, CaseIterable, Identifiable, Sendable {
+    case list
+    case calendar
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .list:
+            "List"
+        case .calendar:
+            "Calendar"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .list:
+            "list.bullet"
+        case .calendar:
+            "calendar"
+        }
+    }
+}
+
 struct AssignmentListItem: Identifiable, Hashable, Sendable {
     let id: UUID
     var title: String

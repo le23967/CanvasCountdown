@@ -25,6 +25,12 @@ final class MainViewModel {
     var isSearchFieldFocused = false
     var selectedCourse: String?
     var showCompletedAndIgnored = false
+    /// List or calendar. Two ways of looking at the same filtered events, not
+    /// two different sets of events.
+    var assignmentViewMode: AssignmentViewMode = .list
+    /// The month the calendar is showing.
+    var calendarMonth = Date.now
+    var selectedCalendarDay: Date?
     var currentDate = Date.now
     var settingsForm: SettingsFormState
     var notificationPermission: NotificationPermissionState = .notDetermined
@@ -156,6 +162,50 @@ final class MainViewModel {
     /// Nil selects every course.
     func selectCourse(_ course: String?) {
         selectedCourse = course
+    }
+
+    // MARK: - Calendar
+
+    /// The month grid, built from exactly the events the list would show.
+    var calendarDays: [CalendarDay] {
+        AssignmentCalendar.month(
+            containing: calendarMonth,
+            events: filteredAssignments,
+            calendar: calendar,
+            now: currentDate
+        )
+    }
+
+    var calendarMonthTitle: String {
+        AssignmentCalendar.monthTitle(for: calendarMonth, calendar: calendar)
+    }
+
+    /// Events on the selected day, or an empty list when no day is chosen.
+    var selectedDayItems: [AssignmentListItem] {
+        guard let selectedCalendarDay else {
+            return []
+        }
+        return filteredAssignments
+            .filter { calendar.isDate($0.dueDate, inSameDayAs: selectedCalendarDay) }
+            .sorted { $0.dueDate < $1.dueDate }
+    }
+
+    func showCalendarMonth(offsetBy months: Int) {
+        calendarMonth = AssignmentCalendar.month(
+            byAdding: months,
+            to: calendarMonth,
+            calendar: calendar
+        )
+        selectedCalendarDay = nil
+    }
+
+    func showCurrentMonth() {
+        calendarMonth = .now
+        selectedCalendarDay = nil
+    }
+
+    func selectCalendarDay(_ day: Date?) {
+        selectedCalendarDay = day
     }
 
     // MARK: - Search

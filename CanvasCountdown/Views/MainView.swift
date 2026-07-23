@@ -206,7 +206,13 @@ struct MainView: View {
                         .padding(.bottom, 14)
                 }
 
-                assignmentList
+                if viewModel.assignmentViewMode == .calendar {
+                    AssignmentCalendarView(viewModel: viewModel) { item in
+                        viewModel.presentEditor(for: item)
+                    }
+                } else {
+                    assignmentList
+                }
             }
         }
         .navigationTitle("Canvas Countdown")
@@ -432,6 +438,21 @@ struct MainView: View {
             }
 
             Spacer()
+
+            if (viewModel.sidebarSelection ?? .upcoming) != .settings {
+                Picker("View", selection: $viewModel.assignmentViewMode) {
+                    ForEach(AssignmentViewMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.systemImage)
+                            .labelStyle(.iconOnly)
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 84)
+                .help("Switch between list and calendar")
+                .accessibilityLabel("View mode")
+            }
 
             if viewModel.isRefreshing {
                 ProgressView()
