@@ -86,6 +86,30 @@ Screenshots are held in memory only for the length of the review and are
 discarded when the sheet closes. No image, image path or recognised text is
 written to the database or to exported diagnostics.
 
+## Optional AI assistant
+
+**Off by default.** Canvas Countdown works completely without it.
+
+**Settings → AI Assistant** can connect either of two things:
+
+- **On this Mac** — a local server such as Ollama. Nothing is uploaded.
+- **Groq (cloud)** — a hosted model. **Assignment titles, course names and due
+  dates are sent to Groq.** Nothing else is: not the feed URL, not your
+  completed or ignored marks, not the database.
+
+A local model is usually less reliable at reading a date out of a sentence, and
+a hosted one is usually better. That is the trade being made, and it is yours to
+make.
+
+The assistant can summarise what is coming up, and turn a sentence into a draft
+task. **Anything it proposes is reviewed by you before it is saved**, exactly
+like screenshot import, and it never edits or deletes an existing event. If the
+model replies with something unreadable, no task is created rather than a task
+with an invented deadline.
+
+The Groq API key is stored in the macOS Keychain, never in preferences or
+diagnostics.
+
 ## The Dock icon
 
 The application icon and the running Dock tile share one renderer, so they look
@@ -131,6 +155,9 @@ setting.
 - Feed downloads go directly from the Mac to the HTTPS URL supplied by the
   user.
 - The app has no analytics, tracking, cloud sync, or application server.
+- The optional AI assistant is off by default. When it is switched on and set to
+  Groq, assignment titles, course names and due dates are sent to Groq. Set to
+  run on this Mac, nothing is uploaded.
 - Logs and exported diagnostics never include the feed URL, its query string,
   or embedded credentials.
 - Notifications are scheduled locally with macOS.

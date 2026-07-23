@@ -170,6 +170,10 @@ struct MainView: View {
                 },
                 onResetDockAppearance: {
                     viewModel.resetDockAppearance()
+                },
+                assistantAPIKey: viewModel.assistantAPIKey,
+                onSaveAssistantKey: { key in
+                    viewModel.saveAssistantKey(key)
                 }
             )
         } else {

@@ -24,9 +24,11 @@
 		3C95666807557DF0AC2BAB00 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF44862D6D66155114DB0551 /* AppEnvironment.swift */; };
 		40711829F2493E315B650325 /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2792182D2C91DAEF8CA975CC /* RefreshCoordinator.swift */; };
 		4524E510E23EF70ABDD68742 /* EventInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */; };
+		458BD306852C568BFD818170 /* AssistantService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F88E929469A17930D9732D /* AssistantService.swift */; };
 		468C50E4CA3946964D02D708 /* ICSParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7BFB7D37A5B236476760DEB /* ICSParserTests.swift */; };
 		481366BF3368F9F0C2EC27CA /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 40668D8C1FAC47414991A26D /* Security.framework */; };
 		4A3C9328B7FE3B6B7783F4C6 /* FeedExclusionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */; };
+		4AA68D420BCAF0DEE75A5E26 /* AssistantTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD057CBAC80A157FFC612859 /* AssistantTests.swift */; };
 		4B19C4F14552EDE139926B41 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4EA2450F0BF5C12E1A3D720D /* Preview Assets.xcassets */; };
 		5A8A98B82182A95BE9DA0309 /* CanvasFeedFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DADDF014908B17CA6199D2D /* CanvasFeedFetcher.swift */; };
 		60CAAF02CD0A8552A79C6CC8 /* AssignmentCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C81D7C5B54877531FB8560D /* AssignmentCalendarTests.swift */; };
@@ -42,6 +44,7 @@
 		8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */; };
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
 		8F3B103D54BF8DEF9C98717A /* CanvasDateTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76BC7128DEFCEAA70AC73E7 /* CanvasDateTextParser.swift */; };
+		93DA62B41C768B713C5AF2DB /* AssistantSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */; };
 		9B47B94F2FE60BCAC73AA55A /* DockTileLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722BC99654E82DFC600CF02B /* DockTileLayout.swift */; };
 		9C29E48C0B1610E753799035 /* NearestAssignmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */; };
 		9E1869235312809AF07D16A2 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BA7EC3B8DA2FAABFCDCED1 /* LaunchAtLoginController.swift */; };
@@ -111,6 +114,7 @@
 		3C81D7C5B54877531FB8560D /* AssignmentCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentCalendarTests.swift; sourceTree = "<group>"; };
 		3D1AD4BF52000EEFFDE32B09 /* CanvasCountdownTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CanvasCountdownTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		40668D8C1FAC47414991A26D /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		41F88E929469A17930D9732D /* AssistantService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantService.swift; sourceTree = "<group>"; };
 		49A3FB276155C9EA3C774E19 /* CanvasCountdown.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CanvasCountdown.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4EA2450F0BF5C12E1A3D720D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScreenshotParserTests.swift; sourceTree = "<group>"; };
@@ -147,7 +151,9 @@
 		AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcherTests.swift; sourceTree = "<group>"; };
 		AC943AD74D13FFCB7FE6B925 /* AssignmentCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentCalendar.swift; sourceTree = "<group>"; };
 		ACF4898F04D7CB05B2B9E3B2 /* ToolbarSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarSearchTests.swift; sourceTree = "<group>"; };
+		AD057CBAC80A157FFC612859 /* AssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantTests.swift; sourceTree = "<group>"; };
 		BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasDateTextParserTests.swift; sourceTree = "<group>"; };
+		BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSettings.swift; sourceTree = "<group>"; };
 		BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasCountdownApp.swift; sourceTree = "<group>"; };
 		C8405352AB9D291A1D57D03C /* ImportedEventDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedEventDetailsView.swift; sourceTree = "<group>"; };
 		CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduleTests.swift; sourceTree = "<group>"; };
@@ -254,6 +260,7 @@
 			children = (
 				FA728C6E0402225EBF5D05FB /* AppSettings.swift */,
 				5ABDEF05D9E2174EB73A68B2 /* AssignmentEvent.swift */,
+				BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */,
 				354D08732371A4156B46E57D /* DockAppearance.swift */,
 				77030799B2DA28706F2F6C2D /* ReminderRule.swift */,
 				CF8B1F1723B52C6DE98E2EF0 /* ScreenshotImport.swift */,
@@ -312,6 +319,7 @@
 			children = (
 				3C81D7C5B54877531FB8560D /* AssignmentCalendarTests.swift */,
 				D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */,
+				AD057CBAC80A157FFC612859 /* AssistantTests.swift */,
 				BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */,
 				AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */,
 				55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */,
@@ -352,6 +360,7 @@
 		C1193CEA8BA431F913F2DB47 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				41F88E929469A17930D9732D /* AssistantService.swift */,
 				5DADDF014908B17CA6199D2D /* CanvasFeedFetcher.swift */,
 				AA2876D5254D102642C61016 /* DockTileService.swift */,
 				EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */,
@@ -500,6 +509,7 @@
 			files = (
 				60CAAF02CD0A8552A79C6CC8 /* AssignmentCalendarTests.swift in Sources */,
 				C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */,
+				4AA68D420BCAF0DEE75A5E26 /* AssistantTests.swift in Sources */,
 				D819A504296ACA82DC7FCA12 /* CanvasDateTextParserTests.swift in Sources */,
 				86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */,
 				B5083DB1028BE9682BCB0511 /* CanvasScreenshotParserTests.swift in Sources */,
@@ -536,6 +546,8 @@
 				207ECB3CDA432C977A51C6B6 /* AssignmentEvent.swift in Sources */,
 				8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */,
 				C465D6530DCC2B2B59101061 /* AssignmentRowView.swift in Sources */,
+				458BD306852C568BFD818170 /* AssistantService.swift in Sources */,
+				93DA62B41C768B713C5AF2DB /* AssistantSettings.swift in Sources */,
 				E8EE34FA5853590E9242C1F3 /* CanvasCountdownApp.swift in Sources */,
 				8F3B103D54BF8DEF9C98717A /* CanvasDateTextParser.swift in Sources */,
 				5A8A98B82182A95BE9DA0309 /* CanvasFeedFetcher.swift in Sources */,

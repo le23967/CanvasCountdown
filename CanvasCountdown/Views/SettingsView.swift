@@ -42,7 +42,11 @@ struct SettingsView: View {
     let onResetReminders: @MainActor () -> Void
     let onApplyDockTheme: @MainActor (DockThemePreset) -> Void
     let onResetDockAppearance: @MainActor () -> Void
+    let assistantAPIKey: String
+    let onSaveAssistantKey: @MainActor (String) -> Void
 
+    @State private var apiKeyDraft = ""
+    @State private var revealAPIKey = false
     @State private var previewValue: Int? = 7
     @State private var hoveredSize: DockNumberSize?
     @State private var editingRule: ReminderRule?
@@ -65,6 +69,7 @@ struct SettingsView: View {
             notificationSection
             courseFilteringSection
             dockSection
+            assistantSection
             systemSection
             dataSection
         }
@@ -566,6 +571,91 @@ struct SettingsView: View {
             Text("Course Filtering")
         } footer: {
             Text("Applies to Upcoming, the nearest deadline card and the Dock countdown. All Events and Completed always show everything, and events without a course are always included.")
+        }
+    }
+
+    private var assistantSection: some View {
+        Section {
+            Toggle("Use an AI assistant", isOn: $settings.assistant.isEnabled)
+
+            if settings.assistant.isEnabled {
+                Picker("Runs", selection: Binding(
+                    get: { settings.assistant.provider },
+                    set: { settings.assistant = AssistantSettings.applying($0, to: settings.assistant) }
+                )) {
+                    ForEach(AssistantProvider.allCases) { provider in
+                        Text(provider.title).tag(provider)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                // The whole decision, stated where it is made.
+                Label(
+                    settings.assistant.staysOnThisMac
+                        ? AssistantProvider.local.privacySummary
+                        : AssistantProvider.groq.privacySummary,
+                    systemImage: settings.assistant.staysOnThisMac ? "lock.fill" : "arrow.up.right.circle.fill"
+                )
+                .font(.callout)
+                .foregroundStyle(
+                    settings.assistant.staysOnThisMac
+                        ? AnyShapeStyle(.secondary)
+                        : AnyShapeStyle(Color.orange)
+                )
+
+                Text(settings.assistant.provider.qualityNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("Address", text: $settings.assistant.baseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Assistant address")
+
+                TextField("Model", text: $settings.assistant.model)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Assistant model")
+
+                if settings.assistant.provider.requiresAPIKey {
+                    HStack {
+                        Group {
+                            if revealAPIKey {
+                                TextField("API key", text: $apiKeyDraft)
+                            } else {
+                                SecureField("API key", text: $apiKeyDraft)
+                            }
+                        }
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Assistant API key")
+
+                        Button {
+                            revealAPIKey.toggle()
+                        } label: {
+                            Image(systemName: revealAPIKey ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(revealAPIKey ? "Hide API key" : "Reveal API key")
+
+                        Button("Save Key") {
+                            onSaveAssistantKey(apiKeyDraft)
+                        }
+                        .disabled(apiKeyDraft == assistantAPIKey)
+                    }
+
+                    Label(
+                        "Stored in the macOS Keychain, never in preferences or diagnostics.",
+                        systemImage: "lock.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("AI Assistant (optional)")
+        } footer: {
+            Text("Off by default. It can summarise your workload and turn a sentence into a task, and anything it proposes is reviewed by you before it is saved. It never changes an event on its own.")
+        }
+        .onAppear {
+            apiKeyDraft = assistantAPIKey
         }
     }
 

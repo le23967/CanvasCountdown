@@ -232,6 +232,7 @@ struct SettingsFormState: Equatable, Sendable {
     var refreshInterval: RefreshIntervalOption = .sixHours
     var reminderSchedule: ReminderSchedule = .defaults
     var dockAppearance: DockAppearance = .defaults
+    var assistant: AssistantSettings = .defaults
     var dockLabel: DockLabelOption = .english
     var dockCourseScope: DockCourseScopeOption = .allAssignments
     var selectedCourses: Set<String> = []
@@ -301,6 +302,7 @@ extension SettingsFormState {
             refreshInterval: RefreshIntervalOption(settings.refreshInterval),
             reminderSchedule: settings.reminderSchedule,
             dockAppearance: settings.dockAppearance,
+            assistant: settings.assistant,
             dockLabel: DockLabelOption(settings.dockDisplayLanguage),
             dockCourseScope: DockCourseScopeOption(settings.dockCountMode),
             selectedCourses: settings.selectedCourses,

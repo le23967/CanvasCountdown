@@ -83,6 +83,8 @@ final class MainViewModel {
     @ObservationIgnored
     private var transientStatusTask: Task<Void, Never>?
     @ObservationIgnored
+    private let assistantKeyStore: KeychainAssistantKeyStore
+    @ObservationIgnored
     private var hasStarted = false
 
     init(
@@ -93,8 +95,10 @@ final class MainViewModel {
         dockRenderer: any DockRendering,
         notificationScheduler: any NotificationScheduling,
         calendar: Calendar = .autoupdatingCurrent,
-        automaticActivityEnabled: Bool = true
+        automaticActivityEnabled: Bool = true,
+        assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore()
     ) {
+        self.assistantKeyStore = assistantKeyStore
         self.automaticActivityEnabled = automaticActivityEnabled
         self.repository = repository
         self.refreshCoordinator = refreshCoordinator
@@ -162,6 +166,43 @@ final class MainViewModel {
     /// Nil selects every course.
     func selectCourse(_ course: String?) {
         selectedCourse = course
+    }
+
+    // MARK: - Assistant
+
+    /// Read back so the field can show what is stored without the key ever
+    /// touching preferences or diagnostics.
+    private(set) var assistantAPIKey = ""
+
+    func loadAssistantKey() async {
+        assistantAPIKey = (try? await assistantKeyStore.load()) ?? ""
+    }
+
+    func saveAssistantKey(_ key: String) {
+        Task {
+            do {
+                try await assistantKeyStore.save(key)
+                assistantAPIKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                showTransientStatus("Assistant key saved")
+            } catch {
+                present(error)
+            }
+        }
+    }
+
+    /// Only the three agreed fields, and only for what is currently in scope.
+    func assistantDigests() -> [AssistantAssignmentDigest] {
+        visibleUpcomingAssignments
+            .filter { !$0.isCompleted && !$0.isIgnored && $0.dueDate >= currentDate }
+            .map(AssistantAssignmentDigest.init)
+    }
+
+    var isAssistantEnabled: Bool {
+        settingsStore.assistant.isEnabled
+    }
+
+    var assistantSettings: AssistantSettings {
+        settingsStore.assistant
     }
 
     // MARK: - Calendar
@@ -637,6 +678,8 @@ final class MainViewModel {
             settingsStore.reminderSchedule != form.reminderSchedule
         settingsStore.reminderSchedule = form.reminderSchedule
 
+        settingsStore.assistant = form.assistant
+
         // Colours the user cannot read are corrected rather than stored.
         let appearance = form.dockAppearance.correctedForContrast()
         if settingsStore.dockAppearance != appearance {
@@ -832,6 +875,9 @@ final class MainViewModel {
             "dockLanguage=\(settingsStore.dockDisplayLanguage.rawValue)",
             "dockNumberSize=\(settingsStore.dockAppearance.numberSize.rawValue)",
             "dockTheme=\(settingsStore.dockAppearance.preset.rawValue)",
+            "assistantEnabled=\(settingsStore.assistant.isEnabled)",
+            "assistantProvider=\(settingsStore.assistant.provider.rawValue)",
+            "assistantStaysLocal=\(settingsStore.assistant.staysOnThisMac)",
             "dockCountMode=\(settingsStore.dockCountMode.rawValue)",
             "selectedCourseCount=\(settingsStore.selectedCourses.count)",
             "launchAtLogin=\(LaunchAtLoginController.isEnabled)",
