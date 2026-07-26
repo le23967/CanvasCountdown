@@ -3,6 +3,7 @@ import Foundation
 enum SidebarDestination: String, CaseIterable, Identifiable, Sendable {
     case upcoming
     case allEvents
+    case calendar
     case completed
     case settings
 
@@ -14,6 +15,8 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Sendable {
             "Upcoming"
         case .allEvents:
             "All Events"
+        case .calendar:
+            "Calendar"
         case .completed:
             "Completed"
         case .settings:
@@ -27,35 +30,12 @@ enum SidebarDestination: String, CaseIterable, Identifiable, Sendable {
             "calendar.badge.clock"
         case .allEvents:
             "list.bullet.rectangle"
+        case .calendar:
+            "calendar"
         case .completed:
             "checkmark.circle"
         case .settings:
             "gearshape"
-        }
-    }
-}
-
-enum AssignmentViewMode: String, CaseIterable, Identifiable, Sendable {
-    case list
-    case calendar
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .list:
-            "List"
-        case .calendar:
-            "Calendar"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .list:
-            "list.bullet"
-        case .calendar:
-            "calendar"
         }
     }
 }

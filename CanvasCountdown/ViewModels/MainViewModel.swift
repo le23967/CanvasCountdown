@@ -25,9 +25,6 @@ final class MainViewModel {
     var isSearchFieldFocused = false
     var selectedCourse: String?
     var showCompletedAndIgnored = false
-    /// List or calendar. Two ways of looking at the same filtered events, not
-    /// two different sets of events.
-    var assignmentViewMode: AssignmentViewMode = .list
     /// The month the calendar is showing.
     var calendarMonth = Date.now
     var selectedCalendarDay: Date?
@@ -278,6 +275,49 @@ final class MainViewModel {
             apiKey: assistantAPIKey.isEmpty ? nil : assistantAPIKey,
             calendar: calendar
         )
+    }
+
+    private(set) var conversation: [AssistantMessage] = []
+
+    /// Common openers, so a blank box is not the first thing anyone meets.
+    static let assistantSuggestions = [
+        "What is most urgent?",
+        "How many are due this week?",
+        "What should I start today?",
+    ]
+
+    func ask(_ question: String) async {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return
+        }
+        let history = conversation
+        conversation.append(AssistantMessage(role: .user, text: trimmed))
+        isAssistantBusy = true
+        assistantErrorMessage = nil
+        defer { isAssistantBusy = false }
+
+        do {
+            let reply = try await makeAssistant().answer(
+                trimmed,
+                history: history,
+                digests: assistantDigests(),
+                now: .now
+            )
+            conversation.append(
+                AssistantMessage(
+                    role: .assistant,
+                    text: reply.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            )
+        } catch {
+            assistantErrorMessage = error.localizedDescription
+        }
+    }
+
+    func clearConversation() {
+        conversation = []
+        assistantErrorMessage = nil
     }
 
     func summariseWorkload() async {
@@ -556,7 +596,10 @@ final class MainViewModel {
                     }
                     return showCompletedAndIgnored
                         || (!item.isCompleted && !item.isIgnored)
-                case .allEvents:
+                case .allEvents, .calendar:
+                    // The calendar shows the whole library. Restricting it to
+                    // what is still ahead would leave every past week blank,
+                    // which is not what a month grid is for.
                     return showCompletedAndIgnored
                         || (!item.isCompleted && !item.isIgnored)
                 case .completed:

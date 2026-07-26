@@ -185,8 +185,7 @@ final class AssignmentCalendarTests: XCTestCase {
     func testCalendarShowsExactlyWhatTheListShows() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.sidebarSelection = .upcoming
-        context.viewModel.assignmentViewMode = .calendar
+        context.viewModel.sidebarSelection = .calendar
         context.viewModel.calendarMonth = context.viewModel.currentDate
 
         let listTitles = Set(context.viewModel.filteredAssignments.map(\.title))
@@ -200,7 +199,7 @@ final class AssignmentCalendarTests: XCTestCase {
     func testCourseFilterAppliesToTheCalendarToo() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.sidebarSelection = .upcoming
+        context.viewModel.sidebarSelection = .calendar
         context.viewModel.calendarMonth = context.viewModel.currentDate
 
         context.viewModel.selectCourse("PHYS200")
@@ -214,7 +213,7 @@ final class AssignmentCalendarTests: XCTestCase {
     func testSearchAppliesToTheCalendarToo() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.sidebarSelection = .upcoming
+        context.viewModel.sidebarSelection = .calendar
         context.viewModel.calendarMonth = context.viewModel.currentDate
 
         context.viewModel.searchText = "Maths"
@@ -270,13 +269,34 @@ final class AssignmentCalendarTests: XCTestCase {
         XCTAssertEqual(context.viewModel.selectedDayItems.map(\.title), [target.title])
     }
 
-    func testViewModeDefaultsToListAndSwitches() async throws {
+    func testCalendarIsItsOwnSidebarSection() async throws {
         let context = try makeContext()
         await context.viewModel.start()
 
-        XCTAssertEqual(context.viewModel.assignmentViewMode, .list)
-        context.viewModel.assignmentViewMode = .calendar
-        XCTAssertEqual(context.viewModel.assignmentViewMode, .calendar)
+        XCTAssertTrue(SidebarDestination.allCases.contains(.calendar))
+        XCTAssertEqual(SidebarDestination.calendar.title, "Calendar")
+
+        context.viewModel.sidebarSelection = .calendar
+        XCTAssertEqual(context.viewModel.sidebarSelection, .calendar)
+    }
+
+    func testCalendarSectionShowsTheWholeLibraryNotJustWhatIsAhead() async throws {
+        // Upcoming hides anything already past. A month grid restricted the
+        // same way would leave every earlier week blank.
+        let context = try makeContext(includingPast: true)
+        await context.viewModel.start()
+
+        context.viewModel.sidebarSelection = .upcoming
+        let upcoming = context.viewModel.filteredAssignments.count
+
+        context.viewModel.sidebarSelection = .calendar
+        let onCalendar = context.viewModel.filteredAssignments.count
+
+        XCTAssertGreaterThan(
+            onCalendar,
+            upcoming,
+            "A past deadline still belongs on the calendar"
+        )
     }
 
     // MARK: - Helpers
@@ -285,7 +305,7 @@ final class AssignmentCalendarTests: XCTestCase {
         let viewModel: MainViewModel
     }
 
-    private func makeContext() throws -> Context {
+    private func makeContext(includingPast: Bool = false) throws -> Context {
         var testCalendar = Calendar(identifier: .gregorian)
         testCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
 
@@ -295,22 +315,31 @@ final class AssignmentCalendarTests: XCTestCase {
             return testCalendar.date(bySettingHour: 12, minute: 0, second: 0, of: day) ?? day
         }
 
-        let repository = ScopeRepositoryStub(
-            snapshots: [
+        var snapshots = [
+            AssignmentSnapshot(
+                title: "Maths sheet",
+                courseName: "MATH100",
+                dueDate: due(inDays: 1),
+                source: .canvasCalendarFeed
+            ),
+            AssignmentSnapshot(
+                title: "Physics lab",
+                courseName: "PHYS200",
+                dueDate: due(inDays: 3),
+                source: .canvasCalendarFeed
+            ),
+        ]
+        if includingPast {
+            snapshots.append(
                 AssignmentSnapshot(
-                    title: "Maths sheet",
+                    title: "Last week's reading",
                     courseName: "MATH100",
-                    dueDate: due(inDays: 1),
+                    dueDate: due(inDays: -6),
                     source: .canvasCalendarFeed
-                ),
-                AssignmentSnapshot(
-                    title: "Physics lab",
-                    courseName: "PHYS200",
-                    dueDate: due(inDays: 3),
-                    source: .canvasCalendarFeed
-                ),
-            ]
-        )
+                )
+            )
+        }
+        let repository = ScopeRepositoryStub(snapshots: snapshots)
 
         let suiteName = "AssignmentCalendarTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

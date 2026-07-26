@@ -9,7 +9,9 @@ struct AssistantPanelView: View {
     let onSaveDrafts: @MainActor ([AssistantDraftTask]) async -> Void
 
     @State private var request = ""
+    @State private var question = ""
     @FocusState private var isRequestFocused: Bool
+    @FocusState private var isQuestionFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -21,7 +23,7 @@ struct AssistantPanelView: View {
                     if !viewModel.isAssistantEnabled {
                         disabledNotice
                     } else {
-                        summarySection
+                        conversationSection
                         Divider()
                         draftSection
                     }
@@ -75,18 +77,37 @@ struct AssistantPanelView: View {
         }
     }
 
-    private var summarySection: some View {
+    private var conversationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("What should I start?")
-                .font(.subheadline.weight(.semibold))
+            if viewModel.conversation.isEmpty {
+                Text("Ask about your deadlines")
+                    .font(.subheadline.weight(.semibold))
 
-            Button {
-                Task { await viewModel.summariseWorkload() }
-            } label: {
-                Label("Summarise what is due", systemImage: "text.append")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Counts and dates are worked out by the app and handed to the
+                // model, so an answer about "how many" is not a guess.
+                Text("Counts and dates come from your own list, not from the model.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ForEach(MainViewModel.assistantSuggestions, id: \.self) { suggestion in
+                    Button(suggestion) {
+                        Task { await viewModel.ask(suggestion) }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(viewModel.isAssistantBusy)
+                }
+            } else {
+                ForEach(viewModel.conversation) { message in
+                    messageBubble(message)
+                }
+
+                Button("Clear conversation") {
+                    viewModel.clearConversation()
+                }
+                .buttonStyle(.link)
+                .font(.caption)
             }
-            .disabled(viewModel.isAssistantBusy)
 
             if viewModel.isAssistantBusy {
                 HStack(spacing: 6) {
@@ -96,15 +117,53 @@ struct AssistantPanelView: View {
                 .font(.callout)
             }
 
-            if let summary = viewModel.assistantSummary {
-                Text(summary)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            HStack(spacing: 6) {
+                TextField("Ask anything about your deadlines", text: $question, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...4)
+                    .focused($isQuestionFocused)
+                    .onSubmit(sendQuestion)
+                    .accessibilityLabel("Ask the assistant")
+
+                Button {
+                    sendQuestion()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .disabled(
+                    viewModel.isAssistantBusy
+                        || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+                .accessibilityLabel("Send")
             }
         }
+    }
+
+    private func messageBubble(_ message: AssistantMessage) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(message.role == .user ? "You" : "Assistant")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(message.text)
+                .font(.callout)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .background(
+            message.role == .user
+                ? AnyShapeStyle(.quaternary.opacity(0.35))
+                : AnyShapeStyle(Color.accentColor.opacity(0.12)),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+    }
+
+    private func sendQuestion() {
+        let text = question
+        question = ""
+        Task { await viewModel.ask(text) }
     }
 
     private var draftSection: some View {

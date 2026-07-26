@@ -33,7 +33,86 @@ struct AssistantDraftTask: Identifiable, Equatable, Sendable {
     }
 }
 
+/// One turn of the conversation.
+struct AssistantMessage: Identifiable, Equatable, Sendable {
+    enum Role: Equatable, Sendable {
+        case user
+        case assistant
+    }
+
+    let id: UUID
+    let role: Role
+    let text: String
+
+    init(id: UUID = UUID(), role: Role, text: String) {
+        self.id = id
+        self.role = role
+        self.text = text
+    }
+}
+
+/// Facts the app has worked out itself.
+///
+/// Counting and date arithmetic are given to the model rather than asked of it.
+/// A small local model will happily miscount a list; the app cannot. The model
+/// is left to do what it is actually good at, which is judgement and phrasing.
+struct AssistantFacts: Equatable, Sendable {
+    let total: Int
+    let dueThisWeek: Int
+    let dueThisMonth: Int
+    let overdue: Int
+    let nearestTitle: String?
+    let nearestInDays: Int?
+
+    init(
+        digests: [AssistantAssignmentDigest],
+        now: Date,
+        calendar: Calendar
+    ) {
+        let startOfToday = calendar.startOfDay(for: now)
+        func days(to date: Date) -> Int {
+            calendar.dateComponents(
+                [.day],
+                from: startOfToday,
+                to: calendar.startOfDay(for: date)
+            ).day ?? 0
+        }
+
+        total = digests.count
+        dueThisWeek = digests.filter { (0...7).contains(days(to: $0.dueDate)) }.count
+        dueThisMonth = digests.filter { (0...31).contains(days(to: $0.dueDate)) }.count
+        overdue = digests.filter { days(to: $0.dueDate) < 0 }.count
+
+        let nearest = digests.min { $0.dueDate < $1.dueDate }
+        nearestTitle = nearest?.title
+        nearestInDays = nearest.map { days(to: $0.dueDate) }
+    }
+
+    var promptLines: String {
+        var lines = [
+            "Total upcoming: \(total)",
+            "Due within 7 days: \(dueThisWeek)",
+            "Due within 31 days: \(dueThisMonth)",
+        ]
+        if overdue > 0 {
+            lines.append("Already past their date: \(overdue)")
+        }
+        if let nearestTitle, let nearestInDays {
+            lines.append("Nearest: \(nearestTitle), in \(nearestInDays) days")
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
 protocol AssistantServicing: Sendable {
+    /// Answers a question about the workload. Read-only: it changes nothing.
+    func answer(
+        _ question: String,
+        history: [AssistantMessage],
+        digests: [AssistantAssignmentDigest],
+        now: Date
+    ) async throws -> String
+
     /// A short plain-language summary of the workload. Read-only.
     func summarise(
         _ digests: [AssistantAssignmentDigest],
@@ -72,6 +151,52 @@ actor ChatCompletionsAssistantService: AssistantServicing {
             configuration.httpCookieAcceptPolicy = .never
             self.session = URLSession(configuration: configuration)
         }
+    }
+
+    func answer(
+        _ question: String,
+        history: [AssistantMessage],
+        digests: [AssistantAssignmentDigest],
+        now: Date = .now
+    ) async throws -> String {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+
+        let facts = AssistantFacts(digests: digests, now: now, calendar: calendar)
+        let lines = digests
+            .sorted { $0.dueDate < $1.dueDate }
+            .prefix(40)
+            .map { $0.line(now: now, calendar: calendar) }
+            .joined(separator: "\n")
+
+        // Recent turns only: enough to follow up, not enough to send the whole
+        // session every time.
+        let recent = history.suffix(6).map { turn in
+            [
+                "role": turn.role == .user ? "user" : "assistant",
+                "content": turn.text,
+            ]
+        }
+
+        return try await send(
+            system: """
+            You help a student manage coursework deadlines. Answer briefly and \
+            concretely, in the user's language. Use only the figures and items \
+            given below; the counts are already correct, so do not recount \
+            them. Never invent a deadline that is not listed. If something is \
+            not in the list, say so.
+
+            Figures:
+            \(facts.promptLines)
+
+            Items:
+            \(lines.isEmpty ? "none" : lines)
+            """,
+            user: trimmed,
+            history: recent
+        )
     }
 
     func summarise(
@@ -172,7 +297,11 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         }
     }
 
-    private func send(system: String, user: String) async throws -> String {
+    private func send(
+        system: String,
+        user: String,
+        history: [[String: String]] = []
+    ) async throws -> String {
         guard settings.isEnabled else {
             throw AssistantError.notConfigured
         }
@@ -194,10 +323,9 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
             "model": settings.model,
             "temperature": 0.2,
-            "messages": [
-                ["role": "system", "content": system],
-                ["role": "user", "content": user],
-            ],
+            "messages": [["role": "system", "content": system]]
+                + history
+                + [["role": "user", "content": user]],
         ])
 
         do {

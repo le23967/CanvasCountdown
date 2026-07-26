@@ -223,12 +223,12 @@ struct MainView: View {
                 ProgressView("Loading assignments…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                if (viewModel.sidebarSelection ?? .upcoming) == .upcoming,
+                if [.upcoming, .calendar].contains(viewModel.sidebarSelection ?? .upcoming),
                    let nearest = viewModel.nearestAssignment {
                     // The full card is worth its height above a list. Above a
                     // month grid it repeats what the grid already shows and
                     // pushes the weeks off the window, so it shrinks to a line.
-                    if viewModel.assignmentViewMode == .calendar {
+                    if (viewModel.sidebarSelection ?? .upcoming) == .calendar {
                         compactNextDeadline(nearest)
                     } else {
                         NearestAssignmentCard(
@@ -240,7 +240,7 @@ struct MainView: View {
                     }
                 }
 
-                if viewModel.assignmentViewMode == .calendar {
+                if (viewModel.sidebarSelection ?? .upcoming) == .calendar {
                     AssignmentCalendarView(viewModel: viewModel) { item in
                         viewModel.presentEditor(for: item)
                     }
@@ -526,21 +526,6 @@ struct MainView: View {
 
             Spacer()
 
-            if (viewModel.sidebarSelection ?? .upcoming) != .settings {
-                Picker("View", selection: $viewModel.assignmentViewMode) {
-                    ForEach(AssignmentViewMode.allCases) { mode in
-                        Label(mode.title, systemImage: mode.systemImage)
-                            .labelStyle(.iconOnly)
-                            .tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 84)
-                .help("Switch between list and calendar")
-                .accessibilityLabel("View mode")
-            }
-
             if viewModel.isRefreshing {
                 ProgressView()
                     .controlSize(.small)
@@ -669,7 +654,7 @@ struct MainView: View {
                         viewModel.presentScreenshotImport()
                     }
                 }
-            case .allEvents:
+            case .allEvents, .calendar:
                 ContentUnavailableView(
                     "No events",
                     systemImage: "calendar",
