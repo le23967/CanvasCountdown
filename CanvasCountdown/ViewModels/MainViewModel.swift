@@ -326,9 +326,24 @@ final class MainViewModel {
             availableWidth: availableAssistantWidth,
             current: assistantPresentation
         )
-        if next != assistantPresentation {
-            assistantPresentation = next
+        guard next != assistantPresentation else {
+            return
         }
+        move(to: next)
+    }
+
+    /// The single writer for the presentation.
+    ///
+    /// The sidebar and the popover are two presentation modifiers attached at
+    /// the same time, each bound to this one value, so the value being a single
+    /// case is what keeps them from both appearing. Every path that changes
+    /// where the assistant lives goes through here rather than assigning
+    /// directly.
+    private func move(to presentation: ActiveAssistantPresentation) {
+        guard presentation != assistantPresentation else {
+            return
+        }
+        assistantPresentation = presentation
     }
 
     func toggleAssistant() {
@@ -343,10 +358,12 @@ final class MainViewModel {
         if let item {
             assistantContext = AssistantContext(item)
         }
-        assistantPresentation = AssistantLayout.presentation(
-            preference: assistantPreference,
-            availableWidth: availableAssistantWidth,
-            current: assistantPresentation
+        move(
+            to: AssistantLayout.presentation(
+                preference: assistantPreference,
+                availableWidth: availableAssistantWidth,
+                current: assistantPresentation
+            )
         )
     }
 
@@ -356,28 +373,27 @@ final class MainViewModel {
 
     /// Explicit only: a detached window is never chosen for the user.
     func openAssistantInSeparateWindow() {
-        assistantPresentation = .separateWindow
+        move(to: .separateWindow)
     }
 
     func showAssistantAsPopover() {
-        assistantPresentation = .popover
+        move(to: .popover)
     }
 
     func showAssistantAsSidebar() {
-        assistantPresentation = AssistantLayout.fitsSidebar(
-            availableWidth: availableAssistantWidth,
-            current: assistantPresentation
-        ) ? .sidebar : .popover
+        move(to: .sidebar)
     }
 
     func setAssistantPreference(_ preference: AssistantPresentationPreference) {
         settingsForm.assistant.presentation = preference
         applySettings(settingsForm)
         if assistantPresentation.isOpen, assistantPresentation != .separateWindow {
-            assistantPresentation = AssistantLayout.presentation(
-                preference: preference,
-                availableWidth: availableAssistantWidth,
-                current: assistantPresentation
+            move(
+                to: AssistantLayout.presentation(
+                    preference: preference,
+                    availableWidth: availableAssistantWidth,
+                    current: assistantPresentation
+                )
             )
         }
     }

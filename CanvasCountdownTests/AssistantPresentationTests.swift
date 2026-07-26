@@ -68,28 +68,56 @@ final class AssistantPresentationTests: XCTestCase {
         )
     }
 
-    func testAnExplicitSidebarChoiceFallsBackRatherThanBreakingTheLayout() {
-        let presentation = AssistantLayout.presentation(
-            preference: .sidebar,
-            availableWidth: AssistantLayout.availableWidth(forWindowWidth: 700),
-            current: .closed
-        )
-
-        XCTAssertEqual(
-            presentation,
-            .popover,
-            "A forced sidebar that cannot fit would corrupt the layout"
-        )
+    func testAnExplicitSidebarChoiceSurvivesANarrowWindow() {
+        for width in [700, 900, narrowWindow, wideWindow].map(CGFloat.init) {
+            XCTAssertEqual(
+                AssistantLayout.presentation(
+                    preference: .sidebar,
+                    availableWidth: AssistantLayout.availableWidth(forWindowWidth: width),
+                    current: .closed
+                ),
+                .sidebar,
+                "Split screen and full screen must not undo what the user chose"
+            )
+        }
     }
 
-    func testAnExplicitPopoverChoiceIsHonouredOnAWideWindow() {
-        let presentation = AssistantLayout.presentation(
-            preference: .popover,
-            availableWidth: AssistantLayout.availableWidth(forWindowWidth: wideWindow),
-            current: .closed
-        )
+    func testAnExplicitPopoverChoiceSurvivesAWideWindow() {
+        for width in [700, 900, narrowWindow, wideWindow, 3_000].map(CGFloat.init) {
+            XCTAssertEqual(
+                AssistantLayout.presentation(
+                    preference: .popover,
+                    availableWidth: AssistantLayout.availableWidth(forWindowWidth: width),
+                    current: .closed
+                ),
+                .popover
+            )
+        }
+    }
 
-        XCTAssertEqual(presentation, .popover)
+    func testOnlyAutomaticReactsToTheWindowWidth() {
+        // The width is consulted for exactly one preference. This is the whole
+        // difference between the three settings.
+        let narrow = AssistantLayout.availableWidth(forWindowWidth: narrowWindow)
+        let wide = AssistantLayout.availableWidth(forWindowWidth: wideWindow)
+
+        for preference in AssistantPresentationPreference.allCases {
+            let atNarrow = AssistantLayout.presentation(
+                preference: preference,
+                availableWidth: narrow,
+                current: .closed
+            )
+            let atWide = AssistantLayout.presentation(
+                preference: preference,
+                availableWidth: wide,
+                current: .closed
+            )
+            XCTAssertEqual(
+                atNarrow != atWide,
+                preference == .automatic,
+                "\(preference.title) reacted to width when it should not have"
+            )
+        }
     }
 
     func testASeparateWindowIsNeverTakenAwayByResizing() {
@@ -214,6 +242,30 @@ final class AssistantPresentationTests: XCTestCase {
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
         XCTAssertEqual(context.viewModel.assistantDraftInput, "half a question")
         XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
+    }
+
+    func testAPinnedSidebarSurvivesResizing() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.updateAvailableWidth(wideWindow)
+        context.viewModel.setAssistantPreference(.sidebar)
+        context.viewModel.openAssistant()
+
+        context.viewModel.updateAvailableWidth(narrowWindow)
+
+        XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
+    }
+
+    func testAPinnedPopoverSurvivesResizing() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.updateAvailableWidth(narrowWindow)
+        context.viewModel.setAssistantPreference(.popover)
+        context.viewModel.openAssistant()
+
+        context.viewModel.updateAvailableWidth(wideWindow)
+
+        XCTAssertEqual(context.viewModel.assistantPresentation, .popover)
     }
 
     func testResizingWhileClosedDoesNotOpenAnything() async throws {

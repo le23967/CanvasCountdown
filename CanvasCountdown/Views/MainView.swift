@@ -32,13 +32,13 @@ struct MainView: View {
         .onChange(of: viewModel.assistantPresentation) { _, presentation in
             syncAssistantWindow(presentation == .separateWindow)
         }
-        // Measured from the whole window, so the decision does not depend on
-        // the panel that is being decided about.
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { width in
-            viewModel.updateAvailableWidth(width)
-        }
+        // Measured from the window itself, so the decision does not depend on
+        // the panel being decided about, and does not wait on a layout pass.
+        .background(
+            WindowWidthReporter { width in
+                viewModel.updateAvailableWidth(width)
+            }
+        )
         .inspector(
             isPresented: Binding(
                 get: { viewModel.assistantPresentation == .sidebar },

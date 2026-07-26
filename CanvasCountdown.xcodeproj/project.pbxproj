@@ -11,6 +11,7 @@
 		0F6EE63CD85B34B406083EA7 /* ToolbarSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF4898F04D7CB05B2B9E3B2 /* ToolbarSearchTests.swift */; };
 		10566BFC7E72DA5AFBA70F95 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E53D49DEC7CFE3995861D2 /* SidebarView.swift */; };
 		118673876157DD94F0AF31B4 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89307B88F02B43EF58286C41 /* AppDependencies.swift */; };
+		1E8757D4DC176409A32E249C /* WindowWidthReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332AEA2ED299F35EA20940FB /* WindowWidthReporter.swift */; };
 		205D4C4555148E2EBF08D525 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EEFE4DBCCA8C08167AC19EE /* MainView.swift */; };
 		207ECB3CDA432C977A51C6B6 /* AssignmentEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABDEF05D9E2174EB73A68B2 /* AssignmentEvent.swift */; };
 		2C2EB95EEFDD77419A2B9306 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A0EE4153E8C25B319DC86F /* SettingsView.swift */; };
@@ -118,6 +119,7 @@
 		2D127CFD40C17172BFE35651 /* CanvasScreenshotParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScreenshotParser.swift; sourceTree = "<group>"; };
 		313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmediateSettingsTests.swift; sourceTree = "<group>"; };
 		32AA2CD44F2D8FD2D44B7EDF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		332AEA2ED299F35EA20940FB /* WindowWidthReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowWidthReporter.swift; sourceTree = "<group>"; };
 		354D08732371A4156B46E57D /* DockAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockAppearance.swift; sourceTree = "<group>"; };
 		36E0D9F768688445C44FF690 /* DockTileLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileLayoutTests.swift; sourceTree = "<group>"; };
 		3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearestAssignmentCard.swift; sourceTree = "<group>"; };
@@ -401,6 +403,7 @@
 				3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */,
 				6AF9592976EB8099DD69929B /* SearchDismissMonitor.swift */,
 				A17EBF71ACA5C7E9FDB4BCD9 /* ToolbarDisplayModeConfigurator.swift */,
+				332AEA2ED299F35EA20940FB /* WindowWidthReporter.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -610,6 +613,7 @@
 				2C2EB95EEFDD77419A2B9306 /* SettingsView.swift in Sources */,
 				10566BFC7E72DA5AFBA70F95 /* SidebarView.swift in Sources */,
 				A46C085D5793C154599F9A6E /* ToolbarDisplayModeConfigurator.swift in Sources */,
+				1E8757D4DC176409A32E249C /* WindowWidthReporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

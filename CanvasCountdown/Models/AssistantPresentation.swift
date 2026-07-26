@@ -79,14 +79,14 @@ enum AssistantLayout {
         }
 
         switch preference {
+        // An explicit choice is a standing instruction, not a hint. Resizing the
+        // window, splitting the screen or going full screen does not revisit it:
+        // a panel that swaps itself out from under the person who pinned it
+        // there is worse than a narrow panel.
+        case .sidebar:
+            return .sidebar
         case .popover:
             return .popover
-        case .sidebar:
-            // An explicit choice is honoured while it is workable. When it is
-            // not, falling back beats corrupting the layout.
-            return fitsSidebar(availableWidth: availableWidth, current: current)
-                ? .sidebar
-                : .popover
         case .automatic:
             return fitsSidebar(availableWidth: availableWidth, current: current)
                 ? .sidebar
