@@ -7,6 +7,7 @@ struct MainView: View {
     @State private var eventPendingDeletion: AssignmentListItem?
     @State private var hoveredEventID: UUID?
     @FocusState private var isSearchFieldFocused: Bool
+    @State private var assistantWindow = AssistantWindowController()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -27,13 +28,10 @@ struct MainView: View {
         .task {
             await viewModel.start()
         }
-        .inspector(isPresented: $viewModel.isAssistantPanelShown) {
-            AssistantPanelView(viewModel: viewModel) { drafts in
-                await viewModel.saveAssistantDrafts(drafts)
-            }
-            .inspectorColumnWidth(min: 240, ideal: 320, max: 420)
-        }
         .background(ToolbarDisplayModeConfigurator())
+        .onChange(of: viewModel.isAssistantPanelShown) { _, shown in
+            syncAssistantWindow(shown)
+        }
         // The field's focus and the view model's copy of it are kept in step so
         // any part of the app can release focus without reaching into the view.
         .onChange(of: isSearchFieldFocused) { _, isFocused in
@@ -377,6 +375,22 @@ struct MainView: View {
         .menuIndicator(.hidden)
         .help("Add an event, or import from Canvas")
         .accessibilityLabel("Add or import events")
+    }
+
+    /// Opens or closes the assistant panel to match the flag, leaving the main
+    /// window exactly where it is either way.
+    private func syncAssistantWindow(_ shown: Bool) {
+        if shown {
+            assistantWindow.show(
+                onClose: { viewModel.isAssistantPanelShown = false }
+            ) {
+                AssistantPanelView(viewModel: viewModel) { drafts in
+                    await viewModel.saveAssistantDrafts(drafts)
+                }
+            }
+        } else {
+            assistantWindow.close()
+        }
     }
 
     /// The search field, shown only in search mode.

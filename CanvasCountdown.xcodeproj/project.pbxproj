@@ -57,6 +57,7 @@
 		A46C085D5793C154599F9A6E /* ToolbarDisplayModeConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17EBF71ACA5C7E9FDB4BCD9 /* ToolbarDisplayModeConfigurator.swift */; };
 		AA5276B7683D872920ED9B84 /* ICSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099CBA2FB3FF6F3E078E3056 /* ICSParser.swift */; };
 		ADAB8B2A9F463069586E19CA /* CanvasScreenshotParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D127CFD40C17172BFE35651 /* CanvasScreenshotParser.swift */; };
+		B0567EF05ADCE72C3E4FA4F9 /* AssistantWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5857C74C93EF06A42C86FA0E /* AssistantWindowController.swift */; };
 		B07D431C640241F7C8EC2D70 /* CourseFilterMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE33EE5F3A5C159CC490748 /* CourseFilterMenuTests.swift */; };
 		B0FCA0D0BFD1BB1C2824ED33 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F7473B249AF5056BAC114A76 /* ServiceManagement.framework */; };
 		B281D9589272AEB45F58FE78 /* ScreenshotImportWorkflowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F08250DEC107AAC1FD46C78A /* ScreenshotImportWorkflowTests.swift */; };
@@ -125,6 +126,7 @@
 		4EA2450F0BF5C12E1A3D720D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		55247B70D6D09DF56B8E6B9E /* CanvasScreenshotParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScreenshotParserTests.swift; sourceTree = "<group>"; };
 		56F304E836C57FB3DB040EE5 /* ScreenshotOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotOCRService.swift; sourceTree = "<group>"; };
+		5857C74C93EF06A42C86FA0E /* AssistantWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantWindowController.swift; sourceTree = "<group>"; };
 		5ABDEF05D9E2174EB73A68B2 /* AssignmentEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentEvent.swift; sourceTree = "<group>"; };
 		5DADDF014908B17CA6199D2D /* CanvasFeedFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcher.swift; sourceTree = "<group>"; };
 		5EEFE4DBCCA8C08167AC19EE /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -388,6 +390,7 @@
 			isa = PBXGroup;
 			children = (
 				0F33CE0026A029FBF9E7C6F8 /* AssignmentRowView.swift */,
+				5857C74C93EF06A42C86FA0E /* AssistantWindowController.swift */,
 				1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */,
 				3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */,
 				6AF9592976EB8099DD69929B /* SearchDismissMonitor.swift */,
@@ -562,6 +565,7 @@
 				DC66BCA36AC21FFCF52F0EE7 /* AssistantPanelView.swift in Sources */,
 				458BD306852C568BFD818170 /* AssistantService.swift in Sources */,
 				93DA62B41C768B713C5AF2DB /* AssistantSettings.swift in Sources */,
+				B0567EF05ADCE72C3E4FA4F9 /* AssistantWindowController.swift in Sources */,
 				E8EE34FA5853590E9242C1F3 /* CanvasCountdownApp.swift in Sources */,
 				8F3B103D54BF8DEF9C98717A /* CanvasDateTextParser.swift in Sources */,
 				5A8A98B82182A95BE9DA0309 /* CanvasFeedFetcher.swift in Sources */,

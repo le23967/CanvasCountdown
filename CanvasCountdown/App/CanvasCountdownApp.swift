@@ -94,6 +94,13 @@ struct CanvasCountdownApp: App {
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(viewModel == nil)
             }
+            CommandGroup(after: .windowArrangement) {
+                Button("Assistant") {
+                    viewModel?.isAssistantPanelShown.toggle()
+                }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+                .disabled(viewModel == nil)
+            }
             CommandGroup(after: .textEditing) {
                 Button("Find") {
                     viewModel?.presentSearch()
