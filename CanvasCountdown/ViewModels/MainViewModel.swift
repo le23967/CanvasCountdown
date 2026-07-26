@@ -171,7 +171,16 @@ final class MainViewModel {
 
     // MARK: - Assistant
 
-    var isAssistantPanelShown = false
+    /// One value, so the assistant cannot be in two places at once and every
+    /// close path clears the same thing.
+    private(set) var assistantPresentation: ActiveAssistantPresentation = .closed
+    /// The assignment a question is about, if any.
+    private(set) var assistantContext: AssistantContext?
+    /// Kept here rather than in the panel, so moving between a sidebar, a
+    /// popover and a window never resets what was typed or said.
+    var assistantDraftInput = ""
+    @ObservationIgnored
+    private var availableAssistantWidth: CGFloat = 0
     private(set) var assistantSummary: String?
     private(set) var assistantDrafts: [AssistantDraftTask] = []
     private(set) var isAssistantBusy = false
@@ -278,6 +287,113 @@ final class MainViewModel {
     }
 
     private(set) var conversation: [AssistantMessage] = []
+
+    var assistantPreference: AssistantPresentationPreference {
+        settingsStore.assistant.presentation
+    }
+
+    var isAssistantOpen: Bool {
+        assistantPresentation.isOpen
+    }
+
+    var sidebarWidth: CGFloat {
+        AssistantLayout.clampedSidebarWidth(settingsStore.assistant.sidebarWidth)
+    }
+
+    /// Accurate by construction: it reads the endpoint rather than the provider
+    /// name, so pointing "local" at a remote host cannot produce a false claim.
+    var assistantPrivacyLabel: String {
+        settingsStore.assistant.staysOnThisMac
+            ? "On this Mac"
+            : "Cloud · \(settingsStore.assistant.provider.title)"
+    }
+
+    var assistantStaysOnThisMac: Bool {
+        settingsStore.assistant.staysOnThisMac
+    }
+
+    /// Called as the window resizes. Only the choice between sidebar and
+    /// popover changes; the conversation is untouched.
+    func updateAvailableWidth(_ windowWidth: CGFloat) {
+        availableAssistantWidth = AssistantLayout.availableWidth(
+            forWindowWidth: windowWidth
+        )
+        guard assistantPresentation.isOpen else {
+            return
+        }
+        let next = AssistantLayout.presentation(
+            preference: assistantPreference,
+            availableWidth: availableAssistantWidth,
+            current: assistantPresentation
+        )
+        if next != assistantPresentation {
+            assistantPresentation = next
+        }
+    }
+
+    func toggleAssistant() {
+        if assistantPresentation.isOpen {
+            closeAssistant()
+        } else {
+            openAssistant()
+        }
+    }
+
+    func openAssistant(about item: AssignmentListItem? = nil) {
+        if let item {
+            assistantContext = AssistantContext(item)
+        }
+        assistantPresentation = AssistantLayout.presentation(
+            preference: assistantPreference,
+            availableWidth: availableAssistantWidth,
+            current: assistantPresentation
+        )
+    }
+
+    func closeAssistant() {
+        assistantPresentation = .closed
+    }
+
+    /// Explicit only: a detached window is never chosen for the user.
+    func openAssistantInSeparateWindow() {
+        assistantPresentation = .separateWindow
+    }
+
+    func showAssistantAsPopover() {
+        assistantPresentation = .popover
+    }
+
+    func showAssistantAsSidebar() {
+        assistantPresentation = AssistantLayout.fitsSidebar(
+            availableWidth: availableAssistantWidth,
+            current: assistantPresentation
+        ) ? .sidebar : .popover
+    }
+
+    func setAssistantPreference(_ preference: AssistantPresentationPreference) {
+        settingsForm.assistant.presentation = preference
+        applySettings(settingsForm)
+        if assistantPresentation.isOpen, assistantPresentation != .separateWindow {
+            assistantPresentation = AssistantLayout.presentation(
+                preference: preference,
+                availableWidth: availableAssistantWidth,
+                current: assistantPresentation
+            )
+        }
+    }
+
+    /// Stored only when usable, so a bad drag cannot leave an unopenable panel.
+    func rememberSidebarWidth(_ width: CGFloat) {
+        guard AssistantLayout.isValidSidebarWidth(width) else {
+            return
+        }
+        settingsForm.assistant.sidebarWidth = width
+        applySettings(settingsForm)
+    }
+
+    func clearAssistantContext() {
+        assistantContext = nil
+    }
 
     /// Common openers, so a blank box is not the first thing anyone meets.
     static let assistantSuggestions = [
@@ -406,10 +522,17 @@ final class MainViewModel {
     }
 
     /// Only the three agreed fields, and only for what is currently in scope.
+    ///
+    /// With an assignment in context the list narrows to that one item: asking
+    /// about a single deadline is not a reason to send the whole term.
     func assistantDigests() -> [AssistantAssignmentDigest] {
-        visibleUpcomingAssignments
+        let scoped = visibleUpcomingAssignments
             .filter { !$0.isCompleted && !$0.isIgnored && $0.dueDate >= currentDate }
-            .map(AssistantAssignmentDigest.init)
+        if let assistantContext,
+           let focused = scoped.first(where: { $0.id == assistantContext.id }) {
+            return [AssistantAssignmentDigest(focused)]
+        }
+        return scoped.map(AssistantAssignmentDigest.init)
     }
 
     var isAssistantEnabled: Bool {

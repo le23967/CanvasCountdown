@@ -29,8 +29,32 @@ struct MainView: View {
             await viewModel.start()
         }
         .background(ToolbarDisplayModeConfigurator())
-        .onChange(of: viewModel.isAssistantPanelShown) { _, shown in
-            syncAssistantWindow(shown)
+        .onChange(of: viewModel.assistantPresentation) { _, presentation in
+            syncAssistantWindow(presentation == .separateWindow)
+        }
+        // Measured from the whole window, so the decision does not depend on
+        // the panel that is being decided about.
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            viewModel.updateAvailableWidth(width)
+        }
+        .inspector(
+            isPresented: Binding(
+                get: { viewModel.assistantPresentation == .sidebar },
+                set: { shown in
+                    if !shown, viewModel.assistantPresentation == .sidebar {
+                        viewModel.closeAssistant()
+                    }
+                }
+            )
+        ) {
+            assistantPanel
+                .inspectorColumnWidth(
+                    min: AssistantLayout.sidebarMinimum,
+                    ideal: viewModel.sidebarWidth,
+                    max: AssistantLayout.sidebarMaximum
+                )
         }
         // The field's focus and the view model's copy of it are kept in step so
         // any part of the app can release focus without reaching into the view.
@@ -313,17 +337,32 @@ struct MainView: View {
                 }
                 ToolbarItem(id: "action.assistant", placement: .primaryAction) {
                     toolbarButton(
-                        systemImage: viewModel.isAssistantPanelShown
-                            ? "sparkles.rectangle.stack.fill"
-                            : "sparkles",
+                        systemImage: "sparkles",
                         title: "Assistant",
-                        description: viewModel.isAssistantPanelShown
+                        description: viewModel.isAssistantOpen
                             ? "Hide the assistant"
                             : "Show the assistant"
                     ) {
-                        viewModel.isAssistantPanelShown.toggle()
+                        viewModel.toggleAssistant()
                     }
                     .keyboardShortcut("a", modifiers: [.command, .option])
+                    // Anchored to the button it came from, rather than
+                    // appearing as an unrelated window in the middle.
+                    .popover(
+                        isPresented: Binding(
+                            get: { viewModel.assistantPresentation == .popover },
+                            set: { shown in
+                                if !shown, viewModel.assistantPresentation == .popover {
+                                    viewModel.closeAssistant()
+                                }
+                            }
+                        ),
+                        arrowEdge: .bottom
+                    ) {
+                        assistantPanel
+                            .frame(width: 400)
+                            .frame(minHeight: 320, maxHeight: 560)
+                    }
                 }
                 ToolbarItem(id: "action.search", placement: .primaryAction) {
                     toolbarButton(
@@ -377,12 +416,18 @@ struct MainView: View {
         .accessibilityLabel("Add or import events")
     }
 
-    /// Opens or closes the assistant panel to match the flag, leaving the main
+    private var assistantPanel: some View {
+        AssistantPanelView(viewModel: viewModel) { drafts in
+            await viewModel.saveAssistantDrafts(drafts)
+        }
+    }
+
+    /// Opens or closes the detached window to match the state, leaving the main
     /// window exactly where it is either way.
     private func syncAssistantWindow(_ shown: Bool) {
         if shown {
             assistantWindow.show(
-                onClose: { viewModel.isAssistantPanelShown = false }
+                onClose: { viewModel.closeAssistant() }
             ) {
                 AssistantPanelView(viewModel: viewModel) { drafts in
                     await viewModel.saveAssistantDrafts(drafts)
@@ -730,6 +775,12 @@ struct MainView: View {
                     ? "arrow.uturn.backward.circle"
                     : "checkmark.circle"
             )
+        }
+
+        Button {
+            viewModel.openAssistant(about: item)
+        } label: {
+            Label("Ask the Assistant…", systemImage: "sparkles")
         }
 
         Button {

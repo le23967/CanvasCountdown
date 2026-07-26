@@ -96,7 +96,7 @@ struct CanvasCountdownApp: App {
             }
             CommandGroup(after: .windowArrangement) {
                 Button("Assistant") {
-                    viewModel?.isAssistantPanelShown.toggle()
+                    viewModel?.toggleAssistant()
                 }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .disabled(viewModel == nil)

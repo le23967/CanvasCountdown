@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Where the assistant runs.
@@ -85,12 +86,17 @@ struct AssistantSettings: Equatable, Codable, Sendable {
     var provider: AssistantProvider
     var baseURL: String
     var model: String
+    var presentation: AssistantPresentationPreference
+    /// Last width the user left the sidebar at, if it was a usable one.
+    var sidebarWidth: CGFloat?
 
     static let defaults = AssistantSettings(
         isEnabled: true,
         provider: .local,
         baseURL: AssistantProvider.local.defaultBaseURL,
-        model: AssistantProvider.local.defaultModel
+        model: AssistantProvider.local.defaultModel,
+        presentation: .automatic,
+        sidebarWidth: nil
     )
 
     /// Switching provider carries its own sensible endpoint and model.

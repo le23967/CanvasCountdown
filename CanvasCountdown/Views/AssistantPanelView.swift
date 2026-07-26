@@ -4,12 +4,27 @@ import SwiftUI
 ///
 /// Kept next to the list on purpose: asking "what should I start" while the
 /// deadlines are still visible is the whole point, and a sheet would cover them.
+/// The assistant's accent: a blue-violet that reads as distinct from the app's
+/// own tint without turning the panel into a purple slab. Used for the identity
+/// mark, the user's own messages and the send control, never for body text or
+/// large surfaces.
+enum AssistantStyle {
+    static let accent = Color(red: 0.42, green: 0.36, blue: 0.86)
+    static let secondaryAccent = Color(red: 0.58, green: 0.44, blue: 0.90)
+
+    /// Tinted fills stay faint so system label colours keep their contrast in
+    /// both appearances.
+    static func messageFill(isUser: Bool) -> Color {
+        isUser ? accent.opacity(0.14) : Color.secondary.opacity(0.10)
+    }
+}
+
 struct AssistantPanelView: View {
     @Bindable var viewModel: MainViewModel
     let onSaveDrafts: @MainActor ([AssistantDraftTask]) async -> Void
 
     @State private var request = ""
-    @State private var question = ""
+
     @FocusState private var isRequestFocused: Bool
     @FocusState private var isQuestionFocused: Bool
 
@@ -20,6 +35,8 @@ struct AssistantPanelView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    contextChip
+
                     if !viewModel.isAssistantEnabled {
                         disabledNotice
                     } else {
@@ -45,23 +62,108 @@ struct AssistantPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles")
-                .foregroundStyle(.tint)
+                .foregroundStyle(AssistantStyle.accent)
                 .accessibilityHidden(true)
+
             Text("Assistant")
                 .font(.headline)
-            Spacer()
-            // Where the data goes, stated where the questions are asked.
+
+            Text("Beta")
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(
+                    AssistantStyle.accent.opacity(0.16),
+                    in: Capsule()
+                )
+
+            Spacer(minLength: 4)
+
+            // Reads the endpoint, not the provider name, so this cannot claim
+            // privacy the configuration does not provide.
             Label(
-                viewModel.assistantSettings.staysOnThisMac ? "On this Mac" : "Cloud",
-                systemImage: viewModel.assistantSettings.staysOnThisMac
+                viewModel.assistantPrivacyLabel,
+                systemImage: viewModel.assistantStaysOnThisMac
                     ? "lock.fill"
                     : "arrow.up.right.circle.fill"
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+            .lineLimit(1)
+
+            Menu {
+                Picker("Show as", selection: Binding(
+                    get: { viewModel.assistantPreference },
+                    set: { viewModel.setAssistantPreference($0) }
+                )) {
+                    ForEach(AssistantPresentationPreference.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+
+                Divider()
+
+                Button("Open in Separate Window") {
+                    viewModel.openAssistantInSeparateWindow()
+                }
+                Button("Clear Conversation") {
+                    viewModel.clearConversation()
+                }
+                .disabled(viewModel.conversation.isEmpty)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Assistant options")
+
+            Button {
+                viewModel.closeAssistant()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close assistant")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    /// Shown when a question is about one assignment, so the panel says what it
+    /// is answering about and the request stays narrow.
+    @ViewBuilder
+    private var contextChip: some View {
+        if let context = viewModel.assistantContext {
+            HStack(spacing: 6) {
+                Text("Asking about:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 4) {
+                    Text(context.chipTitle)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Button {
+                        viewModel.clearAssistantContext()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove assignment context")
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    AssistantStyle.accent.opacity(0.12),
+                    in: Capsule()
+                )
+
+                Spacer(minLength: 0)
+            }
+            .help(context.title)
+        }
     }
 
     private var disabledNotice: some View {
@@ -118,7 +220,11 @@ struct AssistantPanelView: View {
             }
 
             HStack(spacing: 6) {
-                TextField("Ask anything about your deadlines", text: $question, axis: .vertical)
+                TextField(
+                    "Ask anything about your deadlines",
+                    text: $viewModel.assistantDraftInput,
+                    axis: .vertical
+                )
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .focused($isQuestionFocused)
@@ -129,11 +235,16 @@ struct AssistantPanelView: View {
                     sendQuestion()
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
+                        .foregroundStyle(
+                            viewModel.assistantDraftInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? AnyShapeStyle(.secondary)
+                                : AnyShapeStyle(AssistantStyle.accent)
+                        )
                 }
                 .buttonStyle(.borderless)
                 .disabled(
                     viewModel.isAssistantBusy
-                        || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || viewModel.assistantDraftInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 )
                 .accessibilityLabel("Send")
             }
@@ -153,16 +264,14 @@ struct AssistantPanelView: View {
         }
         .padding(10)
         .background(
-            message.role == .user
-                ? AnyShapeStyle(.quaternary.opacity(0.35))
-                : AnyShapeStyle(Color.accentColor.opacity(0.12)),
+            AssistantStyle.messageFill(isUser: message.role == .user),
             in: RoundedRectangle(cornerRadius: 8)
         )
     }
 
     private func sendQuestion() {
-        let text = question
-        question = ""
+        let text = viewModel.assistantDraftInput
+        viewModel.assistantDraftInput = ""
         Task { await viewModel.ask(text) }
     }
 
