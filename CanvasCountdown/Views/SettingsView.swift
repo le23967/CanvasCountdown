@@ -44,6 +44,7 @@ struct SettingsView: View {
     let onResetDockAppearance: @MainActor () -> Void
     let assistantAPIKey: String
     let onSaveAssistantKey: @MainActor (String) -> Void
+    let models: LocalModelPresentation
 
     @State private var apiKeyDraft = ""
     @State private var revealAPIKey = false
@@ -611,9 +612,27 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Assistant address")
 
-                TextField("Model", text: $settings.assistant.model)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Assistant model")
+                HStack {
+                    TextField("Model", text: $settings.assistant.model)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Assistant model")
+
+                    if settings.assistant.provider == .groq {
+                        Menu("Choose") {
+                            ForEach(AssistantProvider.groqModels, id: \.self) { name in
+                                Button(name) {
+                                    settings.assistant.model = name
+                                }
+                            }
+                        }
+                        .frame(width: 90)
+                        .help("Common Groq models. Any other name can be typed.")
+                    }
+                }
+
+                if settings.assistant.staysOnThisMac {
+                    localModelControls
+                }
 
                 if settings.assistant.provider.requiresAPIKey {
                     HStack {
@@ -656,7 +675,135 @@ struct SettingsView: View {
         }
         .onAppear {
             apiKeyDraft = assistantAPIKey
+            // Ask the local server what it has, so the list is not stale.
+            models.onRefresh()
         }
+    }
+
+    /// Model management for the local server.
+    ///
+    /// The app can list, fetch and remove models, but it cannot install or start
+    /// Ollama itself: a sandboxed application may not launch another program. So
+    /// when nothing answers, the commands are shown ready to copy rather than
+    /// pretending the app can do it.
+    @ViewBuilder
+    private var localModelControls: some View {
+        if models.isReachable {
+            if !models.installed.isEmpty {
+                ForEach(models.installed) { model in
+                    HStack {
+                        Image(systemName: model.name == settings.assistant.model
+                            ? "largecircle.fill.circle"
+                            : "circle")
+                            .foregroundStyle(.tint)
+                            .accessibilityHidden(true)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(model.name)
+                            Text(model.sizeDescription)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        if model.name != settings.assistant.model {
+                            Button("Use") {
+                                models.onUse(model.name)
+                            }
+                        }
+                        Button(role: .destructive) {
+                            models.onDelete(model.name)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Delete \(model.name)")
+                    }
+                }
+            } else {
+                Text("No models are installed yet. Download one below.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let downloading = models.downloading {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Downloading \(downloading)")
+                            .font(.callout)
+                        Spacer()
+                        Button("Cancel") {
+                            models.onCancelDownload()
+                        }
+                    }
+                    ProgressView(value: models.progress)
+                }
+            } else {
+                Menu("Download a Model…") {
+                    ForEach(SuggestedModel.all) { suggestion in
+                        Button {
+                            models.onDownload(suggestion.name)
+                        } label: {
+                            Text("\(suggestion.name) — \(suggestion.approximateSize). \(suggestion.note)")
+                        }
+                        .disabled(models.installed.contains { $0.name == suggestion.name })
+                    }
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    "Ollama is not responding on this Mac.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
+
+                Text("Canvas Countdown can manage models for you, but it cannot install or start Ollama itself. Run these once:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                copyableCommand(OllamaSetup.homebrewCommand)
+                copyableCommand(OllamaSetup.serveCommand)
+
+                HStack {
+                    Link("Download Ollama", destination: URL(string: OllamaSetup.downloadPage)!)
+                    Spacer()
+                    Button("Check Again") {
+                        models.onRefresh()
+                    }
+                }
+            }
+        }
+
+        if let message = models.message {
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func copyableCommand(_ command: String) -> some View {
+        HStack {
+            Text(command)
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+            Spacer()
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(command, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .help("Copy")
+            .accessibilityLabel("Copy \(command)")
+        }
+        .padding(6)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
     }
 
     private var systemSection: some View {

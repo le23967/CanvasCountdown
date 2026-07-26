@@ -56,6 +56,15 @@ enum AssistantProvider: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Offered as a convenience only. Any model name can still be typed, so a
+    /// new release does not have to wait for an app update.
+    static let groqModels = [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it",
+    ]
+
     var defaultModel: String {
         switch self {
         case .local:

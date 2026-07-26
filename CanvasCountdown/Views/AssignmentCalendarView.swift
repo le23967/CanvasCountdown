@@ -9,8 +9,10 @@ struct AssignmentCalendarView: View {
     @Bindable var viewModel: MainViewModel
     let onOpen: (AssignmentListItem) -> Void
 
+    /// A small minimum so seven columns still fit a narrow window; the cells
+    /// share whatever width there is rather than pushing past the edge.
     private let columns = Array(
-        repeating: GridItem(.flexible(minimum: 70), spacing: 1),
+        repeating: GridItem(.flexible(minimum: 34), spacing: 1),
         count: 7
     )
 
@@ -128,7 +130,7 @@ struct AssignmentCalendarView: View {
             Spacer(minLength: 0)
         }
         .padding(4)
-        .frame(height: 86, alignment: .topLeading)
+        .frame(minHeight: 62, idealHeight: 86, maxHeight: 96, alignment: .topLeading)
         .frame(maxWidth: .infinity)
         .background(day.isInDisplayedMonth ? Color.clear : Color.secondary.opacity(0.05))
         .overlay {

@@ -85,6 +85,8 @@ final class MainViewModel {
     @ObservationIgnored
     private let assistantKeyStore: KeychainAssistantKeyStore
     @ObservationIgnored
+    private let localModels: any LocalModelManaging
+    @ObservationIgnored
     private var hasStarted = false
 
     init(
@@ -96,8 +98,10 @@ final class MainViewModel {
         notificationScheduler: any NotificationScheduling,
         calendar: Calendar = .autoupdatingCurrent,
         automaticActivityEnabled: Bool = true,
-        assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore()
+        assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore(),
+        localModels: any LocalModelManaging = OllamaModelManager()
     ) {
+        self.localModels = localModels
         self.assistantKeyStore = assistantKeyStore
         self.automaticActivityEnabled = automaticActivityEnabled
         self.repository = repository
@@ -179,6 +183,90 @@ final class MainViewModel {
     /// Read back so the field can show what is stored without the key ever
     /// touching preferences or diagnostics.
     private(set) var assistantAPIKey = ""
+
+    private(set) var isOllamaReachable = false
+    private(set) var installedModels: [LocalModel] = []
+    private(set) var pullingModel: String?
+    private(set) var pullProgress: Double = 0
+    private(set) var modelMessage: String?
+
+    @ObservationIgnored
+    private var pullTask: Task<Void, Never>?
+
+    /// Refreshes what is installed, and whether Ollama is answering at all.
+    func refreshLocalModels() async {
+        guard let url = settingsStore.assistant.resolvedURL else {
+            isOllamaReachable = false
+            return
+        }
+        isOllamaReachable = await localModels.isReachable(baseURL: url)
+        guard isOllamaReachable else {
+            installedModels = []
+            return
+        }
+        installedModels = (try? await localModels.installedModels(baseURL: url)) ?? []
+    }
+
+    func downloadModel(_ name: String) {
+        guard let url = settingsStore.assistant.resolvedURL else {
+            return
+        }
+        pullTask?.cancel()
+        pullingModel = name
+        pullProgress = 0
+        modelMessage = nil
+
+        let manager = localModels
+        // Captured once, outside the task, so the progress callback does not
+        // reach back into a captured optional from concurrent code.
+        let onProgress: @Sendable (Double) -> Void = { [weak self] fraction in
+            Task { @MainActor in
+                self?.pullProgress = fraction
+            }
+        }
+
+        pullTask = Task { [weak self] in
+            do {
+                try await manager.pull(name, baseURL: url, progress: onProgress)
+                await self?.finishDownload(message: "\(name) is ready to use.")
+            } catch {
+                await self?.finishDownload(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func finishDownload(message: String) async {
+        pullingModel = nil
+        await refreshLocalModels()
+        modelMessage = message
+    }
+
+    func cancelModelDownload() {
+        pullTask?.cancel()
+        pullTask = nil
+        pullingModel = nil
+        modelMessage = "Download cancelled."
+    }
+
+    func deleteModel(_ name: String) {
+        guard let url = settingsStore.assistant.resolvedURL else {
+            return
+        }
+        Task {
+            do {
+                try await localModels.delete(name, baseURL: url)
+                await refreshLocalModels()
+                modelMessage = "\(name) was removed."
+            } catch {
+                modelMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func useModel(_ name: String) {
+        settingsForm.assistant.model = name
+        applySettings(settingsForm)
+    }
 
     var hasSaveableDrafts: Bool {
         assistantDrafts.contains { $0.include && $0.canBeSaved }

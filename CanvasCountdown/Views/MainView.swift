@@ -18,7 +18,11 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(min: 185, ideal: 220, max: 280)
         } detail: {
             detail
-                .frame(minWidth: 600, minHeight: 500)
+                // Low enough that a sidebar, the content and the assistant
+                // panel all fit on a half-screen window. A large minimum here
+                // does not keep the layout readable, it just makes macOS clip
+                // whatever does not fit.
+                .frame(minWidth: 380, minHeight: 420)
         }
         .task {
             await viewModel.start()
@@ -27,7 +31,7 @@ struct MainView: View {
             AssistantPanelView(viewModel: viewModel) { drafts in
                 await viewModel.saveAssistantDrafts(drafts)
             }
-            .inspectorColumnWidth(min: 280, ideal: 340, max: 420)
+            .inspectorColumnWidth(min: 240, ideal: 320, max: 420)
         }
         .background(ToolbarDisplayModeConfigurator())
         // The field's focus and the view model's copy of it are kept in step so
@@ -180,12 +184,27 @@ struct MainView: View {
                 assistantAPIKey: viewModel.assistantAPIKey,
                 onSaveAssistantKey: { key in
                     viewModel.saveAssistantKey(key)
-                }
+                },
+                models: LocalModelPresentation(
+                    isReachable: viewModel.isOllamaReachable,
+                    installed: viewModel.installedModels,
+                    downloading: viewModel.pullingModel,
+                    progress: viewModel.pullProgress,
+                    message: viewModel.modelMessage,
+                    onDownload: { viewModel.downloadModel($0) },
+                    onDelete: { viewModel.deleteModel($0) },
+                    onUse: { viewModel.useModel($0) },
+                    onCancelDownload: { viewModel.cancelModelDownload() },
+                    onRefresh: {
+                        Task { await viewModel.refreshLocalModels() }
+                    }
+                )
             )
         } else {
             assignmentDashboard
         }
     }
+
 
     /// Turns a thrown schedule-validation error into a message the reminder
     /// editor can show inline, rather than a modal alert for a typo.

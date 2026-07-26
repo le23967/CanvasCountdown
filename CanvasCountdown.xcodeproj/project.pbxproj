@@ -45,6 +45,8 @@
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
 		8F3B103D54BF8DEF9C98717A /* CanvasDateTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76BC7128DEFCEAA70AC73E7 /* CanvasDateTextParser.swift */; };
 		93DA62B41C768B713C5AF2DB /* AssistantSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */; };
+		946A3D2BC6075C8A5DC7C076 /* LocalModelPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */; };
+		961FDDE565A1B9364F3BA201 /* LocalModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3437FC7C8929C1C76473CE /* LocalModelManager.swift */; };
 		9B47B94F2FE60BCAC73AA55A /* DockTileLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722BC99654E82DFC600CF02B /* DockTileLayout.swift */; };
 		9C29E48C0B1610E753799035 /* NearestAssignmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */; };
 		9E1869235312809AF07D16A2 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BA7EC3B8DA2FAABFCDCED1 /* LaunchAtLoginController.swift */; };
@@ -68,6 +70,7 @@
 		C522AE475E64161034193F1A /* ScreenshotImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9899653832A95B088689E810 /* ScreenshotImportCoordinator.swift */; };
 		C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */; };
 		C9AC8533F40AEA60491EDF0D /* CountdownCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */; };
+		CA46E10EBC54D5D851128060 /* LocalModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */; };
 		D819A504296ACA82DC7FCA12 /* CanvasDateTextParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */; };
 		D88CBFBD1048289F3BCC5147 /* ImmediateSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */; };
 		DBA66166C20757BECB573252 /* DockDigitSpacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751AAF71611CC0CABC565638 /* DockDigitSpacingTests.swift */; };
@@ -101,7 +104,9 @@
 		0E98E499DB1891628EE75363 /* ManualEventEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualEventEditorView.swift; sourceTree = "<group>"; };
 		0F33CE0026A029FBF9E7C6F8 /* AssignmentRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentRowView.swift; sourceTree = "<group>"; };
 		149E8CDBDEB48DECA04640F8 /* KeychainFeedURLStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainFeedURLStore.swift; sourceTree = "<group>"; };
+		1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelPresentation.swift; sourceTree = "<group>"; };
 		22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinatorTests.swift; sourceTree = "<group>"; };
+		26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelManagerTests.swift; sourceTree = "<group>"; };
 		26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownCalculator.swift; sourceTree = "<group>"; };
 		2792182D2C91DAEF8CA975CC /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICSRefreshRegressionTests.swift; sourceTree = "<group>"; };
@@ -154,6 +159,7 @@
 		AC943AD74D13FFCB7FE6B925 /* AssignmentCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentCalendar.swift; sourceTree = "<group>"; };
 		ACF4898F04D7CB05B2B9E3B2 /* ToolbarSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarSearchTests.swift; sourceTree = "<group>"; };
 		AD057CBAC80A157FFC612859 /* AssistantTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantTests.swift; sourceTree = "<group>"; };
+		BA3437FC7C8929C1C76473CE /* LocalModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelManager.swift; sourceTree = "<group>"; };
 		BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasDateTextParserTests.swift; sourceTree = "<group>"; };
 		BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantSettings.swift; sourceTree = "<group>"; };
 		BFECB8333F7A843628EE9DBE /* CanvasCountdownApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasCountdownApp.swift; sourceTree = "<group>"; };
@@ -338,6 +344,7 @@
 				27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */,
 				313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */,
 				69A7F429FEEB678B1BD75C85 /* LaunchIsolationTests.swift */,
+				26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */,
 				22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */,
 				CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */,
 				F08250DEC107AAC1FD46C78A /* ScreenshotImportWorkflowTests.swift */,
@@ -368,6 +375,7 @@
 				AA2876D5254D102642C61016 /* DockTileService.swift */,
 				EBD2953A233B06BE92CD4DFC /* FeedExclusionStore.swift */,
 				149E8CDBDEB48DECA04640F8 /* KeychainFeedURLStore.swift */,
+				BA3437FC7C8929C1C76473CE /* LocalModelManager.swift */,
 				8CB23E4A7453EB83A9551245 /* NotificationService.swift */,
 				2792182D2C91DAEF8CA975CC /* RefreshCoordinator.swift */,
 				9899653832A95B088689E810 /* ScreenshotImportCoordinator.swift */,
@@ -380,6 +388,7 @@
 			isa = PBXGroup;
 			children = (
 				0F33CE0026A029FBF9E7C6F8 /* AssignmentRowView.swift */,
+				1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */,
 				3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */,
 				6AF9592976EB8099DD69929B /* SearchDismissMonitor.swift */,
 				A17EBF71ACA5C7E9FDB4BCD9 /* ToolbarDisplayModeConfigurator.swift */,
@@ -530,6 +539,7 @@
 				FD39C43E33EF28EB1A1019D4 /* ICSRefreshRegressionTests.swift in Sources */,
 				D88CBFBD1048289F3BCC5147 /* ImmediateSettingsTests.swift in Sources */,
 				723BD80A984A3EF5E5052D58 /* LaunchIsolationTests.swift in Sources */,
+				CA46E10EBC54D5D851128060 /* LocalModelManagerTests.swift in Sources */,
 				B360C603B0A811EC158A3BA9 /* RefreshCoordinatorTests.swift in Sources */,
 				8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */,
 				B281D9589272AEB45F58FE78 /* ScreenshotImportWorkflowTests.swift in Sources */,
@@ -569,6 +579,8 @@
 				F4F7F34451640CBFCCD84676 /* IsolatedLaunchServices.swift in Sources */,
 				78E7574412F37F9F1012755F /* KeychainFeedURLStore.swift in Sources */,
 				9E1869235312809AF07D16A2 /* LaunchAtLoginController.swift in Sources */,
+				961FDDE565A1B9364F3BA201 /* LocalModelManager.swift in Sources */,
+				946A3D2BC6075C8A5DC7C076 /* LocalModelPresentation.swift in Sources */,
 				205D4C4555148E2EBF08D525 /* MainView.swift in Sources */,
 				9FAAF64D5235501A782E08C4 /* MainViewModel.swift in Sources */,
 				7CD0391A62302E133B4B93C1 /* ManualEventEditorView.swift in Sources */,

@@ -31,12 +31,13 @@ struct AssistantPanelView: View {
                             .font(.callout)
                             .foregroundStyle(.orange)
                             .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(16)
             }
         }
-        .frame(minWidth: 280)
+        .frame(minWidth: 220)
     }
 
     private var header: some View {
@@ -83,6 +84,7 @@ struct AssistantPanelView: View {
                 Task { await viewModel.summariseWorkload() }
             } label: {
                 Label("Summarise what is due", systemImage: "text.append")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .disabled(viewModel.isAssistantBusy)
 
