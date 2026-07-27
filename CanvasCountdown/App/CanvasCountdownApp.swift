@@ -74,6 +74,36 @@ struct CanvasCountdownApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             SidebarCommands()
+            // The calendar's own shortcuts, in the menu the system calendar
+            // puts them in, so ⌘1 … ⌘4 mean here what they mean there.
+            CommandGroup(after: .sidebar) {
+                Divider()
+
+                ForEach(CalendarScale.allCases) { scale in
+                    Button(scale.title) {
+                        viewModel?.showCalendarSection(scale)
+                    }
+                    .keyboardShortcut(
+                        KeyEquivalent(scale.shortcut),
+                        modifiers: .command
+                    )
+                    .disabled(viewModel == nil)
+                }
+
+                Divider()
+
+                Button("Today") {
+                    viewModel?.showCalendarSection()
+                }
+                .keyboardShortcut("t", modifiers: .command)
+                .disabled(viewModel == nil)
+
+                Button("Go to Date…") {
+                    viewModel?.presentCalendarDateEntry()
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(viewModel == nil)
+            }
             CommandGroup(replacing: .newItem) {
                 Button("New Manual Event…") {
                     viewModel?.presentNewManualEvent()

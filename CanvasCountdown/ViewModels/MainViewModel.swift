@@ -25,9 +25,16 @@ final class MainViewModel {
     var isSearchFieldFocused = false
     var selectedCourse: String?
     var showCompletedAndIgnored = false
-    /// The month the calendar is showing.
-    var calendarMonth = Date.now
+    /// The day the calendar is centred on. Which grid is drawn around it is
+    /// `calendarScale`; the two together are the whole of "where am I".
+    var calendarAnchor = Date.now
     var selectedCalendarDay: Date?
+    /// What the user typed into Go to Date, kept here so the field survives the
+    /// popover being dismissed and reopened.
+    var calendarDateEntry = ""
+    /// Opened from the calendar bar and from the View menu, so it lives here
+    /// rather than inside the bar.
+    var isShowingCalendarDateEntry = false
     var currentDate = Date.now
     var settingsForm: SettingsFormState
     var notificationPermission: NotificationPermissionState = .notDetermined
@@ -539,46 +546,169 @@ final class MainViewModel {
 
     // MARK: - Calendar
 
+    /// Day, week, month or year. Persisted, because a person who works in the
+    /// week view expects to come back to the week view.
+    var calendarScale: CalendarScale {
+        settingsStore.calendarScale
+    }
+
     /// The month grid, built from exactly the events the list would show.
     var calendarDays: [CalendarDay] {
         AssignmentCalendar.month(
-            containing: calendarMonth,
+            containing: calendarAnchor,
             events: filteredAssignments,
             calendar: calendar,
             now: currentDate
         )
     }
 
-    var calendarMonthTitle: String {
-        AssignmentCalendar.monthTitle(for: calendarMonth, calendar: calendar)
+    var calendarWeekDays: [CalendarDay] {
+        AssignmentCalendar.week(
+            containing: calendarAnchor,
+            events: filteredAssignments,
+            calendar: calendar,
+            now: currentDate
+        )
     }
 
-    /// Events on the selected day, or an empty list when no day is chosen.
+    var calendarDay: CalendarDay {
+        AssignmentCalendar.day(
+            containing: calendarAnchor,
+            events: filteredAssignments,
+            calendar: calendar,
+            now: currentDate
+        )
+    }
+
+    var calendarYearMonths: [CalendarMonthSummary] {
+        AssignmentCalendar.year(
+            containing: calendarAnchor,
+            events: filteredAssignments,
+            calendar: calendar,
+            now: currentDate
+        )
+    }
+
+    var calendarTitle: String {
+        AssignmentCalendar.title(
+            for: calendarScale,
+            date: calendarAnchor,
+            calendar: calendar
+        )
+    }
+
+    /// Still used by the month grid's popover, and by anything that wants the
+    /// day the user last clicked.
     var selectedDayItems: [AssignmentListItem] {
         guard let selectedCalendarDay else {
             return []
         }
-        return filteredAssignments
-            .filter { calendar.isDate($0.dueDate, inSameDayAs: selectedCalendarDay) }
+        return items(on: selectedCalendarDay)
+    }
+
+    func items(on day: Date) -> [AssignmentListItem] {
+        filteredAssignments
+            .filter { calendar.isDate($0.dueDate, inSameDayAs: day) }
             .sorted { $0.dueDate < $1.dueDate }
     }
 
-    func showCalendarMonth(offsetBy months: Int) {
-        calendarMonth = AssignmentCalendar.month(
-            byAdding: months,
-            to: calendarMonth,
+    func showCalendarScale(_ scale: CalendarScale) {
+        guard scale != calendarScale else {
+            return
+        }
+        settingsForm.calendarScale = scale
+        applySettings(settingsForm)
+        selectedCalendarDay = nil
+    }
+
+    /// One step of whatever is on screen: a day in Day, a week in Week, and so
+    /// on, so the arrows always mean what the switcher says.
+    func showCalendar(offsetBy steps: Int) {
+        // Anchored to the start of the period first, so paging through the
+        // months from the 31st does not slide a day earlier each time.
+        let anchor = AssignmentCalendar.normalized(
+            calendarAnchor,
+            for: calendarScale,
+            calendar: calendar
+        )
+        calendarAnchor = AssignmentCalendar.date(
+            byAdding: calendarScale,
+            count: steps,
+            to: anchor,
             calendar: calendar
         )
         selectedCalendarDay = nil
     }
 
-    func showCurrentMonth() {
-        calendarMonth = .now
+    func showToday() {
+        calendarAnchor = currentDate
         selectedCalendarDay = nil
+    }
+
+    /// Moves the calendar to a day, optionally changing scale with it — how the
+    /// year view drills into a month and the month view into a day.
+    func showCalendarDate(_ date: Date, scale: CalendarScale? = nil) {
+        calendarAnchor = date
+        selectedCalendarDay = nil
+        if let scale {
+            showCalendarScale(scale)
+        }
+    }
+
+    var isShowingToday: Bool {
+        switch calendarScale {
+        case .day:
+            calendar.isDate(calendarAnchor, inSameDayAs: currentDate)
+        case .week:
+            calendar.isDate(calendarAnchor, equalTo: currentDate, toGranularity: .weekOfYear)
+        case .month:
+            calendar.isDate(calendarAnchor, equalTo: currentDate, toGranularity: .month)
+        case .year:
+            calendar.isDate(calendarAnchor, equalTo: currentDate, toGranularity: .year)
+        }
+    }
+
+    /// What Go to Date would land on, so the field can show the day before it
+    /// is committed and disable itself when the text means nothing.
+    var calendarDateEntryResult: Date? {
+        CalendarDateEntry.date(
+            from: calendarDateEntry,
+            reference: calendarAnchor,
+            calendar: calendar,
+            now: currentDate
+        )
+    }
+
+    /// Returns whether it went anywhere, so the field can stay open on a typo.
+    @discardableResult
+    func commitCalendarDateEntry() -> Bool {
+        guard let target = calendarDateEntryResult else {
+            return false
+        }
+        showCalendarDate(target)
+        calendarDateEntry = ""
+        return true
     }
 
     func selectCalendarDay(_ day: Date?) {
         selectedCalendarDay = day
+    }
+
+    /// What the View menu calls: it moves to the calendar first, so ⌘2 from the
+    /// list means "show me the week" rather than quietly changing a setting for
+    /// a screen that is not open.
+    func showCalendarSection(_ scale: CalendarScale? = nil) {
+        sidebarSelection = .calendar
+        if let scale {
+            showCalendarScale(scale)
+        } else {
+            showToday()
+        }
+    }
+
+    func presentCalendarDateEntry() {
+        sidebarSelection = .calendar
+        isShowingCalendarDateEntry = true
     }
 
     // MARK: - Search
@@ -1009,6 +1139,7 @@ final class MainViewModel {
         settingsStore.dockCountMode = form.dockCourseScope.modelValue
         settingsStore.selectedCourses = form.selectedCourses
         settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
+        settingsStore.calendarScale = form.calendarScale
 
         let remindersChanged =
             settingsStore.reminderSchedule != form.reminderSchedule

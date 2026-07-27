@@ -186,7 +186,7 @@ final class AssignmentCalendarTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .calendar
-        context.viewModel.calendarMonth = context.viewModel.currentDate
+        context.viewModel.calendarAnchor = context.viewModel.currentDate
 
         let listTitles = Set(context.viewModel.filteredAssignments.map(\.title))
         let calendarTitles = Set(
@@ -200,7 +200,7 @@ final class AssignmentCalendarTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .calendar
-        context.viewModel.calendarMonth = context.viewModel.currentDate
+        context.viewModel.calendarAnchor = context.viewModel.currentDate
 
         context.viewModel.selectCourse("PHYS200")
 
@@ -214,7 +214,7 @@ final class AssignmentCalendarTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .calendar
-        context.viewModel.calendarMonth = context.viewModel.currentDate
+        context.viewModel.calendarAnchor = context.viewModel.currentDate
 
         context.viewModel.searchText = "Maths"
 
@@ -229,16 +229,17 @@ final class AssignmentCalendarTests: XCTestCase {
     func testMonthNavigationMovesAndReturns() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        let start = context.viewModel.calendarMonth
+        context.viewModel.showCalendarScale(.month)
+        let start = context.viewModel.calendarAnchor
 
-        context.viewModel.showCalendarMonth(offsetBy: 1)
-        XCTAssertGreaterThan(context.viewModel.calendarMonth, start)
+        context.viewModel.showCalendar(offsetBy: 1)
+        XCTAssertGreaterThan(context.viewModel.calendarAnchor, start)
 
-        context.viewModel.showCalendarMonth(offsetBy: -1)
+        context.viewModel.showCalendar(offsetBy: -1)
         XCTAssertEqual(
             Calendar.autoupdatingCurrent.component(
                 .month,
-                from: context.viewModel.calendarMonth
+                from: context.viewModel.calendarAnchor
             ),
             Calendar.autoupdatingCurrent.component(.month, from: start)
         )
@@ -250,7 +251,7 @@ final class AssignmentCalendarTests: XCTestCase {
         context.viewModel.selectCalendarDay(context.viewModel.currentDate)
         XCTAssertNotNil(context.viewModel.selectedCalendarDay)
 
-        context.viewModel.showCalendarMonth(offsetBy: 1)
+        context.viewModel.showCalendar(offsetBy: 1)
 
         XCTAssertNil(
             context.viewModel.selectedCalendarDay,
@@ -299,10 +300,191 @@ final class AssignmentCalendarTests: XCTestCase {
         )
     }
 
+    // MARK: - Scales
+
+    func testEveryScaleShowsTheSameEventsAsTheList() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.sidebarSelection = .calendar
+        context.viewModel.calendarAnchor = context.viewModel.currentDate
+
+        let listTitles = Set(context.viewModel.filteredAssignments.map(\.title))
+
+        // The month and year grids reach beyond the events on hand, so each is
+        // checked for carrying nothing the list would not show.
+        for scale in CalendarScale.allCases {
+            context.viewModel.showCalendarScale(scale)
+            let shown: Set<String>
+            switch scale {
+            case .day:
+                shown = Set(context.viewModel.calendarDay.items.map(\.title))
+            case .week:
+                shown = Set(context.viewModel.calendarWeekDays.flatMap(\.items).map(\.title))
+            case .month:
+                shown = Set(context.viewModel.calendarDays.flatMap(\.items).map(\.title))
+            case .year:
+                shown = Set(
+                    context.viewModel.calendarYearMonths
+                        .flatMap(\.days)
+                        .flatMap(\.items)
+                        .map(\.title)
+                )
+            }
+            XCTAssertTrue(
+                shown.isSubset(of: listTitles),
+                "\(scale.title) showed something the list would not"
+            )
+        }
+    }
+
+    func testTheYearShowsEverythingTheListShows() async throws {
+        let context = try makeContext(includingPast: true)
+        await context.viewModel.start()
+        context.viewModel.sidebarSelection = .calendar
+        context.viewModel.showCalendarScale(.year)
+
+        let shown = Set(
+            context.viewModel.calendarYearMonths
+                .flatMap(\.days)
+                .flatMap(\.items)
+                .map(\.title)
+        )
+
+        XCTAssertEqual(
+            shown,
+            Set(context.viewModel.filteredAssignments.map(\.title))
+        )
+    }
+
+    func testTheChosenScaleIsRemembered() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        context.viewModel.showCalendarScale(.week)
+
+        XCTAssertEqual(context.viewModel.calendarScale, .week)
+        XCTAssertEqual(
+            SettingsStore(defaults: context.defaults).calendarScale,
+            .week,
+            "Coming back to the week view is the whole point of choosing it"
+        )
+    }
+
+    func testTheArrowsStepByWhateverIsOnScreen() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        let start = context.viewModel.calendarAnchor
+
+        let today = context.calendar.startOfDay(for: start)
+        context.viewModel.showCalendarScale(.day)
+        context.viewModel.showCalendar(offsetBy: 1)
+        XCTAssertEqual(
+            context.calendar.dateComponents(
+                [.day],
+                from: today,
+                to: context.viewModel.calendarAnchor
+            ).day,
+            1
+        )
+
+        context.viewModel.showToday()
+        context.viewModel.showCalendarScale(.year)
+        context.viewModel.showCalendar(offsetBy: 1)
+        XCTAssertEqual(
+            context.calendar.component(.year, from: context.viewModel.calendarAnchor),
+            context.calendar.component(.year, from: start) + 1
+        )
+    }
+
+    func testTodayIsOnlyOfferedWhenItIsSomewhereElse() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.showCalendarScale(.month)
+        context.viewModel.showToday()
+
+        XCTAssertTrue(context.viewModel.isShowingToday)
+
+        context.viewModel.showCalendar(offsetBy: 1)
+        XCTAssertFalse(context.viewModel.isShowingToday)
+
+        context.viewModel.showToday()
+        XCTAssertTrue(context.viewModel.isShowingToday)
+    }
+
+    func testDrillingFromTheYearOpensTheDay() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.showCalendarScale(.year)
+
+        let target = try XCTUnwrap(context.viewModel.filteredAssignments.first)
+        context.viewModel.showCalendarDate(target.dueDate, scale: .day)
+
+        XCTAssertEqual(context.viewModel.calendarScale, .day)
+        XCTAssertEqual(context.viewModel.calendarDay.items.map(\.title), [target.title])
+    }
+
+    // MARK: - Typing a date
+
+    func testGoToDateMovesTheCalendarAndClearsTheField() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        context.viewModel.calendarDateEntry = "2027-03-04"
+        XCTAssertNotNil(context.viewModel.calendarDateEntryResult)
+        XCTAssertTrue(context.viewModel.commitCalendarDateEntry())
+
+        let parts = context.calendar.dateComponents(
+            [.year, .month, .day],
+            from: context.viewModel.calendarAnchor
+        )
+        XCTAssertEqual(parts.year, 2027)
+        XCTAssertEqual(parts.month, 3)
+        XCTAssertEqual(parts.day, 4)
+        XCTAssertEqual(context.viewModel.calendarDateEntry, "")
+    }
+
+    func testGoToDateRefusesTextItCannotRead() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        let anchor = context.viewModel.calendarAnchor
+
+        context.viewModel.calendarDateEntry = "sometime next term"
+
+        XCTAssertNil(context.viewModel.calendarDateEntryResult)
+        XCTAssertFalse(context.viewModel.commitCalendarDateEntry())
+        XCTAssertEqual(context.viewModel.calendarAnchor, anchor)
+        XCTAssertEqual(
+            context.viewModel.calendarDateEntry,
+            "sometime next term",
+            "A typo must stay in the field to be corrected"
+        )
+    }
+
+    func testTheMenuOpensTheCalendarBeforeChangingIt() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.sidebarSelection = .upcoming
+
+        context.viewModel.showCalendarSection(.week)
+
+        XCTAssertEqual(context.viewModel.sidebarSelection, .calendar)
+        XCTAssertEqual(context.viewModel.calendarScale, .week)
+
+        context.viewModel.sidebarSelection = .upcoming
+        context.viewModel.presentCalendarDateEntry()
+
+        XCTAssertEqual(context.viewModel.sidebarSelection, .calendar)
+        XCTAssertTrue(context.viewModel.isShowingCalendarDateEntry)
+    }
+
     // MARK: - Helpers
 
     private struct Context {
         let viewModel: MainViewModel
+        let defaults: UserDefaults
+        /// The same calendar the view model was built with, so assertions about
+        /// where it moved are not made in a different time zone from the move.
+        let calendar: Calendar
     }
 
     private func makeContext(includingPast: Bool = false) throws -> Context {
@@ -355,7 +537,11 @@ final class AssignmentCalendarTests: XCTestCase {
             calendar: testCalendar,
             automaticActivityEnabled: false
         )
-        return Context(viewModel: viewModel)
+        return Context(
+            viewModel: viewModel,
+            defaults: defaults,
+            calendar: testCalendar
+        )
     }
 }
 

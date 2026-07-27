@@ -77,6 +77,8 @@ struct AppSettings: Equatable, Sendable {
     var dockCountMode: DockCountMode
     var selectedCourses: Set<String>
     var launchAtLogin: Bool
+    /// Which calendar grid to come back to.
+    var calendarScale: CalendarScale
 
     static let defaults = AppSettings(
         refreshInterval: .everySixHours,
@@ -86,7 +88,8 @@ struct AppSettings: Equatable, Sendable {
         dockDisplayLanguage: .english,
         dockCountMode: .allAssignments,
         selectedCourses: [],
-        launchAtLogin: false
+        launchAtLogin: false,
+        calendarScale: .month
     )
 }
 
@@ -133,6 +136,10 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    var calendarScale: CalendarScale {
+        didSet { persist() }
+    }
+
     @ObservationIgnored
     private let defaults: UserDefaults
 
@@ -175,6 +182,10 @@ final class SettingsStore {
             defaults.stringArray(forKey: Key.selectedCourses) ?? []
         )
         launchAtLogin = defaults.bool(forKey: Key.launchAtLogin)
+        calendarScale = defaults
+            .string(forKey: Key.calendarScale)
+            .flatMap(CalendarScale.init(rawValue:))
+            ?? fallback.calendarScale
     }
 
     var snapshot: AppSettings {
@@ -186,7 +197,8 @@ final class SettingsStore {
             dockDisplayLanguage: dockDisplayLanguage,
             dockCountMode: dockCountMode,
             selectedCourses: selectedCourses,
-            launchAtLogin: launchAtLogin
+            launchAtLogin: launchAtLogin,
+            calendarScale: calendarScale
         )
     }
 
@@ -204,6 +216,7 @@ final class SettingsStore {
         dockCountMode = fallback.dockCountMode
         selectedCourses = fallback.selectedCourses
         launchAtLogin = fallback.launchAtLogin
+        calendarScale = fallback.calendarScale
         persist()
     }
 
@@ -258,6 +271,7 @@ final class SettingsStore {
         defaults.set(dockCountMode.rawValue, forKey: Key.dockCountMode)
         defaults.set(selectedCourses.sorted(), forKey: Key.selectedCourses)
         defaults.set(launchAtLogin, forKey: Key.launchAtLogin)
+        defaults.set(calendarScale.rawValue, forKey: Key.calendarScale)
     }
 
     private enum Key {
@@ -272,6 +286,7 @@ final class SettingsStore {
         static let dockCountMode = prefix + "dockCountMode"
         static let selectedCourses = prefix + "selectedCourses"
         static let launchAtLogin = prefix + "launchAtLogin"
+        static let calendarScale = prefix + "calendarScale"
     }
 }
 

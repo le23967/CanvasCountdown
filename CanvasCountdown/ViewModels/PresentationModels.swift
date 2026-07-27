@@ -217,6 +217,7 @@ struct SettingsFormState: Equatable, Sendable {
     var dockCourseScope: DockCourseScopeOption = .allAssignments
     var selectedCourses: Set<String> = []
     var launchAtLogin = false
+    var calendarScale: CalendarScale = .month
 }
 
 enum FeedURLPresentationPolicy {
@@ -286,7 +287,8 @@ extension SettingsFormState {
             dockLabel: DockLabelOption(settings.dockDisplayLanguage),
             dockCourseScope: DockCourseScopeOption(settings.dockCountMode),
             selectedCourses: settings.selectedCourses,
-            launchAtLogin: settings.launchAtLogin
+            launchAtLogin: settings.launchAtLogin,
+            calendarScale: settings.calendarScale
         )
     }
 }
