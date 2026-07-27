@@ -197,9 +197,19 @@ struct MainView: View {
                 onResetReminders: {
                     viewModel.resetRemindersToDefaults()
                 },
-                onApplyDockTheme: { preset in
-                    viewModel.applyDockTheme(preset)
-                },
+                dockThemes: DockThemePresetActions(
+                    presets: viewModel.dockThemePresets,
+                    status: viewModel.dockThemeStatus,
+                    applyBuiltIn: { viewModel.applyDockTheme($0) },
+                    applySaved: { viewModel.applyDockTheme($0) },
+                    save: { viewModel.saveDockThemePreset(named: $0) },
+                    updateSelected: { viewModel.updateSelectedDockThemePreset() },
+                    revertSelected: { viewModel.revertToSelectedDockThemePreset() },
+                    rename: { viewModel.renameDockThemePreset($0, to: $1) },
+                    duplicate: { viewModel.duplicateDockThemePreset($0) },
+                    delete: { viewModel.deleteDockThemePreset($0) },
+                    validateName: { viewModel.validateDockPresetName($0, excluding: $1) }
+                ),
                 onResetDockAppearance: {
                     viewModel.resetDockAppearance()
                 },

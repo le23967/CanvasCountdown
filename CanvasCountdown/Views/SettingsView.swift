@@ -40,7 +40,7 @@ struct SettingsView: View {
     let onRemoveReminder: @MainActor (UUID) -> Void
     let onSetReminderEnabled: @MainActor (Bool, UUID) -> Void
     let onResetReminders: @MainActor () -> Void
-    let onApplyDockTheme: @MainActor (DockThemePreset) -> Void
+    let dockThemes: DockThemePresetActions
     let onResetDockAppearance: @MainActor () -> Void
     let assistantAPIKey: String
     let onSaveAssistantKey: @MainActor (String) -> Void
@@ -349,18 +349,7 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
 
-            Picker("Theme", selection: Binding(
-                get: { settings.dockAppearance.preset },
-                set: { onApplyDockTheme($0) }
-            )) {
-                ForEach(DockThemePreset.selectable) { preset in
-                    Text(preset.title).tag(preset)
-                }
-                if settings.dockAppearance.preset == .custom {
-                    Text(DockThemePreset.custom.title)
-                        .tag(DockThemePreset.custom)
-                }
-            }
+            DockThemeRow(actions: dockThemes)
 
             ColorPicker(
                 "Background top",

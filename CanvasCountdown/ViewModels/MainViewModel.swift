@@ -1067,9 +1067,136 @@ final class MainViewModel {
         applySettings(settingsForm)
     }
 
+    /// Reverts the appearance only. Saved presets are the user's own work and
+    /// survive this, so "Reset to Defaults" is never a way to lose them.
     func resetDockAppearance() {
         settingsForm.dockAppearance = .defaults
         applySettings(settingsForm)
+    }
+
+    // MARK: - Saved Dock themes
+
+    var dockThemePresets: [UserDockThemePreset] {
+        settingsStore.dockThemePresets.presets
+    }
+
+    var dockThemeStatus: DockThemeStatus {
+        settingsStore.dockThemePresets.status(for: settingsForm.dockAppearance)
+    }
+
+    func applyDockTheme(_ preset: UserDockThemePreset) {
+        settingsForm.dockAppearance = DockAppearance.applying(
+            preset,
+            to: settingsForm.dockAppearance
+        )
+        applySettings(settingsForm)
+    }
+
+    func validateDockPresetName(
+        _ name: String,
+        excluding excludedID: UUID? = nil
+    ) -> DockPresetNameError? {
+        switch DockThemePresetLibrary.validate(
+            name: name,
+            in: settingsStore.dockThemePresets,
+            excluding: excludedID
+        ) {
+        case .success:
+            nil
+        case .failure(let error):
+            error
+        }
+    }
+
+    /// Saves the colours currently in force under a new name and selects it.
+    ///
+    /// The contrast correction runs first, so a preset can never be saved in a
+    /// state the app would refuse to draw.
+    @discardableResult
+    func saveDockThemePreset(named name: String) -> DockPresetNameError? {
+        if let error = validateDockPresetName(name) {
+            return error
+        }
+        let corrected = settingsForm.dockAppearance.correctedForContrast()
+        var library = settingsStore.dockThemePresets
+        guard let id = library.add(name: name, colours: corrected.colours) else {
+            return .duplicate
+        }
+        settingsStore.dockThemePresets = library
+        guard let saved = library.preset(withID: id) else {
+            return nil
+        }
+        settingsForm.dockAppearance = DockAppearance.applying(
+            saved,
+            to: corrected
+        )
+        applySettings(settingsForm)
+        showTransientStatus("Saved “\(saved.name)”")
+        return nil
+    }
+
+    /// Writes the current colours back over the preset they were edited from.
+    func updateSelectedDockThemePreset() {
+        guard let preset = dockThemeStatus.editedPreset else {
+            return
+        }
+        let corrected = settingsForm.dockAppearance.correctedForContrast()
+        var library = settingsStore.dockThemePresets
+        guard library.update(preset.id, colours: corrected.colours) else {
+            return
+        }
+        settingsStore.dockThemePresets = library
+        settingsForm.dockAppearance = corrected
+        settingsForm.dockAppearance.userPresetID = preset.id
+        applySettings(settingsForm)
+        showTransientStatus("Updated “\(preset.name)”")
+    }
+
+    /// Throws away edits and goes back to the preset as saved.
+    func revertToSelectedDockThemePreset() {
+        guard let preset = dockThemeStatus.editedPreset else {
+            return
+        }
+        applyDockTheme(preset)
+    }
+
+    func renameDockThemePreset(_ id: UUID, to name: String) -> DockPresetNameError? {
+        if let error = validateDockPresetName(name, excluding: id) {
+            return error
+        }
+        var library = settingsStore.dockThemePresets
+        guard library.rename(id, to: name) else {
+            return .duplicate
+        }
+        settingsStore.dockThemePresets = library
+        return nil
+    }
+
+    func duplicateDockThemePreset(_ id: UUID) {
+        var library = settingsStore.dockThemePresets
+        guard let copy = library.duplicate(id) else {
+            return
+        }
+        settingsStore.dockThemePresets = library
+        showTransientStatus(
+            "Duplicated as “\(library.preset(withID: copy)?.name ?? "")”"
+        )
+    }
+
+    /// Deleting the preset in use leaves its colours alone; only the name goes.
+    func deleteDockThemePreset(_ id: UUID) {
+        var library = settingsStore.dockThemePresets
+        let name = library.preset(withID: id)?.name
+        library.remove(id)
+        settingsStore.dockThemePresets = library
+        if settingsForm.dockAppearance.userPresetID == id {
+            settingsForm.dockAppearance.userPresetID = nil
+            settingsForm.dockAppearance.preset = .custom
+            applySettings(settingsForm)
+        }
+        if let name {
+            showTransientStatus("Deleted “\(name)”")
+        }
     }
 
     /// True when the chosen colours would be hard to read and were corrected.

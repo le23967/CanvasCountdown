@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 
 enum DockNumberSize: String, Codable, CaseIterable, Identifiable, Sendable {
     case small
@@ -153,6 +154,9 @@ struct DockAppearance: Equatable, Codable, Sendable {
     var numberSize: DockNumberSize
     var numberWeight: DockNumberWeight
     var colours: Colours
+    /// Set when the colours came from a preset the user saved. Absent for the
+    /// built-in themes and for colours that have never been named.
+    var userPresetID: UUID?
 
     static let defaults = DockAppearance(
         preset: .defaultBlue,
@@ -174,6 +178,20 @@ struct DockAppearance: Equatable, Codable, Sendable {
         var updated = appearance
         updated.preset = preset
         updated.colours = colours
+        updated.userPresetID = nil
+        return updated
+    }
+
+    /// Puts a saved preset's colours in force, and records which one, so the
+    /// theme row can say "Green Gradient" rather than "Custom".
+    static func applying(
+        _ preset: UserDockThemePreset,
+        to appearance: DockAppearance
+    ) -> DockAppearance {
+        var updated = appearance
+        updated.preset = .custom
+        updated.colours = preset.colours
+        updated.userPresetID = preset.id
         return updated
     }
 
@@ -236,6 +254,9 @@ struct DockAppearance: Equatable, Codable, Sendable {
         }
         if corrected != self {
             corrected.preset = .custom
+            // The colours are no longer the saved ones, so the row must stop
+            // claiming they are.
+            corrected.userPresetID = nil
         }
         return corrected
     }

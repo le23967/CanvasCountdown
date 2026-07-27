@@ -111,6 +111,12 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    /// Kept out of `AppSettings` and out of `reset()`: these are the user's own
+    /// work, not a preference with a sensible default to fall back to.
+    var dockThemePresets: DockThemePresetLibrary {
+        didSet { persist() }
+    }
+
     var dockDisplayLanguage: DockDisplayLanguage {
         didSet { persist() }
     }
@@ -152,6 +158,11 @@ final class SettingsStore {
             from: defaults,
             key: Key.assistant
         ) ?? fallback.assistant
+        dockThemePresets = Self.decode(
+            DockThemePresetLibrary.self,
+            from: defaults,
+            key: Key.dockThemePresets
+        ) ?? .empty
         dockDisplayLanguage = defaults
             .string(forKey: Key.dockDisplayLanguage)
             .flatMap(DockDisplayLanguage.init(rawValue:))
@@ -237,6 +248,9 @@ final class SettingsStore {
         if let data = try? JSONEncoder().encode(assistant) {
             defaults.set(data, forKey: Key.assistant)
         }
+        if let data = try? JSONEncoder().encode(dockThemePresets) {
+            defaults.set(data, forKey: Key.dockThemePresets)
+        }
         defaults.set(
             dockDisplayLanguage.rawValue,
             forKey: Key.dockDisplayLanguage
@@ -253,6 +267,7 @@ final class SettingsStore {
         static let reminderSchedule = prefix + "reminderSchedule"
         static let dockAppearance = prefix + "dockAppearance"
         static let assistant = prefix + "assistant"
+        static let dockThemePresets = prefix + "dockThemePresets"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"
         static let dockCountMode = prefix + "dockCountMode"
         static let selectedCourses = prefix + "selectedCourses"
