@@ -179,8 +179,6 @@ final class MainViewModel {
     /// Kept here rather than in the panel, so moving between a sidebar, a
     /// popover and a window never resets what was typed or said.
     var assistantDraftInput = ""
-    @ObservationIgnored
-    private var availableAssistantWidth: CGFloat = 0
     private(set) var assistantSummary: String?
     private(set) var assistantDrafts: [AssistantDraftTask] = []
     private(set) var isAssistantBusy = false
@@ -296,7 +294,9 @@ final class MainViewModel {
         assistantPresentation.isOpen
     }
 
-    var sidebarWidth: CGFloat {
+    /// The width the user left the panel at. What it is actually drawn at is
+    /// this trimmed to the room the window has, which only the layout knows.
+    var preferredSidebarWidth: CGFloat {
         AssistantLayout.clampedSidebarWidth(settingsStore.assistant.sidebarWidth)
     }
 
@@ -310,26 +310,6 @@ final class MainViewModel {
 
     var assistantStaysOnThisMac: Bool {
         settingsStore.assistant.staysOnThisMac
-    }
-
-    /// Called as the window resizes. Only the choice between sidebar and
-    /// popover changes; the conversation is untouched.
-    func updateAvailableWidth(_ windowWidth: CGFloat) {
-        availableAssistantWidth = AssistantLayout.availableWidth(
-            forWindowWidth: windowWidth
-        )
-        guard assistantPresentation.isOpen else {
-            return
-        }
-        let next = AssistantLayout.presentation(
-            preference: assistantPreference,
-            availableWidth: availableAssistantWidth,
-            current: assistantPresentation
-        )
-        guard next != assistantPresentation else {
-            return
-        }
-        move(to: next)
     }
 
     /// The single writer for the presentation.
@@ -361,7 +341,6 @@ final class MainViewModel {
         move(
             to: AssistantLayout.presentation(
                 preference: assistantPreference,
-                availableWidth: availableAssistantWidth,
                 current: assistantPresentation
             )
         )
@@ -391,7 +370,6 @@ final class MainViewModel {
             move(
                 to: AssistantLayout.presentation(
                     preference: preference,
-                    availableWidth: availableAssistantWidth,
                     current: assistantPresentation
                 )
             )

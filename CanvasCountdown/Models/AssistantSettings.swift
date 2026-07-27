@@ -95,7 +95,7 @@ struct AssistantSettings: Equatable, Codable, Sendable {
         provider: .local,
         baseURL: AssistantProvider.local.defaultBaseURL,
         model: AssistantProvider.local.defaultModel,
-        presentation: .automatic,
+        presentation: .sidebar,
         sidebarWidth: nil
     )
 

@@ -1,9 +1,13 @@
 import CoreGraphics
 import Foundation
 
-/// What the user asked for.
+/// Where the user asked the assistant to appear.
+///
+/// There is no automatic mode. Choosing the container from the window width
+/// meant a tiled or split-screen window silently lost the sidebar, which is the
+/// one case where the panel is most wanted and least replaceable. The width now
+/// decides how wide the panel is, never whether it exists.
 enum AssistantPresentationPreference: String, Codable, CaseIterable, Identifiable, Sendable {
-    case automatic
     case sidebar
     case popover
 
@@ -11,13 +15,19 @@ enum AssistantPresentationPreference: String, Codable, CaseIterable, Identifiabl
 
     var title: String {
         switch self {
-        case .automatic:
-            "Automatic"
         case .sidebar:
             "Sidebar"
         case .popover:
             "Popover"
         }
+    }
+
+    /// Anything unrecognised — notably the "automatic" that used to be stored —
+    /// reads as a sidebar, so an old preferences file opens on the new default
+    /// rather than throwing the whole assistant blob back to its defaults.
+    init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = AssistantPresentationPreference(rawValue: raw) ?? .sidebar
     }
 }
 
@@ -37,39 +47,31 @@ enum ActiveAssistantPresentation: String, Equatable, Sendable {
     }
 }
 
-/// Chooses between a sidebar and a popover from the width actually available.
+/// How much room the assistant panel takes beside the assignments.
 enum AssistantLayout {
-    /// Below this the assignment list stops being readable: titles and course
-    /// names start wrapping into slivers.
-    static let mainContentMinimum: CGFloat = 680
-    static let sidebarMinimum: CGFloat = 340
+    static let sidebarMinimum: CGFloat = 300
     static let sidebarIdeal: CGFloat = 380
     static let sidebarMaximum: CGFloat = 440
 
-    /// The navigation sidebar is not available to either of them.
-    static let navigationSidebarAllowance: CGFloat = 220
+    /// What the assignment list keeps when the panel is open. Below this the
+    /// titles are unreadable, so the panel gives width back instead of taking
+    /// more.
+    static let mainContentFloor: CGFloat = 300
 
-    /// Extra width required to go back to the sidebar, so a window resting near
-    /// the threshold does not flip modes on every pixel of a drag.
-    static let hysteresis: CGFloat = 60
-
-    /// Width the two panes have to share, given the whole window.
-    static func availableWidth(forWindowWidth width: CGFloat) -> CGFloat {
-        max(0, width - navigationSidebarAllowance)
+    /// The room the list and the panel need to sit beside each other. Below it
+    /// something has to give, and the navigation sidebar is the cheapest thing
+    /// to fold away: it is one click to bring back, and unlike the window's own
+    /// width it is the app's to decide.
+    static var minimumWidthForBoth: CGFloat {
+        mainContentFloor + sidebarMinimum
     }
 
-    static var minimumWidthForSidebar: CGFloat {
-        mainContentMinimum + sidebarMinimum
-    }
-
-    /// The presentation to use, given what the user asked for, how much room
-    /// there is, and what is already on screen.
+    /// The presentation to use, given what the user asked for and what is
+    /// already on screen.
     ///
-    /// The current presentation is part of the decision because of the
-    /// hysteresis: leaving the sidebar is cheaper than re-entering it.
+    /// The window's width is not a parameter: it cannot take a container away.
     static func presentation(
         preference: AssistantPresentationPreference,
-        availableWidth: CGFloat,
         current: ActiveAssistantPresentation
     ) -> ActiveAssistantPresentation {
         // A detached window is only ever chosen explicitly, so nothing here
@@ -79,29 +81,33 @@ enum AssistantLayout {
         }
 
         switch preference {
-        // An explicit choice is a standing instruction, not a hint. Resizing the
-        // window, splitting the screen or going full screen does not revisit it:
-        // a panel that swaps itself out from under the person who pinned it
-        // there is worse than a narrow panel.
         case .sidebar:
             return .sidebar
         case .popover:
             return .popover
-        case .automatic:
-            return fitsSidebar(availableWidth: availableWidth, current: current)
-                ? .sidebar
-                : .popover
         }
     }
 
-    static func fitsSidebar(
-        availableWidth: CGFloat,
-        current: ActiveAssistantPresentation
-    ) -> Bool {
-        let threshold = current == .sidebar
-            ? minimumWidthForSidebar
-            : minimumWidthForSidebar + hysteresis
-        return availableWidth >= threshold
+    /// The width to actually draw the panel at, which is the preferred width
+    /// trimmed to what the window already has.
+    ///
+    /// This is what keeps a split-screen window the size the user left it: the
+    /// panel is only ever as wide as the space beside the list, so opening it
+    /// never asks macOS for a wider window. On a window too narrow to satisfy
+    /// both, the two halve it rather than one of them disappearing.
+    static func fittedSidebarWidth(
+        preferred: CGFloat?,
+        availableWidth: CGFloat
+    ) -> CGFloat {
+        let wanted = clampedSidebarWidth(preferred)
+        guard availableWidth.isFinite, availableWidth > 0 else {
+            return wanted
+        }
+        let roomBesideTheList = availableWidth - mainContentFloor
+        guard roomBesideTheList >= sidebarMinimum else {
+            return min(wanted, availableWidth / 2)
+        }
+        return min(wanted, roomBesideTheList)
     }
 
     /// Keeps a stored width inside the usable range, so a bad value from

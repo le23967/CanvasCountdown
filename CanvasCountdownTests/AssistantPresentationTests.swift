@@ -7,123 +7,49 @@ import XCTest
 /// decision changing. All fixtures are invented.
 @MainActor
 final class AssistantPresentationTests: XCTestCase {
-    /// Comfortably above the sidebar threshold plus its hysteresis.
+    /// A detail column with room to spare.
     private let wideWindow: CGFloat = 1_400
-    /// Below the threshold: the list would be squeezed under its readable width.
-    private let narrowWindow: CGFloat = 900
+    /// About what a half-screen window leaves: the case that used to lose the
+    /// sidebar altogether.
+    private let narrowWindow: CGFloat = 620
 
     // MARK: - Choosing a presentation
 
-    func testWideWindowChoosesTheSidebar() {
-        let presentation = AssistantLayout.presentation(
-            preference: .automatic,
-            availableWidth: AssistantLayout.availableWidth(forWindowWidth: wideWindow),
-            current: .closed
-        )
-
-        XCTAssertEqual(presentation, .sidebar)
-    }
-
-    func testNarrowWindowChoosesThePopover() {
-        let presentation = AssistantLayout.presentation(
-            preference: .automatic,
-            availableWidth: AssistantLayout.availableWidth(forWindowWidth: narrowWindow),
-            current: .closed
-        )
-
+    func testTheSidebarIsShownWhateverTheWindowIsDoing() {
         XCTAssertEqual(
-            presentation,
-            .popover,
-            "Squeezing the list below its readable width is not an option"
+            AssistantLayout.presentation(preference: .sidebar, current: .closed),
+            .sidebar,
+            "Split screen and full screen must not undo what the user chose"
         )
     }
 
-    func testTheMainContentKeepsItsMinimumWidth() {
-        // The threshold is exactly the two minimums; nothing is taken from the
-        // list to make the panel fit.
+    func testAPopoverChoiceIsAlsoHonoured() {
         XCTAssertEqual(
-            AssistantLayout.minimumWidthForSidebar,
-            AssistantLayout.mainContentMinimum + AssistantLayout.sidebarMinimum
-        )
-        XCTAssertGreaterThanOrEqual(AssistantLayout.mainContentMinimum, 650)
-    }
-
-    func testHysteresisStopsFlickeringAtTheThreshold() {
-        let threshold = AssistantLayout.minimumWidthForSidebar
-
-        // Sitting just above the bare minimum: a sidebar already open stays.
-        XCTAssertTrue(
-            AssistantLayout.fitsSidebar(availableWidth: threshold + 1, current: .sidebar)
-        )
-        // The same width does not pull a popover back into a sidebar, so a
-        // drag resting near the line does not flip modes repeatedly.
-        XCTAssertFalse(
-            AssistantLayout.fitsSidebar(availableWidth: threshold + 1, current: .popover)
-        )
-        XCTAssertTrue(
-            AssistantLayout.fitsSidebar(
-                availableWidth: threshold + AssistantLayout.hysteresis,
-                current: .popover
-            )
+            AssistantLayout.presentation(preference: .popover, current: .closed),
+            .popover
         )
     }
 
-    func testAnExplicitSidebarChoiceSurvivesANarrowWindow() {
-        for width in [700, 900, narrowWindow, wideWindow].map(CGFloat.init) {
-            XCTAssertEqual(
-                AssistantLayout.presentation(
-                    preference: .sidebar,
-                    availableWidth: AssistantLayout.availableWidth(forWindowWidth: width),
-                    current: .closed
-                ),
-                .sidebar,
-                "Split screen and full screen must not undo what the user chose"
-            )
-        }
+    func testThereIsNoAutomaticPreference() {
+        XCTAssertEqual(
+            AssistantPresentationPreference.allCases,
+            [.sidebar, .popover],
+            "The width decides how wide the panel is, never whether it exists"
+        )
     }
 
-    func testAnExplicitPopoverChoiceSurvivesAWideWindow() {
-        for width in [700, 900, narrowWindow, wideWindow, 3_000].map(CGFloat.init) {
-            XCTAssertEqual(
-                AssistantLayout.presentation(
-                    preference: .popover,
-                    availableWidth: AssistantLayout.availableWidth(forWindowWidth: width),
-                    current: .closed
-                ),
-                .popover
-            )
-        }
-    }
+    func testAStoredAutomaticPreferenceReadsAsSidebar() throws {
+        let decoded = try JSONDecoder().decode(
+            AssistantPresentationPreference.self,
+            from: Data(#""automatic""#.utf8)
+        )
 
-    func testOnlyAutomaticReactsToTheWindowWidth() {
-        // The width is consulted for exactly one preference. This is the whole
-        // difference between the three settings.
-        let narrow = AssistantLayout.availableWidth(forWindowWidth: narrowWindow)
-        let wide = AssistantLayout.availableWidth(forWindowWidth: wideWindow)
-
-        for preference in AssistantPresentationPreference.allCases {
-            let atNarrow = AssistantLayout.presentation(
-                preference: preference,
-                availableWidth: narrow,
-                current: .closed
-            )
-            let atWide = AssistantLayout.presentation(
-                preference: preference,
-                availableWidth: wide,
-                current: .closed
-            )
-            XCTAssertEqual(
-                atNarrow != atWide,
-                preference == .automatic,
-                "\(preference.title) reacted to width when it should not have"
-            )
-        }
+        XCTAssertEqual(decoded, .sidebar)
     }
 
     func testASeparateWindowIsNeverTakenAwayByResizing() {
         let presentation = AssistantLayout.presentation(
-            preference: .automatic,
-            availableWidth: 100,
+            preference: .sidebar,
             current: .separateWindow
         )
 
@@ -131,6 +57,75 @@ final class AssistantPresentationTests: XCTestCase {
     }
 
     // MARK: - Width bounds
+
+    func testAWideWindowGetsThePreferredWidth() {
+        XCTAssertEqual(
+            AssistantLayout.fittedSidebarWidth(
+                preferred: 400,
+                availableWidth: wideWindow
+            ),
+            400
+        )
+    }
+
+    func testTheSidebarNeverAsksForMoreThanTheColumnHas() {
+        // The whole point: on a split-screen window the panel is trimmed rather
+        // than the window being widened to fit it.
+        for available in stride(from: CGFloat(200), through: 1_600, by: 20) {
+            let width = AssistantLayout.fittedSidebarWidth(
+                preferred: AssistantLayout.sidebarMaximum,
+                availableWidth: available
+            )
+
+            XCTAssertLessThanOrEqual(
+                width,
+                available,
+                "A panel wider than the column would force macOS to resize the window"
+            )
+            XCTAssertGreaterThan(width, 0)
+        }
+    }
+
+    func testAHalfScreenColumnGetsANarrowerPanelRatherThanNone() {
+        let width = AssistantLayout.fittedSidebarWidth(
+            preferred: AssistantLayout.sidebarIdeal,
+            availableWidth: narrowWindow
+        )
+
+        XCTAssertLessThan(width, AssistantLayout.sidebarIdeal)
+        XCTAssertLessThanOrEqual(width, narrowWindow - AssistantLayout.mainContentFloor)
+        XCTAssertGreaterThanOrEqual(width, AssistantLayout.sidebarMinimum)
+    }
+
+    func testTheListKeepsItsFloorWhileThereIsRoomForBoth() {
+        let available = AssistantLayout.mainContentFloor
+            + AssistantLayout.sidebarMinimum
+            + 20
+        let width = AssistantLayout.fittedSidebarWidth(
+            preferred: AssistantLayout.sidebarMaximum,
+            availableWidth: available
+        )
+
+        XCTAssertEqual(width, available - AssistantLayout.mainContentFloor)
+        XCTAssertGreaterThanOrEqual(width, AssistantLayout.sidebarMinimum)
+    }
+
+    func testATinyWindowSplitsTheDifferenceInsteadOfHidingThePanel() {
+        let available: CGFloat = 400
+        let width = AssistantLayout.fittedSidebarWidth(
+            preferred: AssistantLayout.sidebarIdeal,
+            availableWidth: available
+        )
+
+        XCTAssertEqual(width, available / 2)
+    }
+
+    func testAnUnmeasuredWindowFallsBackToThePreferredWidth() {
+        XCTAssertEqual(
+            AssistantLayout.fittedSidebarWidth(preferred: 400, availableWidth: 0),
+            400
+        )
+    }
 
     func testSidebarWidthStaysWithinItsBounds() {
         XCTAssertEqual(
@@ -153,7 +148,7 @@ final class AssistantPresentationTests: XCTestCase {
     }
 
     func testDeclaredBoundsMatchTheIntendedRange() {
-        XCTAssertEqual(AssistantLayout.sidebarMinimum, 340)
+        XCTAssertEqual(AssistantLayout.sidebarMinimum, 300)
         XCTAssertEqual(AssistantLayout.sidebarIdeal, 380)
         XCTAssertEqual(AssistantLayout.sidebarMaximum, 440)
     }
@@ -182,7 +177,6 @@ final class AssistantPresentationTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
 
-        context.viewModel.updateAvailableWidth(wideWindow)
         context.viewModel.openAssistant()
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
 
@@ -200,7 +194,6 @@ final class AssistantPresentationTests: XCTestCase {
     func testASeparateWindowIsNeverTheDefault() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(wideWindow)
 
         context.viewModel.toggleAssistant()
 
@@ -211,7 +204,6 @@ final class AssistantPresentationTests: XCTestCase {
     func testClosingReturnsTheWindowToTheAssignments() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(wideWindow)
         context.viewModel.openAssistant()
 
         context.viewModel.toggleAssistant()
@@ -221,37 +213,46 @@ final class AssistantPresentationTests: XCTestCase {
 
     // MARK: - Nothing is lost when the container changes
 
-    func testResizingKeepsTheConversationDraftAndContext() async throws {
+    func testMovingBetweenContainersKeepsTheConversationDraftAndContext() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(wideWindow)
 
         let item = try XCTUnwrap(context.viewModel.assignments.first)
         context.viewModel.openAssistant(about: item)
         context.viewModel.assistantDraftInput = "half a question"
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
 
-        // Drag the window narrow: the presentation changes, nothing else does.
-        context.viewModel.updateAvailableWidth(narrowWindow)
+        // Out to a popover and back: nothing typed or said is lost.
+        context.viewModel.showAssistantAsPopover()
         XCTAssertEqual(context.viewModel.assistantPresentation, .popover)
         XCTAssertEqual(context.viewModel.assistantDraftInput, "half a question")
         XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
 
-        // And back again.
-        context.viewModel.updateAvailableWidth(wideWindow)
+        context.viewModel.showAssistantAsSidebar()
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
         XCTAssertEqual(context.viewModel.assistantDraftInput, "half a question")
         XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
     }
 
+    /// The reported bug: a split-screen window could not open the assistant at
+    /// all, because the panel was chosen away on width. Nothing about the
+    /// window reaches this decision any more.
+    func testTheSidebarOpensWhateverTheWindowIsDoing() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        context.viewModel.openAssistant()
+
+        XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
+        XCTAssertGreaterThan(context.viewModel.preferredSidebarWidth, 0)
+    }
+
     func testAPinnedSidebarSurvivesResizing() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(wideWindow)
         context.viewModel.setAssistantPreference(.sidebar)
         context.viewModel.openAssistant()
 
-        context.viewModel.updateAvailableWidth(narrowWindow)
 
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
     }
@@ -259,11 +260,9 @@ final class AssistantPresentationTests: XCTestCase {
     func testAPinnedPopoverSurvivesResizing() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(narrowWindow)
         context.viewModel.setAssistantPreference(.popover)
         context.viewModel.openAssistant()
 
-        context.viewModel.updateAvailableWidth(wideWindow)
 
         XCTAssertEqual(context.viewModel.assistantPresentation, .popover)
     }
@@ -272,8 +271,6 @@ final class AssistantPresentationTests: XCTestCase {
         let context = try makeContext()
         await context.viewModel.start()
 
-        context.viewModel.updateAvailableWidth(wideWindow)
-        context.viewModel.updateAvailableWidth(narrowWindow)
 
         XCTAssertEqual(context.viewModel.assistantPresentation, .closed)
     }
@@ -319,7 +316,6 @@ final class AssistantPresentationTests: XCTestCase {
     func testOpeningFromTheToolbarStartsWithGeneralContext() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        context.viewModel.updateAvailableWidth(wideWindow)
 
         context.viewModel.openAssistant()
 
@@ -340,8 +336,8 @@ final class AssistantPresentationTests: XCTestCase {
         )
     }
 
-    func testAutomaticIsTheDefaultPreference() {
-        XCTAssertEqual(AssistantSettings.defaults.presentation, .automatic)
+    func testTheSidebarIsTheDefaultPreference() {
+        XCTAssertEqual(AssistantSettings.defaults.presentation, .sidebar)
     }
 
     func testThePrivacyLabelMatchesTheConfiguredService() async throws {

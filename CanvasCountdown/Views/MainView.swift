@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MainView: View {
@@ -8,22 +9,24 @@ struct MainView: View {
     @State private var hoveredEventID: UUID?
     @FocusState private var isSearchFieldFocused: Bool
     @State private var assistantWindow = AssistantWindowController()
+    @State private var draggedSidebarWidth: CGFloat?
+    @State private var sidebarWidthAtDragStart: CGFloat?
+    @State private var navigationColumnVisibility: NavigationSplitViewVisibility = .automatic
+    /// Only what this view folded away is unfolded again, so a sidebar the user
+    /// closed themselves stays closed.
+    @State private var didFoldNavigationForAssistant = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $navigationColumnVisibility) {
             SidebarView(
                 selection: $viewModel.sidebarSelection,
                 upcomingCount: viewModel.upcomingCount
             )
             .navigationSplitViewColumnWidth(min: 185, ideal: 220, max: 280)
         } detail: {
-            detail
-                // Low enough that a sidebar, the content and the assistant
-                // panel all fit on a half-screen window. A large minimum here
-                // does not keep the layout readable, it just makes macOS clip
-                // whatever does not fit.
-                .frame(minWidth: 380, minHeight: 420)
+            detailWithAssistant
+                .frame(minHeight: 420)
         }
         .task {
             await viewModel.start()
@@ -31,30 +34,6 @@ struct MainView: View {
         .background(ToolbarDisplayModeConfigurator())
         .onChange(of: viewModel.assistantPresentation) { _, presentation in
             syncAssistantWindow(presentation == .separateWindow)
-        }
-        // Measured from the window itself, so the decision does not depend on
-        // the panel being decided about, and does not wait on a layout pass.
-        .background(
-            WindowWidthReporter { width in
-                viewModel.updateAvailableWidth(width)
-            }
-        )
-        .inspector(
-            isPresented: Binding(
-                get: { viewModel.assistantPresentation == .sidebar },
-                set: { shown in
-                    if !shown, viewModel.assistantPresentation == .sidebar {
-                        viewModel.closeAssistant()
-                    }
-                }
-            )
-        ) {
-            assistantPanel
-                .inspectorColumnWidth(
-                    min: AssistantLayout.sidebarMinimum,
-                    ideal: viewModel.sidebarWidth,
-                    max: AssistantLayout.sidebarMaximum
-                )
         }
         // The field's focus and the view model's copy of it are kept in step so
         // any part of the app can release focus without reaching into the view.
@@ -148,6 +127,134 @@ struct MainView: View {
                 statusBanner(statusMessage)
             }
         }
+    }
+
+    /// The assignments and the assistant, side by side inside the window.
+    ///
+    /// Deliberately not `.inspector`: an inspector is a column macOS sizes by
+    /// widening the window, which a tiled or split-screen window cannot do, so
+    /// there the panel never appeared at all.
+    ///
+    /// Both panes are given an explicit width cut from the room this column
+    /// actually has, and the geometry reader between them and the window stops
+    /// either pane's own minimum width from travelling any further out. That is
+    /// what keeps the window still: with nothing asking for more room, macOS has
+    /// no reason to widen the window, so a tiled or split-screen window opens
+    /// the assistant at the size the user left it.
+    private var detailWithAssistant: some View {
+        GeometryReader { proxy in
+            let panel = panelWidth(inColumnOf: proxy.size.width)
+
+            HStack(spacing: 0) {
+                detail
+                    // Leading, so what is cut off in the very narrowest window
+                    // is the trailing edge rather than both edges at once.
+                    .frame(
+                        width: max(0, proxy.size.width - panel),
+                        alignment: .leading
+                    )
+                    .clipped()
+
+                if isAssistantSidebarShown {
+                    assistantResizeDivider
+                    assistantPanel
+                        .frame(width: max(0, panel - assistantDividerWidth))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.22),
+                value: isAssistantSidebarShown
+            )
+            // Folding the navigation sidebar buys the two panes another ~200pt
+            // without touching the window, which is the only other place the
+            // room can come from. It happens once per opening and never
+            // reverses on width: folding is itself what makes the column wide
+            // enough again, so reacting to that would just fight itself. Bring
+            // the sidebar back by hand and it stays back.
+            .onChange(of: needsMoreRoom(inColumnOf: proxy.size.width)) { _, needed in
+                guard needed, !didFoldNavigationForAssistant else {
+                    return
+                }
+                navigationColumnVisibility = .detailOnly
+                didFoldNavigationForAssistant = true
+            }
+        }
+        .onChange(of: isAssistantSidebarShown) { _, shown in
+            guard !shown, didFoldNavigationForAssistant else {
+                return
+            }
+            navigationColumnVisibility = .automatic
+            didFoldNavigationForAssistant = false
+        }
+    }
+
+    private func needsMoreRoom(inColumnOf columnWidth: CGFloat) -> Bool {
+        isAssistantSidebarShown
+            && columnWidth > 0
+            && columnWidth < AssistantLayout.minimumWidthForBoth
+    }
+
+    private var isAssistantSidebarShown: Bool {
+        viewModel.assistantPresentation == .sidebar
+    }
+
+    private var assistantDividerWidth: CGFloat { 1 }
+
+    /// What the panel and its divider take from the column, which is never more
+    /// than the column has. Nothing is asked of the window.
+    private func panelWidth(inColumnOf columnWidth: CGFloat) -> CGFloat {
+        guard isAssistantSidebarShown else {
+            return 0
+        }
+        let fitted = AssistantLayout.fittedSidebarWidth(
+            preferred: draggedSidebarWidth ?? viewModel.preferredSidebarWidth,
+            availableWidth: columnWidth
+        )
+        return min(columnWidth, fitted + assistantDividerWidth)
+    }
+
+    /// Replaces the drag handle the inspector used to provide. The width is only
+    /// written back when the drag ends, so a drag in progress cannot leave a
+    /// half-way value in preferences.
+    private var assistantResizeDivider: some View {
+        Divider()
+            .overlay(alignment: .center) {
+                Color.clear
+                    .frame(width: 10)
+                    .contentShape(Rectangle())
+                    .onHover { isInside in
+                        if isInside {
+                            NSCursor.resizeLeftRight.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                let base = sidebarWidthAtDragStart
+                                    ?? viewModel.preferredSidebarWidth
+                                sidebarWidthAtDragStart = base
+                                draggedSidebarWidth = min(
+                                    max(
+                                        base - value.translation.width,
+                                        AssistantLayout.sidebarMinimum
+                                    ),
+                                    AssistantLayout.sidebarMaximum
+                                )
+                            }
+                            .onEnded { _ in
+                                if let width = draggedSidebarWidth {
+                                    viewModel.rememberSidebarWidth(width)
+                                }
+                                draggedSidebarWidth = nil
+                                sidebarWidthAtDragStart = nil
+                            }
+                    )
+                    .accessibilityHidden(true)
+            }
     }
 
     @ViewBuilder
