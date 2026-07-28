@@ -179,11 +179,12 @@ final class SettingsStore {
         ) ?? .empty
         // Absent means a first run rather than an emptied list, and starting
         // with nothing to pick from would hide the feature entirely.
-        eventLabels = Self.decode(
+        let storedLabels = Self.decode(
             EventLabelLibrary.self,
             from: defaults,
             key: Key.eventLabels
-        ) ?? .defaults
+        )
+        eventLabels = storedLabels ?? .defaults
         dockDisplayLanguage = defaults
             .string(forKey: Key.dockDisplayLanguage)
             .flatMap(DockDisplayLanguage.init(rawValue:))
@@ -200,6 +201,13 @@ final class SettingsStore {
             .string(forKey: Key.calendarScale)
             .flatMap(CalendarScale.init(rawValue:))
             ?? fallback.calendarScale
+
+        // Writing the starting labels out on the first run pins them: an event
+        // labelled today keeps its colour even if a later version ships a
+        // different starting set.
+        if storedLabels == nil {
+            persist()
+        }
     }
 
     var snapshot: AppSettings {

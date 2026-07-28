@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import XCTest
 @testable import CanvasCountdown
 
@@ -18,6 +19,68 @@ final class EventLabelTests: XCTestCase {
             "Two labels with the same name cannot be told apart in a menu"
         )
         XCTAssertTrue(library.labels.allSatisfy { NSColor(hex: $0.colorHex) != nil })
+    }
+
+    /// The bug this pins: the starting labels used to be given fresh ids every
+    /// time they were built, so every event labelled with one pointed at a
+    /// label that did not exist on the next launch, and its colour vanished.
+    func testTheStartingLabelsKeepTheSameIdentityOnEveryLaunch() throws {
+        // Written down as constants, and checked as constants. Two stores in
+        // one test process would agree even on generated ids — the id has to
+        // be the same in the *next* process, which only a fixed value gives.
+        XCTAssertEqual(
+            EventLabelLibrary.defaults.labels.map(\.id.uuidString),
+            [
+                "4C1D0E9A-0000-4000-A000-000000000001",
+                "4C1D0E9A-0000-4000-A000-000000000002",
+                "4C1D0E9A-0000-4000-A000-000000000003",
+                "4C1D0E9A-0000-4000-A000-000000000004",
+            ],
+            "An event stores its label's id: a new one on each launch loses the colour"
+        )
+    }
+
+    func testTheStartingLabelsAreWrittenDownOnTheFirstRun() throws {
+        let suiteName = "EventLabelTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertNil(defaults.data(forKey: Self.labelsKey))
+
+        let ids = SettingsStore(defaults: defaults).eventLabels.labels.map(\.id)
+
+        XCTAssertNotNil(
+            defaults.data(forKey: Self.labelsKey),
+            "The starting set is pinned on the first run, not left implicit"
+        )
+        XCTAssertEqual(
+            SettingsStore(defaults: defaults).eventLabels.labels.map(\.id),
+            ids
+        )
+    }
+
+    /// The stored key, spelled out: this is the contract with anything already
+    /// on disk, so it is not free to change.
+    private static let labelsKey = "CanvasCountdown.settings.eventLabels"
+
+    func testAnEmptiedLibraryStaysEmpty() throws {
+        let suiteName = "EventLabelTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = SettingsStore(defaults: defaults)
+        for label in store.eventLabels.labels {
+            var library = store.eventLabels
+            library.remove(label.id)
+            store.eventLabels = library
+        }
+
+        XCTAssertTrue(
+            SettingsStore(defaults: defaults).eventLabels.labels.isEmpty,
+            "Deleting every label is a choice, not an empty first run"
+        )
     }
 
     func testAddingReturnsTheLabelAndKeepsIt() throws {
@@ -235,6 +298,47 @@ final class EventLabelTests: XCTestCase {
             before,
             "Labels are the user's own work, not a preference with a default"
         )
+    }
+
+    // MARK: - Surviving a quit
+
+    /// The other half of "it disappeared after I reopened the app": the mark
+    /// has to reach the database on disk, not just the row on screen.
+    func testALabelledEventKeepsItsLabelWhenTheStoreIsReopened() async throws {
+        let storeURL = FileManager.default.temporaryDirectory
+            .appending(path: "EventLabelTests-\(UUID().uuidString).store")
+        defer {
+            try? FileManager.default.removeItem(at: storeURL)
+        }
+
+        let labelID = EventLabelLibrary.builtIn.important
+        let eventID: UUID
+
+        do {
+            let container = try ModelContainer(
+                for: AssignmentEvent.self,
+                configurations: ModelConfiguration(url: storeURL)
+            )
+            let repository = SwiftDataAssignmentRepository(modelContainer: container)
+            let saved = try await repository.saveManual(
+                ManualAssignmentDraft(title: "Example Quiz", dueDate: .now),
+                now: .now
+            )
+            eventID = saved.id
+            try await repository.setLabel(id: eventID, labelID: labelID, now: .now)
+        }
+
+        // A second container on the same file is what relaunching the app does.
+        let reopened = try ModelContainer(
+            for: AssignmentEvent.self,
+            configurations: ModelConfiguration(url: storeURL)
+        )
+        let repository = SwiftDataAssignmentRepository(modelContainer: reopened)
+        let stored = try await repository.fetchAll()
+
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.id, eventID)
+        XCTAssertEqual(stored.first?.labelID, labelID)
     }
 
     // MARK: - Helpers

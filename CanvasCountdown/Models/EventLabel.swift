@@ -58,11 +58,28 @@ struct EventLabelLibrary: Equatable, Codable, Sendable {
     /// feature is usable before anyone opens Settings. All of them can be
     /// renamed, recoloured or deleted.
     static let defaults = EventLabelLibrary(labels: [
-        EventLabel(name: "Important", colorHex: "#E5484D"),
-        EventLabel(name: "In Progress", colorHex: "#F5A623"),
-        EventLabel(name: "Personal", colorHex: "#30A46C"),
-        EventLabel(name: "Activity", colorHex: "#3E63DD"),
+        EventLabel(id: builtIn.important, name: "Important", colorHex: "#E5484D"),
+        EventLabel(id: builtIn.inProgress, name: "In Progress", colorHex: "#F5A623"),
+        EventLabel(id: builtIn.personal, name: "Personal", colorHex: "#30A46C"),
+        EventLabel(id: builtIn.activity, name: "Activity", colorHex: "#3E63DD"),
     ])
+
+    /// Written down rather than generated, because an event stores the id of
+    /// its label. A fresh id on every launch would point every labelled event
+    /// at a label that no longer exists, and the colours would quietly vanish
+    /// on the next start.
+    enum builtIn {
+        static let important = uuid("4C1D0E9A-0000-4000-A000-000000000001")
+        static let inProgress = uuid("4C1D0E9A-0000-4000-A000-000000000002")
+        static let personal = uuid("4C1D0E9A-0000-4000-A000-000000000003")
+        static let activity = uuid("4C1D0E9A-0000-4000-A000-000000000004")
+
+        /// The strings are literals covered by a test, so the fallback is
+        /// unreachable; it exists only to keep a force-unwrap out of the app.
+        private static func uuid(_ value: String) -> UUID {
+            UUID(uuidString: value) ?? UUID()
+        }
+    }
 
     static let empty = EventLabelLibrary(labels: [])
 
