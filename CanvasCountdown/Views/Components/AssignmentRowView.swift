@@ -3,9 +3,13 @@ import SwiftUI
 struct AssignmentRowView: View {
     let item: AssignmentListItem
     let now: Date
+    /// The user's own mark on this event, if it has one. Passed in rather than
+    /// looked up, so the row stays a pure view of what it is given.
+    var label: EventLabel?
 
     var body: some View {
         HStack(spacing: 14) {
+            labelBar
             dayCount
 
             VStack(alignment: .leading, spacing: 4) {
@@ -27,6 +31,13 @@ struct AssignmentRowView: View {
                 }
 
                 HStack(spacing: 6) {
+                    if let label {
+                        Text(label.name)
+                            .foregroundStyle(Color(nsColor: label.color))
+                            .lineLimit(1)
+                        Text("•")
+                            .accessibilityHidden(true)
+                    }
                     if let courseName = item.normalizedCourseName {
                         Text(courseName)
                             .lineLimit(1)
@@ -45,6 +56,21 @@ struct AssignmentRowView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// A stripe rather than a dot: it reads at a glance down a long list, and
+    /// it takes no width from the title when there is no label.
+    @ViewBuilder
+    private var labelBar: some View {
+        if let label {
+            // A fixed height rather than a flexible one: inside a row, a view
+            // free to grow vertically takes the height it is offered rather
+            // than the height of its neighbours.
+            Capsule()
+                .fill(Color(nsColor: label.color))
+                .frame(width: 3, height: 34)
+                .accessibilityHidden(true)
+        }
     }
 
     private var dayCount: some View {
@@ -102,6 +128,7 @@ struct AssignmentRowView: View {
         }
 
         let course = item.normalizedCourseName.map { ", \($0)" } ?? ""
-        return "\(item.title)\(course), \(timing)"
+        let labelName = label.map { ", labelled \($0.name)" } ?? ""
+        return "\(item.title)\(course)\(labelName), \(timing)"
     }
 }

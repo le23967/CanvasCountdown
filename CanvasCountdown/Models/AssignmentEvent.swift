@@ -18,6 +18,10 @@ final class AssignmentEvent {
     var sourceURL: String?
     var isCompleted: Bool
     var isIgnored: Bool
+    /// The user's own label, if they gave it one. Optional with no default, so
+    /// existing rows migrate without being touched, and a feed refresh never
+    /// writes it: it is the user's mark, not Canvas's.
+    var labelID: UUID?
     var createdAt: Date
     var updatedAt: Date
 
@@ -39,6 +43,7 @@ final class AssignmentEvent {
         sourceURL: String? = nil,
         isCompleted: Bool = false,
         isIgnored: Bool = false,
+        labelID: UUID? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         lastSeenInFeedAt: Date? = nil,
@@ -55,6 +60,7 @@ final class AssignmentEvent {
         self.sourceURL = sourceURL
         self.isCompleted = isCompleted
         self.isIgnored = isIgnored
+        self.labelID = labelID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.lastSeenInFeedAt = lastSeenInFeedAt
@@ -74,6 +80,7 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
     var sourceURL: String?
     var isCompleted: Bool
     var isIgnored: Bool
+    var labelID: UUID?
     var createdAt: Date
     var updatedAt: Date
     var lastSeenInFeedAt: Date?
@@ -91,6 +98,7 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
         sourceURL: String? = nil,
         isCompleted: Bool = false,
         isIgnored: Bool = false,
+        labelID: UUID? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now,
         lastSeenInFeedAt: Date? = nil,
@@ -107,6 +115,7 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
         self.sourceURL = sourceURL
         self.isCompleted = isCompleted
         self.isIgnored = isIgnored
+        self.labelID = labelID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.lastSeenInFeedAt = lastSeenInFeedAt
@@ -126,6 +135,7 @@ struct AssignmentSnapshot: Identifiable, Hashable, Sendable, CountdownEvent {
             sourceURL: event.sourceURL,
             isCompleted: event.isCompleted,
             isIgnored: event.isIgnored,
+            labelID: event.labelID,
             createdAt: event.createdAt,
             updatedAt: event.updatedAt,
             lastSeenInFeedAt: event.lastSeenInFeedAt,

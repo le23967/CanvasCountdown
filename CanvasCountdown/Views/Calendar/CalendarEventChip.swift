@@ -6,6 +6,8 @@ import SwiftUI
 /// itself wherever it is seen.
 struct CalendarEventChip: View {
     let item: AssignmentListItem
+    /// The colour of the user's label, when it has one.
+    var labelColor: Color?
     var showsTime = false
     var isCompact = false
 
@@ -41,12 +43,13 @@ struct CalendarEventChip: View {
     }
 
     /// The one place a deadline's colour is decided, so the grids do not each
-    /// grow their own opinion of it.
+    /// grow their own opinion of it. A label wins over the app's accent, which
+    /// is the whole point of putting one on.
     private var tint: Color {
         if item.isCompleted || item.isIgnored {
             return .secondary
         }
-        return .accentColor
+        return labelColor ?? .accentColor
     }
 
     private var helpText: String {

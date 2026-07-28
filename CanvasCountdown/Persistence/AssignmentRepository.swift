@@ -49,6 +49,14 @@ protocol AssignmentRepository: Sendable {
         now: Date
     ) async throws
 
+    /// Puts the user's label on an event, or takes it off with nil.
+    func setLabel(id: UUID, labelID: UUID?, now: Date) async throws
+
+    /// Takes a deleted label off everything carrying it, so a colour cannot
+    /// outlive the label it belonged to.
+    @discardableResult
+    func clearLabel(_ labelID: UUID, now: Date) async throws -> Int
+
     /// Records what an authoritative feed refresh said about the stored Canvas
     /// rows. Rows are archived, never deleted, and only after repeated absence.
     /// Manual events are never affected.
@@ -341,6 +349,33 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
         }
         event.updatedAt = now
         try modelContext.save()
+    }
+
+    func setLabel(id: UUID, labelID: UUID?, now: Date) async throws {
+        guard let event = try event(id: id) else {
+            throw AssignmentRepositoryError.assignmentNotFound
+        }
+        guard event.labelID != labelID else {
+            return
+        }
+        event.labelID = labelID
+        event.updatedAt = now
+        try modelContext.save()
+    }
+
+    @discardableResult
+    func clearLabel(_ labelID: UUID, now: Date) async throws -> Int {
+        let events = try modelContext.fetch(FetchDescriptor<AssignmentEvent>())
+            .filter { $0.labelID == labelID }
+        guard !events.isEmpty else {
+            return 0
+        }
+        for event in events {
+            event.labelID = nil
+            event.updatedAt = now
+        }
+        try modelContext.save()
+        return events.count
     }
 
     @discardableResult

@@ -1022,6 +1022,134 @@ final class MainViewModel {
         }
     }
 
+    // MARK: - Labels
+
+    var eventLabels: [EventLabel] {
+        settingsStore.eventLabels.labels
+    }
+
+    var canAddEventLabel: Bool {
+        !settingsStore.eventLabels.isFull
+    }
+
+    func label(for item: AssignmentListItem) -> EventLabel? {
+        settingsStore.eventLabels.label(id: item.labelID)
+    }
+
+    /// Nil takes the label off. The same call does both, so a row's menu is one
+    /// list with a "None" at the top rather than an assign and a clear.
+    func setLabel(_ labelID: UUID?, for item: AssignmentListItem) {
+        Task {
+            do {
+                try await repository.setLabel(
+                    id: item.id,
+                    labelID: labelID,
+                    now: .now
+                )
+                try await reloadAssignmentsAndSynchronize()
+            } catch {
+                present(error)
+            }
+        }
+    }
+
+    func validateLabelName(
+        _ name: String,
+        excluding excludedID: UUID? = nil
+    ) -> EventLabelNameError? {
+        settingsStore.eventLabels.validate(name: name, excluding: excludedID)
+    }
+
+    func labelUsageCount(_ id: UUID) -> Int {
+        assignments.filter { $0.labelID == id }.count
+    }
+
+    /// Adds a label the user can then rename in place, rather than making them
+    /// name it in a sheet before they can see it.
+    func addEventLabel() {
+        let palette = [
+            "#E5484D", "#F5A623", "#30A46C", "#3E63DD",
+            "#8E4EC6", "#0091FF", "#D6409F", "#12A594",
+        ]
+        let used = Set(eventLabels.map { $0.colorHex.uppercased() })
+        let colorHex = palette.first { !used.contains($0) } ?? palette[
+            eventLabels.count % palette.count
+        ]
+
+        var name = "New Label"
+        var suffix = 2
+        while validateLabelName(name) == .duplicate {
+            name = "New Label \(suffix)"
+            suffix += 1
+        }
+        addEventLabel(name: name, colorHex: colorHex)
+    }
+
+    @discardableResult
+    func addEventLabel(
+        name: String,
+        colorHex: String
+    ) -> EventLabelNameError? {
+        var library = settingsStore.eventLabels
+        do {
+            let label = try library.add(name: name, colorHex: colorHex)
+            settingsStore.eventLabels = library
+            showTransientStatus("Added “\(label.name)”")
+            return nil
+        } catch let error as EventLabelNameError {
+            return error
+        } catch {
+            present(error)
+            return nil
+        }
+    }
+
+    @discardableResult
+    func renameEventLabel(_ id: UUID, to name: String) -> EventLabelNameError? {
+        var library = settingsStore.eventLabels
+        do {
+            try library.rename(id, to: name)
+            settingsStore.eventLabels = library
+            return nil
+        } catch let error as EventLabelNameError {
+            return error
+        } catch {
+            present(error)
+            return nil
+        }
+    }
+
+    func recolorEventLabel(_ id: UUID, to colorHex: String) {
+        var library = settingsStore.eventLabels
+        library.recolor(id, to: colorHex)
+        settingsStore.eventLabels = library
+    }
+
+    /// Deleting a label takes it off everything carrying it, so no event is
+    /// left pointing at a colour that no longer exists.
+    func deleteEventLabel(_ id: UUID) {
+        let name = settingsStore.eventLabels.label(id: id)?.name
+        var library = settingsStore.eventLabels
+        library.remove(id)
+        settingsStore.eventLabels = library
+
+        Task {
+            do {
+                let cleared = try await repository.clearLabel(id, now: .now)
+                try await reloadAssignmentsAndSynchronize()
+                if let name {
+                    showTransientStatus(
+                        cleared == 0
+                            ? "Deleted “\(name)”"
+                            : "Deleted “\(name)” and removed it from \(cleared) event\(cleared == 1 ? "" : "s")"
+                    )
+                }
+            } catch {
+                present(error)
+            }
+        }
+    }
+
     func toggleIgnored(_ item: AssignmentListItem) {
         Task {
             do {

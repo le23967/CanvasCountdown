@@ -25,14 +25,16 @@ struct AssignmentCalendarView: View {
                 days: [viewModel.calendarDay],
                 now: viewModel.currentDate,
                 onOpen: onOpen,
-                onOpenDay: { viewModel.showCalendarDate($0, scale: .day) }
+                onOpenDay: { viewModel.showCalendarDate($0, scale: .day) },
+                label: { viewModel.label(for: $0) }
             )
         case .week:
             CalendarTimeGridView(
                 days: viewModel.calendarWeekDays,
                 now: viewModel.currentDate,
                 onOpen: onOpen,
-                onOpenDay: { viewModel.showCalendarDate($0, scale: .day) }
+                onOpenDay: { viewModel.showCalendarDate($0, scale: .day) },
+                label: { viewModel.label(for: $0) }
             )
         case .month:
             CalendarMonthGrid(
@@ -41,13 +43,15 @@ struct AssignmentCalendarView: View {
                 now: viewModel.currentDate,
                 onSelect: { viewModel.selectCalendarDay($0) },
                 onOpenDay: { viewModel.showCalendarDate($0, scale: .day) },
-                onOpen: onOpen
+                onOpen: onOpen,
+                label: { viewModel.label(for: $0) }
             )
         case .year:
             CalendarYearGrid(
                 months: viewModel.calendarYearMonths,
                 onOpenDay: { viewModel.showCalendarDate($0, scale: .day) },
-                onOpenMonth: { viewModel.showCalendarDate($0, scale: .month) }
+                onOpenMonth: { viewModel.showCalendarDate($0, scale: .month) },
+                label: { viewModel.label(for: $0) }
             )
         }
     }

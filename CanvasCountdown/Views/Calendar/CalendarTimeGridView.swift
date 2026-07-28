@@ -11,11 +11,16 @@ struct CalendarTimeGridView: View {
     let now: Date
     let onOpen: (AssignmentListItem) -> Void
     let onOpenDay: (Date) -> Void
+    let label: (AssignmentListItem) -> EventLabel?
 
     private let hourHeight: CGFloat = 44
     private let gutterWidth: CGFloat = 54
     private let chipHeight: CGFloat = 34
     private let calendar = Calendar.autoupdatingCurrent
+
+    private func labelColor(_ item: AssignmentListItem) -> Color? {
+        label(item).map { Color(nsColor: $0.color) }
+    }
 
     private var totalHeight: CGFloat {
         CGFloat(CalendarTimeGrid.hoursShown) * hourHeight
@@ -111,7 +116,11 @@ struct CalendarTimeGridView: View {
                             Button {
                                 onOpen(item)
                             } label: {
-                                CalendarEventChip(item: item, isCompact: days.count > 1)
+                                CalendarEventChip(
+                                    item: item,
+                                    labelColor: labelColor(item),
+                                    isCompact: days.count > 1
+                                )
                             }
                             .buttonStyle(.plain)
                         }
@@ -169,7 +178,11 @@ struct CalendarTimeGridView: View {
                     Button {
                         onOpen(entry.item)
                     } label: {
-                        CalendarEventChip(item: entry.item, showsTime: true)
+                        CalendarEventChip(
+                            item: entry.item,
+                            labelColor: labelColor(entry.item),
+                            showsTime: true
+                        )
                             .frame(width: width, height: chipHeight, alignment: .topLeading)
                     }
                     .buttonStyle(.plain)

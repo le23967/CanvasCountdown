@@ -49,6 +49,7 @@
 		860861B6C0D84E5C649EBDFD /* DockSizeSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95902093C69B7D56B46A3DBE /* DockSizeSelectionTests.swift */; };
 		86C72D220246FD00CC940DB0 /* CanvasFeedFetcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */; };
 		8A6D175FF58DFAC27530998B /* CalendarDateEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B30037016B79A8EDD6D1A /* CalendarDateEntry.swift */; };
+		8AE1D56E8A0687CE7C76FBD1 /* EventLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B6894882DC74C3E721638A /* EventLabel.swift */; };
 		8C2FFCFCC43E1DAB1F0BFD57 /* ReminderScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC53AEBB564B8CC911D3B775 /* ReminderScheduleTests.swift */; };
 		8F05A920BA26644F1A846157 /* AssignmentRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBBB4E8742512AA2FAF5A01 /* AssignmentRepository.swift */; };
 		8F3B103D54BF8DEF9C98717A /* CanvasDateTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76BC7128DEFCEAA70AC73E7 /* CanvasDateTextParser.swift */; };
@@ -77,7 +78,9 @@
 		C16421F07BCD84EEE422B35A /* DockAndViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C58F278177095C16BFAD31 /* DockAndViewModelTests.swift */; };
 		C465D6530DCC2B2B59101061 /* AssignmentRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F33CE0026A029FBF9E7C6F8 /* AssignmentRowView.swift */; };
 		C522AE475E64161034193F1A /* ScreenshotImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9899653832A95B088689E810 /* ScreenshotImportCoordinator.swift */; };
+		C5EF2B9F0E9D8D506A700E1E /* EventLabelViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25B61814CD86EC18BB18B723 /* EventLabelViews.swift */; };
 		C5FA2CDB06658BADAD564F20 /* AssignmentRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12FBF9E9C022B9EBEB41DB2 /* AssignmentRepositoryTests.swift */; };
+		C90FAE30191A4C508961E9C6 /* EventLabelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E21BF89A60639D0876DA8C2 /* EventLabelTests.swift */; };
 		C9AC8533F40AEA60491EDF0D /* CountdownCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */; };
 		CA46E10EBC54D5D851128060 /* LocalModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */; };
 		D819A504296ACA82DC7FCA12 /* CanvasDateTextParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */; };
@@ -123,6 +126,7 @@
 		1B8ECA63C4D9FF561B91D33E /* DockThemePresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockThemePresets.swift; sourceTree = "<group>"; };
 		1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelPresentation.swift; sourceTree = "<group>"; };
 		22E3E6DF97A57BE73540585B /* RefreshCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinatorTests.swift; sourceTree = "<group>"; };
+		25B61814CD86EC18BB18B723 /* EventLabelViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLabelViews.swift; sourceTree = "<group>"; };
 		267746207E9601DA548A31CC /* CalendarYearGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarYearGrid.swift; sourceTree = "<group>"; };
 		26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelManagerTests.swift; sourceTree = "<group>"; };
 		26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownCalculator.swift; sourceTree = "<group>"; };
@@ -170,6 +174,7 @@
 		89307B88F02B43EF58286C41 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		8CB23E4A7453EB83A9551245 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		8CFE9B7D621A96F9F3D2D23A /* CalendarMonthGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarMonthGrid.swift; sourceTree = "<group>"; };
+		8E21BF89A60639D0876DA8C2 /* EventLabelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLabelTests.swift; sourceTree = "<group>"; };
 		95902093C69B7D56B46A3DBE /* DockSizeSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockSizeSelectionTests.swift; sourceTree = "<group>"; };
 		9899653832A95B088689E810 /* ScreenshotImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotImportCoordinator.swift; sourceTree = "<group>"; };
 		9A9BD01296587DD6B0C91641 /* representative.ics */ = {isa = PBXFileReference; path = representative.ics; sourceTree = "<group>"; };
@@ -179,6 +184,7 @@
 		A17EBF71ACA5C7E9FDB4BCD9 /* ToolbarDisplayModeConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarDisplayModeConfigurator.swift; sourceTree = "<group>"; };
 		A6E53D49DEC7CFE3995861D2 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		A7C04D78D65827131BF4B848 /* CanvasCountdown.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CanvasCountdown.entitlements; sourceTree = "<group>"; };
+		A8B6894882DC74C3E721638A /* EventLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLabel.swift; sourceTree = "<group>"; };
 		AA2876D5254D102642C61016 /* DockTileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockTileService.swift; sourceTree = "<group>"; };
 		AC6D32E93DD98F3E7D8998DE /* CanvasFeedFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFeedFetcherTests.swift; sourceTree = "<group>"; };
 		AC943AD74D13FFCB7FE6B925 /* AssignmentCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentCalendar.swift; sourceTree = "<group>"; };
@@ -313,6 +319,7 @@
 				BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */,
 				354D08732371A4156B46E57D /* DockAppearance.swift */,
 				1B8ECA63C4D9FF561B91D33E /* DockThemePresets.swift */,
+				A8B6894882DC74C3E721638A /* EventLabel.swift */,
 				77030799B2DA28706F2F6C2D /* ReminderRule.swift */,
 				CF8B1F1723B52C6DE98E2EF0 /* ScreenshotImport.swift */,
 			);
@@ -385,6 +392,7 @@
 				52588398CF09248B3E94DACF /* DockThemePresetTests.swift */,
 				36E0D9F768688445C44FF690 /* DockTileLayoutTests.swift */,
 				7F96CA15B91E4A0B5EA3A6ED /* EventInteractionTests.swift */,
+				8E21BF89A60639D0876DA8C2 /* EventLabelTests.swift */,
 				827B5CA1F3113FDCA6398835 /* FeedReconciliationTests.swift */,
 				27B7B3F64ED12909217BFB39 /* ICSRefreshRegressionTests.swift */,
 				313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */,
@@ -435,6 +443,7 @@
 				0F33CE0026A029FBF9E7C6F8 /* AssignmentRowView.swift */,
 				5857C74C93EF06A42C86FA0E /* AssistantWindowController.swift */,
 				3455A7BFB334C40F34929B28 /* DockThemePresetViews.swift */,
+				25B61814CD86EC18BB18B723 /* EventLabelViews.swift */,
 				1E0FBABB82AB36D2190596E2 /* LocalModelPresentation.swift */,
 				3851F1CADA70ADDD1FED89D1 /* NearestAssignmentCard.swift */,
 				6AF9592976EB8099DD69929B /* SearchDismissMonitor.swift */,
@@ -584,6 +593,7 @@
 				FE7493F033C47898361B9F3C /* DockThemePresetTests.swift in Sources */,
 				317C1AD7B70137166D6066C7 /* DockTileLayoutTests.swift in Sources */,
 				4524E510E23EF70ABDD68742 /* EventInteractionTests.swift in Sources */,
+				C90FAE30191A4C508961E9C6 /* EventLabelTests.swift in Sources */,
 				E65A84744E385683A8B44B85 /* FeedReconciliationTests.swift in Sources */,
 				468C50E4CA3946964D02D708 /* ICSParserTests.swift in Sources */,
 				FD39C43E33EF28EB1A1019D4 /* ICSRefreshRegressionTests.swift in Sources */,
@@ -632,6 +642,8 @@
 				9B47B94F2FE60BCAC73AA55A /* DockTileLayout.swift in Sources */,
 				DFD3F852058A150207DE7E16 /* DockTileRenderer.swift in Sources */,
 				BB369EA6E3C95E2F099BCF5C /* DockTileService.swift in Sources */,
+				8AE1D56E8A0687CE7C76FBD1 /* EventLabel.swift in Sources */,
+				C5EF2B9F0E9D8D506A700E1E /* EventLabelViews.swift in Sources */,
 				4A3C9328B7FE3B6B7783F4C6 /* FeedExclusionStore.swift in Sources */,
 				FB33C9AAD41A82689EEB3F69 /* FeedImportView.swift in Sources */,
 				AA5276B7683D872920ED9B84 /* ICSParser.swift in Sources */,

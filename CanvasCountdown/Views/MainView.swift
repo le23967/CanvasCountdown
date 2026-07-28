@@ -320,6 +320,15 @@ struct MainView: View {
                 onResetDockAppearance: {
                     viewModel.resetDockAppearance()
                 },
+                labels: EventLabelActions(
+                    labels: viewModel.eventLabels,
+                    canAdd: viewModel.canAddEventLabel,
+                    add: { viewModel.addEventLabel() },
+                    rename: { viewModel.renameEventLabel($0, to: $1) },
+                    recolor: { viewModel.recolorEventLabel($0, to: $1) },
+                    delete: { viewModel.deleteEventLabel($0) },
+                    usageCount: { viewModel.labelUsageCount($0) }
+                ),
                 assistantAPIKey: viewModel.assistantAPIKey,
                 onSaveAssistantKey: { key in
                     viewModel.saveAssistantKey(key)
@@ -719,7 +728,8 @@ struct MainView: View {
                 HStack(spacing: 8) {
                     AssignmentRowView(
                         item: item,
-                        now: viewModel.currentDate
+                        now: viewModel.currentDate,
+                        label: viewModel.label(for: item)
                     )
 
                     Spacer(minLength: 0)
@@ -909,6 +919,8 @@ struct MainView: View {
             )
         }
 
+        labelMenu(for: item)
+
         Divider()
 
         Button {
@@ -925,6 +937,39 @@ struct MainView: View {
                 Label("Delete…", systemImage: "trash")
             }
         }
+    }
+
+    /// One list with None at the top: assigning and clearing are the same
+    /// action, so they are not two menu items.
+    private func labelMenu(for item: AssignmentListItem) -> some View {
+        Menu {
+            Button {
+                viewModel.setLabel(nil, for: item)
+            } label: {
+                if item.labelID == nil {
+                    Label("None", systemImage: "checkmark")
+                } else {
+                    Text("None")
+                }
+            }
+
+            Divider()
+
+            ForEach(viewModel.eventLabels) { label in
+                Button {
+                    viewModel.setLabel(label.id, for: item)
+                } label: {
+                    if item.labelID == label.id {
+                        Label(label.name, systemImage: "checkmark")
+                    } else {
+                        Text(label.name)
+                    }
+                }
+            }
+        } label: {
+            Label("Label", systemImage: "tag")
+        }
+        .disabled(viewModel.eventLabels.isEmpty)
     }
 
     private func statusBanner(_ message: String) -> some View {

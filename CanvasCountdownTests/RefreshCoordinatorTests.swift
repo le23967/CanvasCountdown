@@ -192,6 +192,11 @@ private actor RepositorySpy: AssignmentRepository {
         now: Date
     ) async throws {}
 
+    func setLabel(id: UUID, labelID: UUID?, now: Date) async throws {}
+
+    @discardableResult
+    func clearLabel(_ labelID: UUID, now: Date) async throws -> Int { 0 }
+
     func delete(id: UUID) async throws {}
 
     func deleteAll() async throws {}

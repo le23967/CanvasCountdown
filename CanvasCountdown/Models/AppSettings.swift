@@ -120,6 +120,13 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    /// The user's own labels. Kept out of `AppSettings` and out of `reset()`
+    /// alongside the Dock presets: these are their work, not a preference with
+    /// a sensible default to fall back to.
+    var eventLabels: EventLabelLibrary {
+        didSet { persist() }
+    }
+
     var dockDisplayLanguage: DockDisplayLanguage {
         didSet { persist() }
     }
@@ -170,6 +177,13 @@ final class SettingsStore {
             from: defaults,
             key: Key.dockThemePresets
         ) ?? .empty
+        // Absent means a first run rather than an emptied list, and starting
+        // with nothing to pick from would hide the feature entirely.
+        eventLabels = Self.decode(
+            EventLabelLibrary.self,
+            from: defaults,
+            key: Key.eventLabels
+        ) ?? .defaults
         dockDisplayLanguage = defaults
             .string(forKey: Key.dockDisplayLanguage)
             .flatMap(DockDisplayLanguage.init(rawValue:))
@@ -264,6 +278,9 @@ final class SettingsStore {
         if let data = try? JSONEncoder().encode(dockThemePresets) {
             defaults.set(data, forKey: Key.dockThemePresets)
         }
+        if let data = try? JSONEncoder().encode(eventLabels) {
+            defaults.set(data, forKey: Key.eventLabels)
+        }
         defaults.set(
             dockDisplayLanguage.rawValue,
             forKey: Key.dockDisplayLanguage
@@ -282,6 +299,7 @@ final class SettingsStore {
         static let dockAppearance = prefix + "dockAppearance"
         static let assistant = prefix + "assistant"
         static let dockThemePresets = prefix + "dockThemePresets"
+        static let eventLabels = prefix + "eventLabels"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"
         static let dockCountMode = prefix + "dockCountMode"
         static let selectedCourses = prefix + "selectedCourses"

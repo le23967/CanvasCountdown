@@ -443,6 +443,23 @@ private actor RepositoryStub: AssignmentRepository {
         snapshots[index].updatedAt = now
     }
 
+    func setLabel(id: UUID, labelID: UUID?, now: Date) throws {
+        guard let index = snapshots.firstIndex(where: { $0.id == id }) else {
+            throw AssignmentRepositoryError.assignmentNotFound
+        }
+        snapshots[index].labelID = labelID
+    }
+
+    @discardableResult
+    func clearLabel(_ labelID: UUID, now: Date) throws -> Int {
+        var cleared = 0
+        for index in snapshots.indices where snapshots[index].labelID == labelID {
+            snapshots[index].labelID = nil
+            cleared += 1
+        }
+        return cleared
+    }
+
     func delete(id: UUID) throws {
         guard let index = snapshots.firstIndex(where: { $0.id == id }) else {
             throw AssignmentRepositoryError.assignmentNotFound

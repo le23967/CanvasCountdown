@@ -8,6 +8,9 @@ struct CalendarMonthGrid: View {
     let onSelect: (Date?) -> Void
     let onOpenDay: (Date) -> Void
     let onOpen: (AssignmentListItem) -> Void
+    /// Looks up the user's label for an event. A closure rather than the whole
+    /// settings store, so the grid stays a view of what it is handed.
+    let label: (AssignmentListItem) -> EventLabel?
 
     /// A small minimum so seven columns still fit a narrow window; the cells
     /// share whatever width there is rather than pushing past the edge.
@@ -74,7 +77,11 @@ struct CalendarMonthGrid: View {
             // Two entries fit comfortably; the rest are counted so the row
             // height stays even across the month.
             ForEach(day.items.prefix(2)) { item in
-                CalendarEventChip(item: item, isCompact: true)
+                CalendarEventChip(
+                    item: item,
+                    labelColor: label(item).map { Color(nsColor: $0.color) },
+                    isCompact: true
+                )
             }
 
             if day.items.count > 2 {
@@ -167,7 +174,7 @@ struct CalendarMonthGrid: View {
                         onSelect(nil)
                         onOpen(item)
                     } label: {
-                        AssignmentRowView(item: item, now: now)
+                        AssignmentRowView(item: item, now: now, label: label(item))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }

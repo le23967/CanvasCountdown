@@ -42,6 +42,7 @@ struct SettingsView: View {
     let onResetReminders: @MainActor () -> Void
     let dockThemes: DockThemePresetActions
     let onResetDockAppearance: @MainActor () -> Void
+    let labels: EventLabelActions
     let assistantAPIKey: String
     let onSaveAssistantKey: @MainActor (String) -> Void
     let models: LocalModelPresentation
@@ -69,6 +70,7 @@ struct SettingsView: View {
             refreshSection
             notificationSection
             courseFilteringSection
+            labelsSection
             dockSection
             assistantSection
             systemSection
@@ -561,6 +563,35 @@ struct SettingsView: View {
             Text("Course Filtering")
         } footer: {
             Text("Applies to Upcoming, the nearest deadline card and the Dock countdown. All Events and Completed always show everything, and events without a course are always included.")
+        }
+    }
+
+    /// One list of labels, because "how urgent" and "what kind of thing" are
+    /// the same mark on the same event. Two systems would mean two colours
+    /// competing for one row.
+    private var labelsSection: some View {
+        Section {
+            if labels.labels.isEmpty {
+                Text("No labels yet. Add one to colour events in the list and the calendar.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(labels.labels) { label in
+                    EventLabelRow(
+                        label: label,
+                        usageCount: labels.usageCount(label.id),
+                        onRename: { labels.rename(label.id, $0) },
+                        onRecolor: { labels.recolor(label.id, $0) },
+                        onDelete: { labels.delete(label.id) }
+                    )
+                }
+            }
+
+            Button("Add Label", action: labels.add)
+                .disabled(!labels.canAdd)
+        } header: {
+            Text("Labels")
+        } footer: {
+            Text("A label is a name and a colour — Important, Personal, Society, whatever you need. Put one on an event from the ⋯ menu beside it, and it colours that event in the list and on the calendar. Nothing is labelled automatically.")
         }
     }
 

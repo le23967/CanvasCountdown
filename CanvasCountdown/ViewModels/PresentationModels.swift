@@ -48,6 +48,9 @@ struct AssignmentListItem: Identifiable, Hashable, Sendable {
     var isCompleted: Bool
     var isIgnored: Bool
     var isManual: Bool
+    /// The user's label, if any. Carried on the item so every list, grid and
+    /// chip can colour itself without reaching back into settings.
+    var labelID: UUID?
 
     func remainingDays(
         relativeTo now: Date = .now,
@@ -237,7 +240,8 @@ extension AssignmentListItem {
             dueDate: snapshot.dueDate,
             isCompleted: snapshot.isCompleted,
             isIgnored: snapshot.isIgnored,
-            isManual: snapshot.source == .manual
+            isManual: snapshot.source == .manual,
+            labelID: snapshot.labelID
         )
     }
 }

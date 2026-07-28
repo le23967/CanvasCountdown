@@ -9,6 +9,7 @@ struct CalendarYearGrid: View {
     let months: [CalendarMonthSummary]
     let onOpenDay: (Date) -> Void
     let onOpenMonth: (Date) -> Void
+    let label: (AssignmentListItem) -> EventLabel?
 
     private let monthColumns = [
         GridItem(.adaptive(minimum: 190, maximum: 320), spacing: 24)
@@ -97,10 +98,18 @@ struct CalendarYearGrid: View {
         day.isToday ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)
     }
 
+    /// One dot for the day, so it takes the colour of the first labelled thing
+    /// on it. At this size there is room to say "something is here", not to
+    /// list what.
     private func dotColor(_ day: CalendarDay) -> Color {
-        day.items.allSatisfy { $0.isCompleted || $0.isIgnored }
-            ? .secondary
-            : .accentColor
+        let live = day.items.filter { !$0.isCompleted && !$0.isIgnored }
+        guard !live.isEmpty else {
+            return .secondary
+        }
+        if let labelled = live.compactMap({ label($0) }).first {
+            return Color(nsColor: labelled.color)
+        }
+        return .accentColor
     }
 
     private func accessibilityLabel(_ day: CalendarDay) -> String {
