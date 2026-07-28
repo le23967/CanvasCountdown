@@ -696,7 +696,7 @@
 					"@loader_path/../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
-				PRODUCT_BUNDLE_IDENTIFIER = com.local.CanvasCountdownTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdownTests;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CanvasCountdown.app/Contents/MacOS/CanvasCountdown";
@@ -719,9 +719,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
-				PRODUCT_BUNDLE_IDENTIFIER = com.local.CanvasCountdown;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdown;
 				PRODUCT_MODULE_NAME = CanvasCountdown;
 				PRODUCT_NAME = CanvasCountdown;
 				SDKROOT = macosx;
@@ -805,7 +805,7 @@
 					"@loader_path/../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
-				PRODUCT_BUNDLE_IDENTIFIER = com.local.CanvasCountdownTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdownTests;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CanvasCountdown.app/Contents/MacOS/CanvasCountdown";
@@ -828,9 +828,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
-				PRODUCT_BUNDLE_IDENTIFIER = com.local.CanvasCountdown;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdown;
 				PRODUCT_MODULE_NAME = CanvasCountdown;
 				PRODUCT_NAME = CanvasCountdown;
 				SDKROOT = macosx;

@@ -12,6 +12,7 @@ xcuserdata/
 # Generated local build products
 work/
 outputs/
+dist/
 
 # Temporary test and verification artifacts
 TestResults/

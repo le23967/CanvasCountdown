@@ -30,8 +30,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Canvas Countdown
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026"
-        MARKETING_VERSION: 1.0
-        PRODUCT_BUNDLE_IDENTIFIER: com.local.CanvasCountdown
+        MARKETING_VERSION: 1.0.0
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.le23967.CanvasCountdown
         PRODUCT_MODULE_NAME: CanvasCountdown
         PRODUCT_NAME: CanvasCountdown
         OTHER_SWIFT_FLAGS: "$(inherited) -disable-sandbox"
@@ -53,7 +53,7 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         OTHER_SWIFT_FLAGS: "$(inherited) -disable-sandbox"
-        PRODUCT_BUNDLE_IDENTIFIER: com.local.CanvasCountdownTests
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.le23967.CanvasCountdownTests
         SWIFT_STRICT_CONCURRENCY: complete
     dependencies:
       - target: CanvasCountdown

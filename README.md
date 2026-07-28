@@ -1,202 +1,251 @@
 # Canvas Countdown
 
-Canvas Countdown is a native macOS app that keeps Canvas LMS assignment
-deadlines on your Mac and renders the nearest upcoming deadline as a large
-calendar-day countdown in the Dock icon.
+A native macOS deadline manager for Canvas LMS. It keeps your assignment
+deadlines on your Mac and draws the nearest one as a large calendar-day
+countdown in the Dock icon, so the number of days left is visible without
+opening anything.
 
-The app is built with Swift 6, SwiftUI, AppKit, SwiftData, Keychain Services,
-URLSession, and UserNotifications. It has no analytics, account system,
-external backend, or paid dependency.
+Built with Swift 6, SwiftUI, AppKit, SwiftData, Keychain Services, URLSession,
+Vision and UserNotifications. No account, no analytics, no application server,
+no paid dependency.
+
+## Features
+
+- **Canvas Calendar Feed import** — paste your feed URL once; the app refreshes
+  on a schedule while it is running.
+- **Screenshot import with mandatory review** — recognition runs locally with
+  Apple Vision, and nothing is saved until you have checked it.
+- **AI deadline Assistant** — ask what is most urgent, or write a task in a
+  sentence and review the draft before it is saved. Optional, and local by
+  default.
+- **Labels** — a name and a colour of your own (Important, Personal, Society,
+  whatever you need), shown in the list and on the calendar.
+- **Calendar** — day, week, month and year views, with ⌘1–⌘4, ⌘T for today and
+  ⌘⇧T to type a date and jump to it.
+- **Notifications** — local reminders at 7 days, 3 days, 1 day and on the due
+  day by default, and any schedule you add.
+- **Manual events** — countdowns that have nothing to do with Canvas.
+- **Course filtering** — narrow Upcoming, the nearest-deadline card and the
+  Dock countdown to the courses you care about.
+- **Live Dock countdown** — the days remaining, drawn in the Dock tile while the
+  app runs.
+- **Custom Dock appearance** — number size and weight, background, number and
+  header colours, four built-in themes, and a Chinese or English header label.
+- **Reusable Dock theme presets** — save a colour scheme you like, rename it,
+  duplicate it, apply it again later.
 
 ## Requirements
 
-- macOS 15 or later
-- Xcode 16 or later (the project is generated and verified with Xcode 26.3)
-- A Canvas Calendar Feed URL from your university's Canvas instance
+- macOS 15.0 or later
+- Apple silicon or Intel (the app ships as a universal binary)
+- A Canvas Calendar Feed URL from your own institution's Canvas
 
-## Open and run
+## Installation
 
-1. Open `CanvasCountdown.xcodeproj` in Xcode.
-2. Select the **CanvasCountdown** scheme and **My Mac** destination.
-3. If Xcode requests it, choose your personal development team in
-   **Signing & Capabilities**.
-4. Press **Run**.
+1. Download `CanvasCountdown-1.0.0.dmg` from the
+   [latest release](https://github.com/le23967/CanvasCountdown/releases/latest).
+2. Open the DMG and drag **Canvas Countdown** into **Applications**.
+3. **This build is ad-hoc signed and is not notarized by Apple.** The first
+   launch therefore needs one extra step: right-click (or Control-click) the app
+   in Applications, choose **Open**, then confirm **Open** in the dialog.
+   Double-clicking it the normal way will be blocked by Gatekeeper the first
+   time.
+4. If macOS still refuses, open **System Settings → Privacy & Security**, scroll
+   to the message about Canvas Countdown, and choose **Open Anyway**.
 
-For command-line verification:
+After the first launch it opens normally like any other app.
+
+## Canvas Feed Setup
+
+Canvas exposes the feed from its **Calendar** page:
+
+1. Sign in to Canvas in a web browser.
+2. Open **Calendar** from global navigation.
+3. Select **Calendar Feed** near the bottom of the sidebar.
+4. Copy the iCal/ICS URL it shows you.
+5. In Canvas Countdown, open **Settings → Canvas Calendar Feed**, paste the URL,
+   and choose **Preview & Update…**.
+6. Review the parsed events, deselect anything you do not want, then import.
+
+The exact Canvas labels vary by institution.
+
+**Treat this URL like a password.** It usually contains a private token that
+grants read access to your calendar. Never paste it into an issue, a forum, or a
+screenshot. The app stores it in your Keychain and redacts it from exported
+diagnostics.
+
+## Screenshot Import
+
+**Add ▸ Import from Screenshot…** accepts PNG, JPEG, HEIC and TIFF by file
+picker, drag and drop, or paste.
+
+- Text recognition runs **locally on your Mac** using Apple Vision. No image and
+  no recognised text leaves the machine, and no AI service is involved in this
+  feature at all.
+- **Every screenshot goes through a review screen.** Nothing detected is
+  imported automatically. For each row you can correct the title, the course and
+  the date and time, and see the text exactly as it was recognised.
+- **Screenshots are held in memory only for the length of the review** and are
+  dropped when the sheet closes. No image, image path or recognised text is
+  written to the database or to exported diagnostics.
+
+Recognition is imperfect, which is why the review step is not optional:
+
+- A title or date may be read incorrectly and need correcting.
+- If the year is not visible on screen, it is inferred and marked as inferred.
+- Canvas layout varies by institution and theme, which reduces accuracy.
+- A row with no visible "Due" line is kept for review rather than given an
+  invented deadline.
+- Availability lines such as "Not available until" are never read as deadlines.
+
+**Check every date before you import it.**
+
+## AI Assistant and Privacy
+
+The Assistant is **enabled by default but local by default**: out of the box it
+is pointed at `http://localhost:11434`, the address of a local model server such
+as [Ollama](https://ollama.com). If nothing is running there, the Assistant
+simply reports that it cannot be reached. Nothing is sent anywhere.
+
+Two providers are offered in **Settings → AI Assistant**:
+
+- **On this Mac** — a local server. Nothing is uploaded.
+- **Groq (cloud)** — a hosted model. Choosing it is a separate, deliberate act
+  and requires your own API key.
+
+**What is sent when you use the cloud provider:** assignment titles, course
+names and due dates for the deadlines currently in scope — and, when you ask
+about one specific assignment, only that one. Nothing else is sent: not your
+Canvas feed URL, not your completed or ignored marks, not the database, not any
+screenshot or recognised text.
+
+The privacy label in the Assistant's header reads the configured endpoint rather
+than the provider's name, so pointing "local" at a remote host is reported as
+cloud rather than as "On this Mac".
+
+Your Groq API key is stored in the macOS Keychain, never in preferences or
+diagnostics. Never publish your API key or your private schedule.
+
+Anything the Assistant proposes is reviewed by you before it is saved. It never
+edits or deletes an existing event, and an unreadable reply produces no task
+rather than a task with an invented deadline.
+
+## Privacy
+
+- Assignment data, labels and settings stay on this Mac, in the app's sandbox
+  container.
+- The private Canvas feed URL is stored in the macOS Keychain — never in
+  preferences, the database, or exported diagnostics.
+- Feed downloads go directly from your Mac to the HTTPS URL you supplied.
+- Screenshot recognition runs locally and screenshots are not retained after the
+  review session.
+- There is **no analytics, no tracking, no cloud sync and no application
+  server**. The only outbound requests are the Canvas feed download and, if you
+  switch the Assistant to a cloud provider, that provider's API.
+- Notifications are scheduled locally by macOS.
+- Exported diagnostics have URLs redacted before they are written.
+
+## Known Limitations
+
+- **The app is ad-hoc signed and not notarized.** First launch needs the
+  right-click → Open step described under Installation.
+- Automatic refresh runs only while the app is open; there is no background
+  refresh yet.
+- Canvas does not expose submission state in a calendar feed, so completed and
+  ignored marks are maintained locally.
+- Repeating calendar rules and detached recurrence instances are not expanded.
+- The Dock countdown is live only while the app is running. macOS draws the
+  static icon when the app is closed, and no app can change that.
+- Screenshot OCR accuracy depends on your institution's Canvas theme.
+- Launch at login depends on approval in **System Settings → General → Login
+  Items**.
+- Labels are not yet a filter: they colour and name an event, but Upcoming
+  cannot be narrowed to one label.
+
+## Reporting Issues
+
+Use [GitHub Issues](https://github.com/le23967/CanvasCountdown/issues).
+
+**Never include:**
+
+- your Canvas feed URL or any part of its query string
+- API keys or tokens of any kind
+- screenshots containing your name, student ID, or other people's information
+- real assignment titles or course details you would not post publicly
+
+A description of what you did, what you expected and what happened is enough.
+Exported diagnostics (**Settings → Export Diagnostics…**) already have URLs
+redacted, but read the file before attaching it.
+
+## Uninstallation and Data Removal
+
+1. Quit Canvas Countdown.
+2. Drag **Canvas Countdown** from **Applications** to the Bin.
+3. Remove its data:
+
+   ```sh
+   rm -rf ~/Library/Containers/io.github.le23967.CanvasCountdown
+   ```
+
+   That single folder holds the database, preferences, labels and Dock themes.
+4. Remove the Keychain entries: open **Keychain Access**, search for
+   `com.local.CanvasCountdown`, and delete the `canvas-calendar-feed` and
+   `assistant-api-key` items.
+5. If you enabled launch at login, check **System Settings → General → Login
+   Items**.
+
+## Building from Source
 
 ```sh
-xcodebuild \
-  -project CanvasCountdown.xcodeproj \
+xcodegen generate          # only needed if project.yml changed
+xcodebuild -project CanvasCountdown.xcodeproj \
   -scheme CanvasCountdown \
   -destination 'platform=macOS' \
   test
 ```
 
-`project.yml` is the XcodeGen source of truth. XcodeGen is only needed if the
-project structure changes; it is not required to open or build the checked-in
-Xcode project.
+`project.yml` is the XcodeGen source of truth; the checked-in `.xcodeproj` is
+generated from it.
 
-## Find the Canvas Calendar Feed URL
+A release build and a DMG can be produced with:
 
-Canvas normally exposes the feed from its **Calendar** page:
+```sh
+scripts/build-release.sh
+scripts/create-dmg.sh
+```
 
-1. Sign in to Canvas in a web browser.
-2. Open **Calendar** from global navigation.
-3. Select **Calendar Feed** near the bottom of the sidebar.
-4. Copy the displayed iCal/ICS feed URL.
-5. In Canvas Countdown, open **Settings → Canvas feed**, paste the URL, and
-   choose **Preview Import**.
-6. Review the parsed events, deselect anything you do not want, then import.
+Both write to `dist/`, which is not tracked by Git.
 
-The exact Canvas labels can vary by institution. Treat this URL like a
-password: it commonly contains a private token that grants read access to the
-calendar.
-
-## Import from a Canvas screenshot
-
-The Canvas Calendar Feed is the recommended way to import deadlines: it stays
-current by itself and refreshes automatically. Screenshot import is a secondary
-method for when a feed is not available.
-
-**File → Import from Canvas Screenshot…** accepts PNG, JPEG, HEIC and TIFF, by
-file picker, drag and drop, or paste.
-
-Text recognition runs locally on this Mac using Apple Vision. Screenshots are
-never uploaded, and there is no cloud service, AI API or external backend
-involved at any point.
-
-Every screenshot goes through a review screen before anything is saved. Nothing
-detected is imported automatically. For each row you can correct the title, the
-course and the date and time, see the text exactly as it was recognised, and
-choose whether to include it at all.
-
-### What it does not do well
-
-Recognition is imperfect, and the review step exists because of that:
-
-- A title or date may be read incorrectly and need correcting.
-- If the year is not visible on screen, it is inferred and marked as inferred.
-- Canvas layout varies by institution and theme, which can reduce accuracy.
-- A row with no visible "Due" line is kept for review rather than given an
-  invented deadline.
-- Availability lines such as "Not available until" are never treated as
-  deadlines.
-
-Screenshots are held in memory only for the length of the review and are
-discarded when the sheet closes. No image, image path or recognised text is
-written to the database or to exported diagnostics.
-
-## Optional AI assistant
-
-**Off by default.** Canvas Countdown works completely without it.
-
-**Settings → AI Assistant** can connect either of two things:
-
-- **On this Mac** — a local server such as Ollama. Nothing is uploaded.
-- **Groq (cloud)** — a hosted model. **Assignment titles, course names and due
-  dates are sent to Groq.** Nothing else is: not the feed URL, not your
-  completed or ignored marks, not the database.
-
-A local model is usually less reliable at reading a date out of a sentence, and
-a hosted one is usually better. That is the trade being made, and it is yours to
-make.
-
-The assistant can summarise what is coming up, and turn a sentence into a draft
-task. **Anything it proposes is reviewed by you before it is saved**, exactly
-like screenshot import, and it never edits or deletes an existing event. If the
-model replies with something unreadable, no task is created rather than a task
-with an invented deadline.
-
-The Groq API key is stored in the macOS Keychain, never in preferences or
-diagnostics.
-
-## The Dock icon
-
-The application icon and the running Dock tile share one renderer, so they look
-like the same object:
-
-- **Not running:** the static icon shows the header and an em dash placeholder.
-- **Running:** the same tile shows the live countdown to your nearest deadline.
-
-The countdown is dynamic only while Canvas Countdown is running. macOS draws the
-static icon from the app bundle when the app is closed, and no application can
-change that image without running.
-
-**Settings → Dock Appearance** adjusts the number size and weight, the
-background, number and header colours, and offers four presets. Colours that
-would be unreadable are corrected automatically.
-
-## How refreshes treat your data
+## How Refreshes Treat Your Data
 
 - A Canvas event that disappears from one refresh is never deleted. It is
-  counted as missing and only archived after three consecutive refreshes that
+  counted as missing and archived only after three consecutive refreshes that
   carried a real event list and did not mention it.
-- A failed download, a rejected redirect, an oversized response, a parser
-  error, or a feed that parses but contains no events archives nothing.
-- Archiving keeps the row, its deadline, and its completed and ignored state.
-  If Canvas publishes the event again it returns with that state intact.
+- A failed download, a rejected redirect, an oversized response, a parser error,
+  or a feed that parses but contains no events archives nothing.
+- Archiving keeps the row, its deadline, and its completed and ignored state. If
+  Canvas publishes the event again it returns with that state intact.
 - An explicit `STATUS:CANCELLED` entry, or deselecting an event during import,
   archives it straight away.
 
-## Upcoming and Dock scope
-
-**Settings → Upcoming and Dock Countdown** chooses between all assignments and
-selected courses. The selection focuses the Upcoming list, its sidebar count,
-the nearest-deadline card and the Dock countdown together. **All Events** and
-**Completed** always show everything, and assignments without a course
-(including manual entries) are always included. Nothing is deleted by this
-setting.
-
-## Privacy and security
-
-- Assignment data and settings remain on this Mac.
-- The private Canvas feed URL is stored in the user's Keychain, not
-  `UserDefaults` or the SwiftData database.
-- Feed downloads go directly from the Mac to the HTTPS URL supplied by the
-  user.
-- The app has no analytics, tracking, cloud sync, or application server.
-- The optional AI assistant is off by default. When it is switched on and set to
-  Groq, assignment titles, course names and due dates are sent to Groq. Set to
-  run on this Mac, nothing is uploaded.
-- Logs and exported diagnostics never include the feed URL, its query string,
-  or embedded credentials.
-- Notifications are scheduled locally with macOS.
-- Screenshot text recognition runs on this Mac. Screenshots are not uploaded,
-  not stored after the review session, and never appear in diagnostics.
-
-When reporting a bug on GitHub, do not attach your private Canvas feed URL or a
-screenshot containing personal information.
-
 ## Tests
 
-The test target covers calendar-day countdowns (including midnight and
-daylight-saving boundaries), ICS UTC/all-day/TZID values, folded and escaped
-ICS content, stable-UID merging, preservation of local completed/ignored
-state, nearest-event selection, feed reconciliation and archiving, the download
-path (chunking, size limits, redirects, cancellation), Dock tile layout at every
-Dock size, and the selected-course scope.
-
-Run tests in Xcode with **Product → Test**, or use the command above.
+The suite covers calendar-day countdowns (including midnight and
+daylight-saving boundaries), ICS UTC/all-day/TZID values, folded and escaped ICS
+content, stable-UID merging, preservation of local completed/ignored state,
+nearest-event selection, feed reconciliation and archiving, the download path
+(chunking, size limits, redirects, cancellation), Dock tile layout at every Dock
+size, screenshot parsing and review, the calendar's four scales and its date
+entry, labels, and the selected-course scope.
 
 The test bundle is hosted by the app, so the app process starts for every run.
 An automated launch is detected and composed from isolated dependencies: an
 in-memory store, an in-memory feed URL store, an offline fetcher, inert
-notifications and an inert Dock renderer, with no refresh or countdown loops and
-no login-item changes. A test run therefore cannot read the Keychain feed URL,
+notifications and an inert Dock renderer, with no refresh loops and no
+login-item changes. A test run therefore cannot read the Keychain feed URL,
 contact Canvas, or touch the production database. `LaunchIsolationTests` guards
 each of those properties.
 
-## Known limitations
+## Licence
 
-- Automatic refresh runs while the app is open. A future version can add a
-  system background task without changing the feed/repository architecture.
-- Canvas installations can customize calendar event text. The app uses the
-  ICS event start as the deadline and deliberately does not infer due dates
-  from prose such as “available from”.
-- Canvas does not expose submission completion state in a calendar feed.
-  Completed and ignored status is maintained locally.
-- Repeating calendar rules and detached recurrence instances are not expanded
-  in this version.
-- Launch at login depends on macOS approval in **System Settings → General →
-  Login Items**.
-
+MIT. See [LICENSE](LICENSE).
