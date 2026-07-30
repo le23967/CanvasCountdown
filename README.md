@@ -16,8 +16,17 @@ no paid dependency.
 - **Screenshot import with mandatory review** — recognition runs locally with
   Apple Vision, and nothing is saved until you have checked it.
 - **AI deadline Assistant** — ask what is most urgent, or write a task in a
-  sentence and review the draft before it is saved. Optional, and local by
+  sentence, give it a course and a label, and review the draft before it is
+  saved. One click undoes everything a batch just added. Optional, and local by
   default.
+- **Any AI service, saved by name** — anything speaking the common
+  chat-completions API works, including a model running locally through Ollama.
+  Settings suggests the major services and fills in their address for you. Keep
+  several models, each with its own key in the Keychain, and switch between them
+  from the toolbar.
+- **11:59 PM due times** — a Canvas deadline that arrives as midnight is shown
+  as the end of that day, which is what it means. The day and the countdown
+  never move, and it can be turned off.
 - **Labels** — a name and a colour of your own (Important, Personal, Society,
   whatever you need), shown in the list and on the calendar.
 - **Calendar** — day, week, month and year views, with ⌘1–⌘4, ⌘T for today and
@@ -27,6 +36,8 @@ no paid dependency.
 - **Manual events** — countdowns that have nothing to do with Canvas.
 - **Course filtering** — narrow Upcoming, the nearest-deadline card and the
   Dock countdown to the courses you care about.
+- **Course removal** — take an old course out for good, so the Canvas feed
+  stops importing a subject you finished last year. Reversible.
 - **Live Dock countdown** — the days remaining, drawn in the Dock tile while the
   app runs.
 - **Custom Dock appearance** — number size and weight, background, number and

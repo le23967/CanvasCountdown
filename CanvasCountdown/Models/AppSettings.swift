@@ -79,6 +79,10 @@ struct AppSettings: Equatable, Sendable {
     var launchAtLogin: Bool
     /// Which calendar grid to come back to.
     var calendarScale: CalendarScale
+    /// Whether an imported deadline that lands on midnight is read as the end
+    /// of that day. On by default: almost every Canvas deadline is 23:59, and
+    /// an all-day export arrives as 00:00.
+    var treatsMidnightAsEndOfDay: Bool
 
     static let defaults = AppSettings(
         refreshInterval: .everySixHours,
@@ -89,7 +93,8 @@ struct AppSettings: Equatable, Sendable {
         dockCountMode: .allAssignments,
         selectedCourses: [],
         launchAtLogin: false,
-        calendarScale: .month
+        calendarScale: .month,
+        treatsMidnightAsEndOfDay: true
     )
 }
 
@@ -111,6 +116,13 @@ final class SettingsStore {
     }
 
     var assistant: AssistantSettings {
+        didSet { persist() }
+    }
+
+    /// The user's saved models. Kept out of `AppSettings` and out of `reset()`
+    /// alongside the labels and the Dock presets: these are their work, not a
+    /// preference with a sensible default to fall back to.
+    var assistantProfiles: AssistantProfileLibrary {
         didSet { persist() }
     }
 
@@ -147,6 +159,10 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    var treatsMidnightAsEndOfDay: Bool {
+        didSet { persist() }
+    }
+
     @ObservationIgnored
     private let defaults: UserDefaults
 
@@ -172,6 +188,11 @@ final class SettingsStore {
             from: defaults,
             key: Key.assistant
         ) ?? fallback.assistant
+        assistantProfiles = Self.decode(
+            AssistantProfileLibrary.self,
+            from: defaults,
+            key: Key.assistantProfiles
+        ) ?? .empty
         dockThemePresets = Self.decode(
             DockThemePresetLibrary.self,
             from: defaults,
@@ -201,6 +222,11 @@ final class SettingsStore {
             .string(forKey: Key.calendarScale)
             .flatMap(CalendarScale.init(rawValue:))
             ?? fallback.calendarScale
+        // Absent means a first run rather than a deliberate "off", and the
+        // correction is what makes the times match Canvas.
+        treatsMidnightAsEndOfDay = defaults
+            .boolValue(forKey: Key.treatsMidnightAsEndOfDay)
+            ?? fallback.treatsMidnightAsEndOfDay
 
         // Writing the starting labels out on the first run pins them: an event
         // labelled today keeps its colour even if a later version ships a
@@ -220,7 +246,8 @@ final class SettingsStore {
             dockCountMode: dockCountMode,
             selectedCourses: selectedCourses,
             launchAtLogin: launchAtLogin,
-            calendarScale: calendarScale
+            calendarScale: calendarScale,
+            treatsMidnightAsEndOfDay: treatsMidnightAsEndOfDay
         )
     }
 
@@ -239,6 +266,7 @@ final class SettingsStore {
         selectedCourses = fallback.selectedCourses
         launchAtLogin = fallback.launchAtLogin
         calendarScale = fallback.calendarScale
+        treatsMidnightAsEndOfDay = fallback.treatsMidnightAsEndOfDay
         persist()
     }
 
@@ -283,6 +311,9 @@ final class SettingsStore {
         if let data = try? JSONEncoder().encode(assistant) {
             defaults.set(data, forKey: Key.assistant)
         }
+        if let data = try? JSONEncoder().encode(assistantProfiles) {
+            defaults.set(data, forKey: Key.assistantProfiles)
+        }
         if let data = try? JSONEncoder().encode(dockThemePresets) {
             defaults.set(data, forKey: Key.dockThemePresets)
         }
@@ -297,6 +328,10 @@ final class SettingsStore {
         defaults.set(selectedCourses.sorted(), forKey: Key.selectedCourses)
         defaults.set(launchAtLogin, forKey: Key.launchAtLogin)
         defaults.set(calendarScale.rawValue, forKey: Key.calendarScale)
+        defaults.set(
+            treatsMidnightAsEndOfDay,
+            forKey: Key.treatsMidnightAsEndOfDay
+        )
     }
 
     private enum Key {
@@ -306,6 +341,7 @@ final class SettingsStore {
         static let reminderSchedule = prefix + "reminderSchedule"
         static let dockAppearance = prefix + "dockAppearance"
         static let assistant = prefix + "assistant"
+        static let assistantProfiles = prefix + "assistantProfiles"
         static let dockThemePresets = prefix + "dockThemePresets"
         static let eventLabels = prefix + "eventLabels"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"
@@ -313,11 +349,19 @@ final class SettingsStore {
         static let selectedCourses = prefix + "selectedCourses"
         static let launchAtLogin = prefix + "launchAtLogin"
         static let calendarScale = prefix + "calendarScale"
+        static let treatsMidnightAsEndOfDay =
+            prefix + "treatsMidnightAsEndOfDay"
     }
 }
 
 private extension UserDefaults {
     func integerValue(forKey key: String) -> Int? {
         object(forKey: key) == nil ? nil : integer(forKey: key)
+    }
+
+    /// Distinguishes "never written" from a stored `false`, which `bool(forKey:)`
+    /// alone cannot do.
+    func boolValue(forKey key: String) -> Bool? {
+        object(forKey: key) == nil ? nil : bool(forKey: key)
     }
 }

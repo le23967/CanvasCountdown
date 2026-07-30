@@ -65,6 +65,12 @@ protocol AssignmentRepository: Sendable {
         _ request: FeedReconciliationRequest
     ) async throws -> FeedReconciliationOutcome
 
+    /// Removes every event belonging to one course, archived ones included, and
+    /// answers how many went. Used when a course wandered in from the Canvas
+    /// feed and does not belong here at all.
+    @discardableResult
+    func deleteEvents(inCourse courseName: String) async throws -> Int
+
     func delete(id: UUID) async throws
     func deleteAll() async throws
 }
@@ -114,6 +120,11 @@ extension AssignmentRepository {
         // Test doubles and alternate repositories may opt out. The production
         // SwiftData repository implements authoritative reconciliation.
         .empty
+    }
+
+    @discardableResult
+    func deleteEvents(inCourse courseName: String) async throws -> Int {
+        0
     }
 }
 
@@ -450,6 +461,27 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
     private func archive(_ event: AssignmentEvent, at date: Date) {
         event.isArchived = true
         event.archivedAt = date
+    }
+
+    /// Deletes rather than archives: an archived row would still count against
+    /// the course and would come back the moment Canvas published it again.
+    /// Removing a course is a deletion, which is why it is confirmed first and
+    /// why the course is blocked at the same time.
+    @discardableResult
+    func deleteEvents(inCourse courseName: String) async throws -> Int {
+        guard let key = CourseName.normalized(courseName) else {
+            return 0
+        }
+        let events = try modelContext.fetch(FetchDescriptor<AssignmentEvent>())
+            .filter { CourseName.normalized($0.courseName) == key }
+        guard !events.isEmpty else {
+            return 0
+        }
+        for event in events {
+            modelContext.delete(event)
+        }
+        try modelContext.save()
+        return events.count
     }
 
     func delete(id: UUID) async throws {

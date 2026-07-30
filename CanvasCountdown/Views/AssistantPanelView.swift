@@ -92,6 +92,23 @@ struct AssistantPanelView: View {
             .lineLimit(1)
 
             Menu {
+                if viewModel.assistantProfiles.count > 1 {
+                    Picker("Model", selection: Binding(
+                        get: { viewModel.assistantSettings.activeProfileID },
+                        set: { id in
+                            if let id {
+                                viewModel.selectAssistantProfile(id)
+                            }
+                        }
+                    )) {
+                        ForEach(viewModel.assistantProfiles) { profile in
+                            Text(profile.name).tag(Optional(profile.id))
+                        }
+                    }
+
+                    Divider()
+                }
+
                 Picker("Show as", selection: Binding(
                     get: { viewModel.assistantPreference },
                     set: { viewModel.setAssistantPreference($0) }
@@ -346,6 +363,29 @@ struct AssistantPanelView: View {
             }
             .disabled(!task.canBeSaved)
 
+            // What kind of thing this is. The model can guess a course out of
+            // the sentence and often does not; the label it is never asked for
+            // at all. Both belong here, while the task is still a draft, rather
+            // than as two more trips through the list afterwards.
+            HStack(spacing: 6) {
+                TextField("Course (optional)", text: Binding(
+                    get: { task.courseName ?? "" },
+                    set: { course in
+                        var updated = task
+                        let trimmed = course.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        updated.courseName = trimmed.isEmpty ? nil : course
+                        viewModel.updateAssistantDraft(updated)
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.caption)
+                .accessibilityLabel("Course for \(task.title)")
+
+                labelPicker(for: task)
+            }
+
             if let due = task.dueDate {
                 DatePicker(
                     "Due",
@@ -377,6 +417,62 @@ struct AssistantPanelView: View {
         }
         .padding(10)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// One list with None at the top, the same shape the row menu in the list
+    /// uses, so putting a label on something means one thing everywhere.
+    private func labelPicker(for task: AssistantDraftTask) -> some View {
+        Menu {
+            Button {
+                var updated = task
+                updated.labelID = nil
+                viewModel.updateAssistantDraft(updated)
+            } label: {
+                if task.labelID == nil {
+                    Label("None", systemImage: "checkmark")
+                } else {
+                    Text("None")
+                }
+            }
+
+            Divider()
+
+            ForEach(viewModel.eventLabels) { label in
+                Button {
+                    var updated = task
+                    updated.labelID = label.id
+                    viewModel.updateAssistantDraft(updated)
+                } label: {
+                    if task.labelID == label.id {
+                        Label(label.name, systemImage: "checkmark")
+                    } else {
+                        Text(label.name)
+                    }
+                }
+            }
+        } label: {
+            if let label = viewModel.eventLabels.first(where: {
+                $0.id == task.labelID
+            }) {
+                Label {
+                    Text(label.name).lineLimit(1)
+                } icon: {
+                    Circle()
+                        .fill(Color(nsColor: label.color))
+                        .frame(width: 8, height: 8)
+                }
+            } else {
+                Label("Label", systemImage: "tag")
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .font(.caption)
+        .disabled(viewModel.eventLabels.isEmpty)
+        .help(viewModel.eventLabels.isEmpty
+            ? "Add a label in Settings first"
+            : "Put one of your labels on this task")
+        .accessibilityLabel("Label for \(task.title)")
     }
 
     private func draft() {

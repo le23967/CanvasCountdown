@@ -122,6 +122,19 @@ struct ManualEventDraft: Hashable, Sendable {
     }
 }
 
+/// A course as Settings manages it: what it is called, and how much removing it
+/// would take with it.
+struct ManagedCourse: Identifiable, Hashable, Sendable {
+    let name: String
+    let eventCount: Int
+
+    var id: String { name }
+
+    var eventCountDescription: String {
+        eventCount == 1 ? "1 event" : "\(eventCount) events"
+    }
+}
+
 struct ImportPreviewItem: Identifiable, Hashable, Sendable {
     /// Stable across selection changes and suitable for mapping back to the
     /// parsed event. Canvas UID is preferred; a deterministic parser ID may be
@@ -221,6 +234,7 @@ struct SettingsFormState: Equatable, Sendable {
     var selectedCourses: Set<String> = []
     var launchAtLogin = false
     var calendarScale: CalendarScale = .month
+    var treatsMidnightAsEndOfDay = true
 }
 
 enum FeedURLPresentationPolicy {
@@ -232,12 +246,33 @@ enum FeedURLPresentationPolicy {
 extension AssignmentListItem: CountdownEvent {}
 
 extension AssignmentListItem {
+    /// The list item as stored. The due date is whatever the feed said.
     init(snapshot: AssignmentSnapshot) {
+        self.init(
+            snapshot: snapshot,
+            treatsMidnightAsEndOfDay: false,
+            calendar: .autoupdatingCurrent
+        )
+    }
+
+    /// The list item as shown, with a midnight Canvas deadline read as the end
+    /// of that day. Applied here rather than in storage so the correction can be
+    /// turned off and take effect at once, and so nothing the feed sent is lost.
+    init(
+        snapshot: AssignmentSnapshot,
+        treatsMidnightAsEndOfDay: Bool,
+        calendar: Calendar
+    ) {
         self.init(
             id: snapshot.id,
             title: snapshot.title,
             courseName: snapshot.courseName,
-            dueDate: snapshot.dueDate,
+            dueDate: DueTimePolicy.effectiveDueDate(
+                snapshot.dueDate,
+                isManual: snapshot.source == .manual,
+                treatsMidnightAsEndOfDay: treatsMidnightAsEndOfDay,
+                calendar: calendar
+            ),
             isCompleted: snapshot.isCompleted,
             isIgnored: snapshot.isIgnored,
             isManual: snapshot.source == .manual,
@@ -260,10 +295,30 @@ extension ManualAssignmentDraft {
 extension NotificationCandidate {
     init(snapshot: AssignmentSnapshot) {
         self.init(
+            snapshot: snapshot,
+            treatsMidnightAsEndOfDay: false,
+            calendar: .autoupdatingCurrent
+        )
+    }
+
+    /// Reminders count back from the deadline the user is shown, so the same
+    /// correction has to reach them: "1 day before" a 23:59 deadline is the
+    /// evening before, not the previous midnight.
+    init(
+        snapshot: AssignmentSnapshot,
+        treatsMidnightAsEndOfDay: Bool,
+        calendar: Calendar
+    ) {
+        self.init(
             id: snapshot.id,
             title: snapshot.title,
             courseName: snapshot.courseName,
-            dueDate: snapshot.dueDate,
+            dueDate: DueTimePolicy.effectiveDueDate(
+                snapshot.dueDate,
+                isManual: snapshot.source == .manual,
+                treatsMidnightAsEndOfDay: treatsMidnightAsEndOfDay,
+                calendar: calendar
+            ),
             isCompleted: snapshot.isCompleted,
             isIgnored: snapshot.isIgnored
         )
@@ -292,7 +347,8 @@ extension SettingsFormState {
             dockCourseScope: DockCourseScopeOption(settings.dockCountMode),
             selectedCourses: settings.selectedCourses,
             launchAtLogin: settings.launchAtLogin,
-            calendarScale: settings.calendarScale
+            calendarScale: settings.calendarScale,
+            treatsMidnightAsEndOfDay: settings.treatsMidnightAsEndOfDay
         )
     }
 }

@@ -347,7 +347,7 @@ final class AssistantPresentationTests: XCTestCase {
         XCTAssertTrue(context.viewModel.assistantStaysOnThisMac)
 
         var form = context.viewModel.settingsForm
-        form.assistant = AssistantSettings.applying(.groq, to: form.assistant)
+        form.assistant = AssistantSettings.applying(.cloud, to: form.assistant)
         context.viewModel.applySettings(form)
 
         XCTAssertTrue(

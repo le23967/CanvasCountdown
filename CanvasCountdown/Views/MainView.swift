@@ -123,7 +123,12 @@ struct MainView: View {
             Text("“\(item.title)” will be permanently removed.")
         }
         .safeAreaInset(edge: .bottom) {
-            if let statusMessage = viewModel.statusMessage {
+            // The undo offer takes precedence: it is the one banner that is
+            // worth reading, so it must not be pushed aside by a routine
+            // "Settings updated".
+            if let undoable = viewModel.undoableAssistantImport {
+                undoBanner(undoable)
+            } else if let statusMessage = viewModel.statusMessage {
                 statusBanner(statusMessage)
             }
         }
@@ -329,6 +334,24 @@ struct MainView: View {
                     delete: { viewModel.deleteEventLabel($0) },
                     usageCount: { viewModel.labelUsageCount($0) }
                 ),
+                courses: CourseManagementActions(
+                    courses: viewModel.managedCourses,
+                    blocked: viewModel.blockedCourses,
+                    remove: { viewModel.removeCourse($0) },
+                    allow: { viewModel.allowCourse($0) }
+                ),
+                assistant: AssistantProfileActions(
+                    profiles: viewModel.assistantProfiles,
+                    activeID: viewModel.assistantSettings.activeProfileID,
+                    canAdd: viewModel.canAddAssistantProfile,
+                    select: { viewModel.selectAssistantProfile($0) },
+                    add: { viewModel.addAssistantProfile(for: $0) },
+                    addBlank: { viewModel.addBlankAssistantProfile() },
+                    rename: { viewModel.renameAssistantProfile($0, to: $1) },
+                    duplicate: { viewModel.duplicateAssistantProfile($0) },
+                    delete: { viewModel.deleteAssistantProfile($0) },
+                    useService: { viewModel.useAssistantService($0) }
+                ),
                 assistantAPIKey: viewModel.assistantAPIKey,
                 onSaveAssistantKey: { key in
                     viewModel.saveAssistantKey(key)
@@ -490,6 +513,11 @@ struct MainView: View {
                             .frame(minHeight: 320, maxHeight: 560)
                     }
                 }
+                if viewModel.showsAssistantModelSwitcher {
+                    ToolbarItem(id: "action.model", placement: .primaryAction) {
+                        modelSwitcher
+                    }
+                }
                 ToolbarItem(id: "action.search", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "magnifyingglass",
@@ -540,6 +568,38 @@ struct MainView: View {
         .menuIndicator(.hidden)
         .help("Add an event, or import from Canvas")
         .accessibilityLabel("Add or import events")
+    }
+
+    /// Switches which saved model the assistant uses, without a trip to
+    /// Settings. Only appears once there is more than one to switch between.
+    private var modelSwitcher: some View {
+        Menu {
+            ForEach(viewModel.assistantProfiles) { profile in
+                Button {
+                    viewModel.prepareForToolbarAction()
+                    viewModel.selectAssistantProfile(profile.id)
+                } label: {
+                    if profile.id == viewModel.assistantSettings.activeProfileID {
+                        Label(profile.name, systemImage: "checkmark")
+                    } else {
+                        Text(profile.name)
+                    }
+                }
+                .help(profile.subtitle)
+            }
+
+            Divider()
+
+            Button("Manage Models…") {
+                viewModel.prepareForToolbarAction()
+                viewModel.sidebarSelection = .settings
+            }
+        } label: {
+            Label("Model", systemImage: "cpu")
+        }
+        .menuIndicator(.hidden)
+        .help(viewModel.assistantModelDescription)
+        .accessibilityLabel(viewModel.assistantModelDescription)
     }
 
     private var assistantPanel: some View {
@@ -970,6 +1030,42 @@ struct MainView: View {
             Label("Label", systemImage: "tag")
         }
         .disabled(viewModel.eventLabels.isEmpty)
+    }
+
+    /// What the assistant just added, with a way to take all of it back.
+    ///
+    /// Deliberately does not time out. A model asked for several tasks can get
+    /// several of them wrong at once, and an undo that vanishes after two
+    /// seconds leaves the same tidying job it was meant to prevent.
+    private func undoBanner(
+        _ batch: MainViewModel.UndoableAssistantImport
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .foregroundStyle(AssistantStyle.accent)
+                .accessibilityHidden(true)
+            Text(batch.message)
+                .lineLimit(1)
+            Spacer()
+            Button("Undo") {
+                Task { await viewModel.undoAssistantImport() }
+            }
+            .keyboardShortcut("z", modifiers: .command)
+            .help("Remove everything the assistant just added")
+            Button {
+                viewModel.dismissUndoableAssistantImport()
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Keep them")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.bar)
+        .overlay(alignment: .top) {
+            Divider()
+        }
     }
 
     private func statusBanner(_ message: String) -> some View {

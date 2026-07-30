@@ -55,16 +55,77 @@ final class AssistantTests: XCTestCase {
     }
 
     func testSwitchingProviderCarriesItsOwnEndpointAndModel() {
-        let groq = AssistantSettings.applying(.groq, to: .defaults)
+        let cloud = AssistantSettings.applying(.cloud, to: .defaults)
 
-        XCTAssertEqual(groq.provider, .groq)
-        XCTAssertTrue(groq.baseURL.contains("api.groq.com"))
-        XCTAssertFalse(groq.staysOnThisMac)
-        XCTAssertTrue(groq.provider.requiresAPIKey)
+        XCTAssertEqual(cloud.provider, .cloud)
+        XCTAssertFalse(cloud.baseURL.isEmpty)
+        XCTAssertFalse(cloud.staysOnThisMac)
+        XCTAssertTrue(cloud.provider.requiresAPIKey)
 
-        let backToLocal = AssistantSettings.applying(.local, to: groq)
+        let backToLocal = AssistantSettings.applying(.local, to: cloud)
         XCTAssertTrue(backToLocal.staysOnThisMac)
         XCTAssertFalse(backToLocal.provider.requiresAPIKey)
+    }
+
+    /// The cloud option used to name one service. Anything stored under the old
+    /// name has to keep working, or an upgrade silently turns the assistant off.
+    func testTheOldSingleServiceProviderStillDecodes() throws {
+        let stored = Data(#"{"isEnabled":true,"provider":"groq","baseURL":"https://api.groq.com/openai/v1","model":"llama-3.3-70b-versatile","presentation":"sidebar"}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(
+            AssistantSettings.self,
+            from: stored
+        )
+
+        XCTAssertEqual(decoded.provider, .cloud)
+        XCTAssertTrue(decoded.provider.requiresAPIKey)
+        XCTAssertEqual(decoded.baseURL, "https://api.groq.com/openai/v1")
+        XCTAssertEqual(decoded.model, "llama-3.3-70b-versatile")
+    }
+
+    /// An unreadable provider must land on the one setting that cannot upload
+    /// anything, never on the one that can.
+    func testAnUnknownProviderFallsBackToStayingOnThisMac() throws {
+        let stored = Data(#"{"isEnabled":true,"provider":"something-new","baseURL":"http://localhost:11434/v1","model":"llama3.1:8b","presentation":"sidebar"}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(
+            AssistantSettings.self,
+            from: stored
+        )
+
+        XCTAssertEqual(decoded.provider, .local)
+        XCTAssertFalse(decoded.provider.requiresAPIKey)
+    }
+
+    /// The suggestions are a convenience, not a contract, but a broken address
+    /// in the list would fill the fields in with something that cannot work.
+    func testEverySuggestedServiceHasAUsableAddressAndModel() {
+        for service in AssistantService.allServices {
+            XCTAssertNotNil(
+                URL(string: service.baseURL)?.host,
+                "\(service.name) has no usable address"
+            )
+            XCTAssertFalse(
+                service.models.isEmpty,
+                "\(service.name) suggests no model"
+            )
+            XCTAssertFalse(service.note.isEmpty)
+        }
+
+        XCTAssertTrue(
+            AssistantService.ollama.baseURL.contains("localhost"),
+            "The local suggestion must point at this Mac"
+        )
+        for service in AssistantService.cloudServices {
+            XCTAssertFalse(
+                AssistantEndpoint.isLocal(service.baseURL),
+                "\(service.name) is offered as a cloud service"
+            )
+            XCTAssertNotNil(
+                service.keysURL,
+                "\(service.name) needs a key, so it must say where to get one"
+            )
+        }
     }
 
     func testLocalProviderPointedAtARemoteHostIsNotClaimedAsPrivate() {
@@ -257,8 +318,8 @@ final class AssistantTests: XCTestCase {
         }
     }
 
-    func testGroqWithoutAKeyRefusesBeforeAnyRequest() async {
-        var settings = AssistantSettings.applying(.groq, to: .defaults)
+    func testACloudModelWithoutAKeyRefusesBeforeAnyRequest() async {
+        var settings = AssistantSettings.applying(.cloud, to: .defaults)
         settings.isEnabled = true
         let service = ChatCompletionsAssistantService(
             settings: settings,

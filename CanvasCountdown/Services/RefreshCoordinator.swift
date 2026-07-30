@@ -127,6 +127,7 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
     private let repository: any AssignmentRepository
     private let feedURLStore: any FeedURLStoring
     private let exclusionStore: any FeedExclusionStoring
+    private let courseBlocklist: any CourseBlocklisting
     private let defaultTimeZone: TimeZone
     private let recentlyOverdueDayLimit: Int
     private let missingRefreshArchiveThreshold: Int
@@ -143,6 +144,8 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
         feedURLStore: any FeedURLStoring,
         exclusionStore: any FeedExclusionStoring =
             UserDefaultsFeedExclusionStore(),
+        courseBlocklist: any CourseBlocklisting =
+            UserDefaultsCourseBlocklistStore(),
         defaultTimeZone: TimeZone = .autoupdatingCurrent,
         recentlyOverdueDayLimit: Int = 30,
         missingRefreshArchiveThreshold: Int =
@@ -157,6 +160,7 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
         self.repository = repository
         self.feedURLStore = feedURLStore
         self.exclusionStore = exclusionStore
+        self.courseBlocklist = courseBlocklist
         self.defaultTimeZone = defaultTimeZone
         self.recentlyOverdueDayLimit = max(0, recentlyOverdueDayLimit)
     }
@@ -381,8 +385,12 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
         let activeEvents = parsedEvents.filter {
             !Self.isAvailabilityMarker($0)
         }
+        // A course the user removed stays removed. This is the only thing that
+        // stops the next refresh importing an old course all over again.
+        let blockedCourses = await courseBlocklist.blockedCourseKeys()
         let eligibleEvents = activeEvents
             .filter { $0.startDate >= cutoff }
+            .filter { !Self.isInBlockedCourse($0, blocked: blockedCourses) }
             .sorted {
                 if $0.startDate != $1.startDate {
                     return $0.startDate < $1.startDate
@@ -465,6 +473,21 @@ actor RefreshCoordinator: FeedRefreshCoordinating {
             return (title, nil)
         }
         return (titleWithoutCourse, course)
+    }
+
+    /// Reads the course out of the same summary the importer parses, so a block
+    /// written against what the list showed matches what the feed sends.
+    private static func isInBlockedCourse(
+        _ event: ParsedCalendarEvent,
+        blocked: Set<String>
+    ) -> Bool {
+        guard !blocked.isEmpty,
+              let course = CourseName.normalized(
+                  assignmentMetadata(from: event.summary).courseName
+              ) else {
+            return false
+        }
+        return blocked.contains(course)
     }
 
     private static func isAvailabilityMarker(

@@ -45,4 +45,18 @@ enum AppEnvironment: Equatable, Sendable {
             "com.local.CanvasCountdown.isolated-testing"
         }
     }
+
+    /// The defaults anything outside the dependency graph should write to.
+    ///
+    /// `AppDependencies` hands its own store to `SettingsStore`, but a view that
+    /// remembers something for itself has no way to reach that. Without this it
+    /// would reach for `.standard` and an isolated launch would quietly write
+    /// into the real user's preferences.
+    var preferences: UserDefaults {
+        guard let suiteName = preferencesSuiteName,
+              let defaults = UserDefaults(suiteName: suiteName) else {
+            return .standard
+        }
+        return defaults
+    }
 }

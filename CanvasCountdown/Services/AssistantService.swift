@@ -7,7 +7,13 @@ struct AssistantDraftTask: Identifiable, Equatable, Sendable {
     let id: UUID
     var include: Bool
     var title: String
+    /// The course, if the sentence named one. Editable during review, because
+    /// the model guesses this from a sentence and the user knows.
     var courseName: String?
+    /// The user's own label. Never guessed — the model is not given the label
+    /// list and cannot set this — but choosing one here saves finding the event
+    /// in the list afterwards just to mark it.
+    var labelID: UUID?
     var dueDate: Date?
     let sourceText: String
 
@@ -16,6 +22,7 @@ struct AssistantDraftTask: Identifiable, Equatable, Sendable {
         include: Bool = true,
         title: String,
         courseName: String? = nil,
+        labelID: UUID? = nil,
         dueDate: Date?,
         sourceText: String
     ) {
@@ -23,6 +30,7 @@ struct AssistantDraftTask: Identifiable, Equatable, Sendable {
         self.include = include
         self.title = title
         self.courseName = courseName
+        self.labelID = labelID
         self.dueDate = dueDate
         self.sourceText = sourceText
     }
@@ -361,8 +369,14 @@ actor ChatCompletionsAssistantService: AssistantServicing {
     }
 }
 
-/// Stores the assistant API key beside the feed URL, under its own account, so
-/// it is never written to preferences or diagnostics.
+/// Stores assistant API keys beside the feed URL, so none is ever written to
+/// preferences or diagnostics.
+///
+/// One key per saved model, under an account derived from that model's id.
+/// Keeping them apart is what lets someone hold an OpenAI key and a Groq key at
+/// once and switch between them, rather than pasting one over the other. A nil
+/// id addresses the single account earlier versions used, which is what makes
+/// the move to named models invisible to anyone upgrading.
 actor KeychainAssistantKeyStore: Sendable {
     private let service: String
     private let account: String
@@ -375,10 +389,10 @@ actor KeychainAssistantKeyStore: Sendable {
         self.account = account
     }
 
-    func save(_ key: String) throws {
+    func save(_ key: String, for profileID: UUID? = nil) throws {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            try delete()
+            try delete(for: profileID)
             return
         }
         guard let data = trimmed.data(using: .utf8) else {
@@ -390,12 +404,13 @@ actor KeychainAssistantKeyStore: Sendable {
             kSecAttrAccessible as String:
                 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
-        let status = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+        let query = baseQuery(for: profileID)
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         switch status {
         case errSecSuccess:
             return
         case errSecItemNotFound:
-            var item = baseQuery
+            var item = query
             for (key, value) in attributes {
                 item[key] = value
             }
@@ -408,8 +423,8 @@ actor KeychainAssistantKeyStore: Sendable {
         }
     }
 
-    func load() throws -> String? {
-        var query = baseQuery
+    func load(for profileID: UUID? = nil) throws -> String? {
+        var query = baseQuery(for: profileID)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -428,18 +443,35 @@ actor KeychainAssistantKeyStore: Sendable {
         return value
     }
 
-    func delete() throws {
-        let status = SecItemDelete(baseQuery as CFDictionary)
+    func delete(for profileID: UUID? = nil) throws {
+        let status = SecItemDelete(baseQuery(for: profileID) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainFeedURLStoreError.operationFailed(status: status)
         }
     }
 
-    private var baseQuery: [String: Any] {
+    /// Moves the single key earlier versions stored onto a named model, then
+    /// takes the old item away so there is one home for it rather than two.
+    func adoptLegacyKey(as profileID: UUID) throws {
+        guard let legacy = try load(for: nil), !legacy.isEmpty else {
+            return
+        }
+        try save(legacy, for: profileID)
+        try delete(for: nil)
+    }
+
+    private func account(for profileID: UUID?) -> String {
+        guard let profileID else {
+            return account
+        }
+        return "\(account).\(profileID.uuidString)"
+    }
+
+    private func baseQuery(for profileID: UUID?) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: account(for: profileID),
             kSecAttrSynchronizable as String: kCFBooleanFalse as Any,
         ]
     }

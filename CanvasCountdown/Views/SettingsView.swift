@@ -43,10 +43,13 @@ struct SettingsView: View {
     let dockThemes: DockThemePresetActions
     let onResetDockAppearance: @MainActor () -> Void
     let labels: EventLabelActions
+    let courses: CourseManagementActions
+    let assistant: AssistantProfileActions
     let assistantAPIKey: String
     let onSaveAssistantKey: @MainActor (String) -> Void
     let models: LocalModelPresentation
 
+    @State private var coursePendingRemoval: ManagedCourse?
     @State private var apiKeyDraft = ""
     @State private var revealAPIKey = false
     @State private var previewValue: Int? = 7
@@ -68,8 +71,10 @@ struct SettingsView: View {
         Form {
             canvasSection
             refreshSection
+            dueTimeSection
             notificationSection
             courseFilteringSection
+            courseManagementSection
             labelsSection
             dockSection
             assistantSection
@@ -198,6 +203,27 @@ struct SettingsView: View {
             Text("Automatic refresh occurs while Canvas Countdown is running. You can refresh manually at any time.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Canvas exports an assignment due "on Friday" as an all-day entry, which
+    /// arrives as 00:00 — the first moment of Friday rather than the last. This
+    /// is the one switch that decides how that is read.
+    private var dueTimeSection: some View {
+        Section {
+            Toggle(
+                "Show midnight deadlines as 11:59 PM",
+                isOn: $settings.treatsMidnightAsEndOfDay
+            )
+
+            Text("Only the time changes. The day, the days-left count and the Dock number stay exactly as they are, and nothing Canvas sent is altered — turning this off brings the original times straight back.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } header: {
+            Text("Due Times")
+        } footer: {
+            Text("Most Canvas deadlines are 11:59 PM, but an all-day entry reaches this Mac as 00:00, which reads as the start of the day instead of the end. Events you added yourself are never adjusted.")
         }
     }
 
@@ -566,6 +592,89 @@ struct SettingsView: View {
         }
     }
 
+    /// Removing a course, as opposed to filtering it out.
+    ///
+    /// A Canvas Calendar Feed carries every course the account has ever been
+    /// enrolled in, so a subject finished last year keeps arriving. Filtering
+    /// hides it; this takes it out and keeps it out, and says plainly that it is
+    /// a deletion rather than another way to hide something.
+    private var courseManagementSection: some View {
+        Section {
+            if courses.courses.isEmpty {
+                Text("Courses appear here once events are imported.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(courses.courses) { course in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(course.name)
+                                .lineLimit(2)
+                            Text(course.eventCountDescription)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Button(role: .destructive) {
+                            coursePendingRemoval = course
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Remove this course and everything in it")
+                        .accessibilityLabel("Remove \(course.name)")
+                    }
+                }
+            }
+
+            if !courses.blocked.isEmpty {
+                Text("Removed")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                ForEach(courses.blocked, id: \.self) { name in
+                    HStack {
+                        Label(name, systemImage: "nosign")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                        Spacer(minLength: 8)
+                        Button("Allow Again") {
+                            courses.allow(name)
+                        }
+                        .accessibilityLabel("Allow \(name) again")
+                    }
+                }
+            }
+        } header: {
+            Text("Courses")
+        } footer: {
+            Text("Removing a course permanently deletes its events on this Mac and stops the Canvas feed from importing it again. Manual events are never touched. Allowing a course again brings it back on the next refresh.")
+        }
+        .alert(
+            "Remove this course?",
+            isPresented: Binding(
+                get: { coursePendingRemoval != nil },
+                set: { visible in
+                    if !visible {
+                        coursePendingRemoval = nil
+                    }
+                }
+            ),
+            presenting: coursePendingRemoval
+        ) { course in
+            Button("Cancel", role: .cancel) {
+                coursePendingRemoval = nil
+            }
+            Button("Remove Course", role: .destructive) {
+                courses.remove(course.name)
+                coursePendingRemoval = nil
+            }
+        } message: { course in
+            Text("“\(course.name)” and its \(course.eventCountDescription) will be deleted from this Mac, and the Canvas feed will stop importing it. You can allow it again later.")
+        }
+    }
+
     /// One list of labels, because "how urgent" and "what kind of thing" are
     /// the same mark on the same event. Two systems would mean two colours
     /// competing for one row.
@@ -600,6 +709,9 @@ struct SettingsView: View {
             Toggle("Use an AI assistant", isOn: $settings.assistant.isEnabled)
 
             if settings.assistant.isEnabled {
+                savedModelRows
+                addModelMenu
+
                 Picker("Runs", selection: Binding(
                     get: { settings.assistant.provider },
                     set: { settings.assistant = AssistantSettings.applying($0, to: settings.assistant) }
@@ -610,11 +722,13 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.radioGroup)
 
-                // The whole decision, stated where it is made.
+                // The whole decision, stated where it is made. Read off the
+                // address rather than the label, so it cannot claim privacy the
+                // configuration does not provide.
                 Label(
                     settings.assistant.staysOnThisMac
                         ? AssistantProvider.local.privacySummary
-                        : AssistantProvider.groq.privacySummary,
+                        : AssistantProvider.cloud.privacySummary,
                     systemImage: settings.assistant.staysOnThisMac ? "lock.fill" : "arrow.up.right.circle.fill"
                 )
                 .font(.callout)
@@ -632,23 +746,11 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Assistant address")
 
-                HStack {
-                    TextField("Model", text: $settings.assistant.model)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityLabel("Assistant model")
+                TextField("Model", text: $settings.assistant.model)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Assistant model")
 
-                    if settings.assistant.provider == .groq {
-                        Menu("Choose") {
-                            ForEach(AssistantProvider.groqModels, id: \.self) { name in
-                                Button(name) {
-                                    settings.assistant.model = name
-                                }
-                            }
-                        }
-                        .frame(width: 90)
-                        .help("Common Groq models. Any other name can be typed.")
-                    }
-                }
+                serviceSuggestions
 
                 if settings.assistant.staysOnThisMac {
                     localModelControls
@@ -681,7 +783,7 @@ struct SettingsView: View {
                     }
 
                     Label(
-                        "Stored in the macOS Keychain, never in preferences or diagnostics.",
+                        "Each model keeps its own key in the macOS Keychain, never in preferences or diagnostics.",
                         systemImage: "lock.fill"
                     )
                     .font(.caption)
@@ -698,6 +800,107 @@ struct SettingsView: View {
             // Ask the local server what it has, so the list is not stale.
             models.onRefresh()
         }
+        // The key belongs to the selected model, so switching model has to swap
+        // what this field is showing.
+        .onChange(of: assistantAPIKey) { _, key in
+            apiKeyDraft = key
+        }
+    }
+
+    /// The saved models, one of which is in use. Keeping several means an
+    /// OpenAI key and a Groq key can both be held, and switching is one click
+    /// rather than retyping an address, a model name and a key.
+    @ViewBuilder
+    private var savedModelRows: some View {
+        if assistant.profiles.isEmpty {
+            Text("No models saved yet. Add one below, or just fill in the address and model.")
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(assistant.profiles) { profile in
+                AssistantProfileRow(
+                    profile: profile,
+                    isSelected: profile.id == assistant.activeID,
+                    canDelete: assistant.profiles.count > 1,
+                    onSelect: { assistant.select(profile.id) },
+                    onRename: { assistant.rename(profile.id, $0) },
+                    onDuplicate: { assistant.duplicate(profile.id) },
+                    onDelete: { assistant.delete(profile.id) }
+                )
+            }
+        }
+    }
+
+    private var addModelMenu: some View {
+        Menu("Add a Model…") {
+            ForEach(AssistantService.allServices) { service in
+                Button {
+                    assistant.add(service)
+                } label: {
+                    Text("\(service.name) — \(service.note)")
+                }
+            }
+
+            Divider()
+
+            Button("Blank…") {
+                assistant.addBlank()
+            }
+        }
+        .disabled(!assistant.canAdd)
+        .help(assistant.canAdd
+            ? "Start from a known service, or from nothing"
+            : "That is as many models as this keeps")
+    }
+
+    /// Suggestions, in blue, because they are links rather than settings.
+    ///
+    /// The address and the model above stay ordinary text fields: a service
+    /// that ships a new model tomorrow works today, and one missing from this
+    /// list works by typing its address. Nothing here is a restriction.
+    private var serviceSuggestions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Works with any service that speaks the OpenAI format:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Wraps rather than running off the edge on a narrow window.
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(minimum: 108, maximum: 200),
+                        spacing: 8,
+                        alignment: .leading
+                    ),
+                ],
+                alignment: .leading,
+                spacing: 4
+            ) {
+                ForEach(AssistantService.allServices) { service in
+                    Button(service.name) {
+                        assistant.useService(service)
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("\(service.note) \(service.baseURL)")
+                    .accessibilityHint("Fills in the address and a model for \(service.name)")
+                }
+            }
+
+            if let keysURL = currentServiceKeysURL {
+                Link("Where to get a key", destination: keysURL)
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var currentServiceKeysURL: URL? {
+        guard settings.assistant.provider.requiresAPIKey,
+              let keys = AssistantService
+                .matching(baseURL: settings.assistant.baseURL)?.keysURL else {
+            return nil
+        }
+        return URL(string: keys)
     }
 
     /// Model management for the local server.

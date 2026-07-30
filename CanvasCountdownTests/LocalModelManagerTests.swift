@@ -56,14 +56,19 @@ final class LocalModelManagerTests: XCTestCase {
         )
     }
 
-    func testGroqModelListIsOfferedButNotEnforced() {
-        XCTAssertFalse(AssistantProvider.groqModels.isEmpty)
+    func testSuggestedModelListIsOfferedButNotEnforced() {
+        XCTAssertFalse(AssistantService.groq.models.isEmpty)
 
         // A name outside the list is still accepted, so a new release does not
         // have to wait for an app update.
-        var settings = AssistantSettings.applying(.groq, to: .defaults)
+        var settings = AssistantSettings.applying(.cloud, to: .defaults)
         settings.model = "some-new-model-that-does-not-exist-yet"
         XCTAssertEqual(settings.model, "some-new-model-that-does-not-exist-yet")
+
+        // The same for an address no suggestion mentions.
+        settings.baseURL = "https://ai.example.edu/v1"
+        XCTAssertNil(AssistantService.matching(baseURL: settings.baseURL))
+        XCTAssertFalse(settings.staysOnThisMac)
     }
 
     // MARK: - View model behaviour against a stub

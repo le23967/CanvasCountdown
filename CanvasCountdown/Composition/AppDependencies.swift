@@ -14,6 +14,7 @@ struct AppDependencies {
     let feedURLStore: any FeedURLStoring
     let feedFetcher: any FeedFetching
     let exclusionStore: any FeedExclusionStoring
+    let courseBlocklist: any CourseBlocklisting
     let notificationScheduler: any NotificationScheduling
     let dockRenderer: any DockRendering
     let settingsStore: SettingsStore
@@ -31,6 +32,7 @@ struct AppDependencies {
         let feedURLStore: any FeedURLStoring
         let feedFetcher: any FeedFetching
         let exclusionStore: any FeedExclusionStoring
+        let courseBlocklist: any CourseBlocklisting
         let notificationScheduler: any NotificationScheduling
         let dockRenderer: any DockRendering
 
@@ -39,12 +41,14 @@ struct AppDependencies {
             feedURLStore = KeychainFeedURLStore()
             feedFetcher = URLSessionCanvasFeedFetcher()
             exclusionStore = UserDefaultsFeedExclusionStore()
+            courseBlocklist = UserDefaultsCourseBlocklistStore()
             notificationScheduler = NotificationService()
             dockRenderer = DockTileService()
         case .automatedTesting:
             feedURLStore = IsolatedFeedURLStore()
             feedFetcher = OfflineFeedFetcher()
             exclusionStore = IsolatedFeedExclusionStore()
+            courseBlocklist = IsolatedCourseBlocklistStore()
             notificationScheduler = InertNotificationScheduler()
             dockRenderer = InertDockRenderer()
         }
@@ -68,7 +72,8 @@ struct AppDependencies {
             parser: ICSParser(),
             repository: repository,
             feedURLStore: feedURLStore,
-            exclusionStore: exclusionStore
+            exclusionStore: exclusionStore,
+            courseBlocklist: courseBlocklist
         )
         let settingsStore = SettingsStore(defaults: makeDefaults(for: environment))
         let viewModel = MainViewModel(
@@ -78,7 +83,8 @@ struct AppDependencies {
             settingsStore: settingsStore,
             dockRenderer: dockRenderer,
             notificationScheduler: notificationScheduler,
-            automaticActivityEnabled: !environment.isAutomatedTesting
+            automaticActivityEnabled: !environment.isAutomatedTesting,
+            courseBlocklist: courseBlocklist
         )
 
         return AppDependencies(
@@ -88,6 +94,7 @@ struct AppDependencies {
             feedURLStore: feedURLStore,
             feedFetcher: feedFetcher,
             exclusionStore: exclusionStore,
+            courseBlocklist: courseBlocklist,
             notificationScheduler: notificationScheduler,
             dockRenderer: dockRenderer,
             settingsStore: settingsStore,

@@ -91,6 +91,8 @@ final class MainViewModel {
     @ObservationIgnored
     private let localModels: any LocalModelManaging
     @ObservationIgnored
+    private let courseBlocklist: any CourseBlocklisting
+    @ObservationIgnored
     private var hasStarted = false
 
     init(
@@ -103,8 +105,11 @@ final class MainViewModel {
         calendar: Calendar = .autoupdatingCurrent,
         automaticActivityEnabled: Bool = true,
         assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore(),
-        localModels: any LocalModelManaging = OllamaModelManager()
+        localModels: any LocalModelManaging = OllamaModelManager(),
+        courseBlocklist: any CourseBlocklisting =
+            UserDefaultsCourseBlocklistStore()
     ) {
+        self.courseBlocklist = courseBlocklist
         self.localModels = localModels
         self.assistantKeyStore = assistantKeyStore
         self.automaticActivityEnabled = automaticActivityEnabled
@@ -174,6 +179,75 @@ final class MainViewModel {
     /// Nil selects every course.
     func selectCourse(_ course: String?) {
         selectedCourse = course
+    }
+
+    // MARK: - Managing courses
+
+    /// Courses the user removed, read back so Settings can offer to undo it.
+    /// Cached here because the store lives off the main actor.
+    private(set) var blockedCourses: [String] = []
+
+    /// Every course with something stored against it, plus how much, so
+    /// removing one says what it is about to take with it.
+    var managedCourses: [ManagedCourse] {
+        var counts: [String: (name: String, count: Int)] = [:]
+        for item in assignments {
+            guard let name = item.normalizedCourseName,
+                  let key = CourseName.normalized(name) else {
+                continue
+            }
+            counts[key] = (name, (counts[key]?.count ?? 0) + 1)
+        }
+        return counts
+            .map { ManagedCourse(name: $0.value.name, eventCount: $0.value.count) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    func refreshBlockedCourses() async {
+        blockedCourses = await courseBlocklist.loadBlockedCourses().sorted()
+    }
+
+    /// Removes a course entirely: its events go, and the name is blocked so the
+    /// next Canvas refresh does not import them all over again.
+    func removeCourse(_ courseName: String) {
+        Task {
+            do {
+                await courseBlocklist.block(courseName)
+                let removed = try await repository.deleteEvents(
+                    inCourse: courseName
+                )
+                if settingsForm.selectedCourses.contains(courseName) {
+                    settingsForm.selectedCourses.remove(courseName)
+                    settingsStore.selectedCourses = settingsForm.selectedCourses
+                }
+                if selectedCourse == courseName {
+                    selectedCourse = nil
+                }
+                await refreshBlockedCourses()
+                try await reloadAssignmentsAndSynchronize()
+                showTransientStatus(
+                    removed == 1
+                        ? "Removed “\(courseName)” and 1 event"
+                        : "Removed “\(courseName)” and \(removed) events"
+                )
+            } catch {
+                present(error)
+            }
+        }
+    }
+
+    /// Lets a course back in. Nothing reappears until the next refresh, which
+    /// the status message says outright rather than leaving it to be guessed.
+    func allowCourse(_ courseName: String) {
+        Task {
+            await courseBlocklist.unblock(courseName)
+            await refreshBlockedCourses()
+            showTransientStatus(
+                hasConfiguredFeed
+                    ? "“\(courseName)” will return on the next refresh"
+                    : "“\(courseName)” is no longer blocked"
+            )
+        }
     }
 
     // MARK: - Assistant
@@ -481,45 +555,324 @@ final class MainViewModel {
 
     /// Saves only the drafts the user kept, through the ordinary manual-event
     /// path, so nothing the model produced bypasses validation.
+    ///
+    /// Every id created here is remembered, because a model asked for several
+    /// tasks at once can produce several wrong ones at once, and taking those
+    /// back one row at a time is exactly the kind of tidying nobody should have
+    /// to do to recover from a bad guess.
     func saveAssistantDrafts(_ drafts: [AssistantDraftTask]) async {
-        var saved = 0
+        var savedIDs: [UUID] = []
         for draft in drafts where draft.include && draft.canBeSaved {
             guard let dueDate = draft.dueDate else {
                 continue
             }
             do {
-                try await saveManualEvent(
-                    ManualEventDraft(
-                        title: draft.title,
-                        courseName: draft.courseName ?? "",
+                let snapshot = try await repository.saveManual(
+                    ManualAssignmentDraft(
+                        title: draft.title.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                        courseName: draft.courseName?.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
                         dueDate: dueDate
                     )
                 )
-                saved += 1
+                if let labelID = draft.labelID {
+                    try await repository.setLabel(
+                        id: snapshot.id,
+                        labelID: labelID,
+                        now: .now
+                    )
+                }
+                savedIDs.append(snapshot.id)
             } catch {
                 present(error)
             }
         }
+
         assistantDrafts = []
-        if saved > 0 {
-            showTransientStatus(saved == 1 ? "1 task added" : "\(saved) tasks added")
+        guard !savedIDs.isEmpty else {
+            return
         }
+
+        do {
+            try await reloadAssignmentsAndSynchronize()
+        } catch {
+            present(error)
+        }
+        offerUndo(
+            for: savedIDs,
+            message: savedIDs.count == 1
+                ? "1 task added"
+                : "\(savedIDs.count) tasks added"
+        )
+    }
+
+    // MARK: - Undoing what the assistant added
+
+    /// A batch the assistant just saved, and what it would take to take it back.
+    struct UndoableAssistantImport: Equatable, Sendable {
+        var eventIDs: [UUID]
+        var message: String
+    }
+
+    /// Set while a just-saved batch can still be taken back in one go. Unlike
+    /// an ordinary status message this does not time out: an undo that
+    /// disappears before it has been read is not an undo.
+    private(set) var undoableAssistantImport: UndoableAssistantImport?
+
+    private func offerUndo(for eventIDs: [UUID], message: String) {
+        // A pending offer is replaced rather than queued: undo means the last
+        // thing that happened, and two of them at once would be ambiguous.
+        undoableAssistantImport = UndoableAssistantImport(
+            eventIDs: eventIDs,
+            message: message
+        )
+        statusMessage = nil
+        transientStatusTask?.cancel()
+    }
+
+    func dismissUndoableAssistantImport() {
+        undoableAssistantImport = nil
+    }
+
+    /// Deletes exactly what that batch created, and nothing else.
+    func undoAssistantImport() async {
+        guard let batch = undoableAssistantImport else {
+            return
+        }
+        undoableAssistantImport = nil
+
+        var removed = 0
+        for id in batch.eventIDs {
+            do {
+                try await repository.delete(id: id)
+                removed += 1
+            } catch AssignmentRepositoryError.assignmentNotFound {
+                // Already gone, by hand or by a reset. Nothing to undo, and
+                // nothing worth interrupting anyone about.
+                continue
+            } catch {
+                present(error)
+            }
+        }
+
+        do {
+            try await reloadAssignmentsAndSynchronize()
+        } catch {
+            present(error)
+        }
+        showTransientStatus(
+            removed == 1 ? "1 task removed" : "\(removed) tasks removed"
+        )
     }
 
     func loadAssistantKey() async {
-        assistantAPIKey = (try? await assistantKeyStore.load()) ?? ""
+        assistantAPIKey = (try? await assistantKeyStore.load(
+            for: settingsStore.assistant.activeProfileID
+        )) ?? ""
     }
 
     func saveAssistantKey(_ key: String) {
+        let profileID = settingsStore.assistant.activeProfileID
         Task {
             do {
-                try await assistantKeyStore.save(key)
+                try await assistantKeyStore.save(key, for: profileID)
                 assistantAPIKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
                 showTransientStatus("Assistant key saved")
             } catch {
                 present(error)
             }
         }
+    }
+
+    // MARK: - Saved models
+
+    var assistantProfiles: [AssistantProfile] {
+        settingsStore.assistantProfiles.profiles
+    }
+
+    var activeAssistantProfile: AssistantProfile? {
+        settingsStore.assistantProfiles.profile(
+            withID: settingsStore.assistant.activeProfileID
+        )
+    }
+
+    var canAddAssistantProfile: Bool {
+        !settingsStore.assistantProfiles.isFull
+    }
+
+    /// Whether the toolbar is worth a switcher. One model is just the model;
+    /// the control only earns its place once there is something to switch to.
+    var showsAssistantModelSwitcher: Bool {
+        settingsStore.assistant.isEnabled && assistantProfiles.count > 1
+    }
+
+    var assistantModelDescription: String {
+        guard let active = activeAssistantProfile else {
+            return "Choose which AI model to use"
+        }
+        return "AI model, using \(active.name)"
+    }
+
+    /// Builds the starting library from whatever the assistant was already set
+    /// to, and carries the existing API key onto it.
+    ///
+    /// Runs once, on the first launch after saved models arrived. Anyone
+    /// upgrading finds their configuration already named and working rather
+    /// than an empty list and an assistant that stopped answering.
+    private func migrateAssistantProfilesIfNeeded() async {
+        guard settingsStore.assistantProfiles.profiles.isEmpty else {
+            return
+        }
+        let library = AssistantProfileLibrary.migrated(
+            from: settingsStore.assistant
+        )
+        guard let first = library.profiles.first else {
+            return
+        }
+        settingsStore.assistantProfiles = library
+        settingsStore.assistant.activeProfileID = first.id
+        settingsForm.assistant.activeProfileID = first.id
+        if first.provider.requiresAPIKey {
+            try? await assistantKeyStore.adoptLegacyKey(as: first.id)
+        }
+    }
+
+    /// Switches the assistant to a saved model. Its address, its model name and
+    /// its own API key all come with it.
+    func selectAssistantProfile(_ id: UUID) {
+        guard let profile = settingsStore.assistantProfiles.profile(withID: id),
+              profile.id != settingsStore.assistant.activeProfileID else {
+            return
+        }
+        settingsForm.assistant = AssistantSettings.applying(
+            profile,
+            to: settingsForm.assistant
+        )
+        applySettings(settingsForm)
+        Task {
+            await loadAssistantKey()
+            showTransientStatus("Using “\(profile.name)”")
+        }
+    }
+
+    /// Adds a model and selects it, so the fields below are already editing the
+    /// thing that was just added.
+    @discardableResult
+    func addAssistantProfile(_ profile: AssistantProfile) -> UUID? {
+        var library = settingsStore.assistantProfiles
+        guard let id = library.add(profile) else {
+            return nil
+        }
+        settingsStore.assistantProfiles = library
+        guard let saved = library.profile(withID: id) else {
+            return nil
+        }
+        settingsForm.assistant = AssistantSettings.applying(
+            saved,
+            to: settingsForm.assistant
+        )
+        applySettings(settingsForm)
+        Task {
+            await loadAssistantKey()
+        }
+        showTransientStatus("Added “\(saved.name)”")
+        return id
+    }
+
+    func addAssistantProfile(for service: AssistantService) {
+        addAssistantProfile(AssistantProfile(service: service))
+    }
+
+    /// A model to fill in by hand, for a service that is not on the list.
+    /// Starts local, because that is the setting that cannot upload anything
+    /// while it is half-configured.
+    func addBlankAssistantProfile() {
+        addAssistantProfile(
+            AssistantProfile(
+                name: "New Model",
+                provider: .local,
+                baseURL: AssistantProvider.local.defaultBaseURL,
+                model: AssistantProvider.local.defaultModel
+            )
+        )
+    }
+
+    @discardableResult
+    func renameAssistantProfile(
+        _ id: UUID,
+        to name: String
+    ) -> AssistantProfileNameError? {
+        var library = settingsStore.assistantProfiles
+        if let error = library.rename(id, to: name) {
+            return error
+        }
+        settingsStore.assistantProfiles = library
+        return nil
+    }
+
+    func duplicateAssistantProfile(_ id: UUID) {
+        var library = settingsStore.assistantProfiles
+        guard let copy = library.duplicate(id) else {
+            return
+        }
+        settingsStore.assistantProfiles = library
+        if let name = library.profile(withID: copy)?.name {
+            showTransientStatus("Duplicated as “\(name)”")
+        }
+    }
+
+    /// Deleting a model takes its API key with it, and moves to another so the
+    /// assistant is never left pointing at nothing.
+    func deleteAssistantProfile(_ id: UUID) {
+        var library = settingsStore.assistantProfiles
+        let name = library.profile(withID: id)?.name
+        library.remove(id)
+        settingsStore.assistantProfiles = library
+
+        if settingsStore.assistant.activeProfileID == id {
+            if let next = library.profiles.first {
+                settingsForm.assistant = AssistantSettings.applying(
+                    next,
+                    to: settingsForm.assistant
+                )
+            } else {
+                settingsForm.assistant.activeProfileID = nil
+            }
+            applySettings(settingsForm)
+        }
+
+        Task {
+            try? await assistantKeyStore.delete(for: id)
+            await loadAssistantKey()
+            if let name {
+                showTransientStatus("Deleted “\(name)”")
+            }
+        }
+    }
+
+    func validateAssistantProfileName(
+        _ name: String,
+        excluding excludedID: UUID? = nil
+    ) -> AssistantProfileNameError? {
+        settingsStore.assistantProfiles.validate(
+            name: name,
+            excluding: excludedID
+        )
+    }
+
+    /// Points the live configuration at one of the known services. The name is
+    /// left alone: it is the user's, and a service is only a starting point.
+    func useAssistantService(_ service: AssistantService) {
+        settingsForm.assistant.provider = AssistantEndpoint
+            .isLocal(service.baseURL) ? .local : .cloud
+        settingsForm.assistant.baseURL = service.baseURL
+        if let model = service.models.first {
+            settingsForm.assistant.model = model
+        }
+        applySettings(settingsForm)
     }
 
     /// Only the three agreed fields, and only for what is currently in scope.
@@ -759,11 +1112,15 @@ final class MainViewModel {
         isSearchModeActive
     }
 
-    /// Six compact actions normally, or the field plus Cancel while searching.
+    /// Seven compact actions normally — eight once there is more than one saved
+    /// model to switch between — or the field plus Cancel while searching.
     /// Keeping the search layout down to two items is what stops the field
     /// being pushed into the toolbar's overflow menu.
     var toolbarItemCount: Int {
-        isSearchModeActive ? 2 : 7
+        guard !isSearchModeActive else {
+            return 2
+        }
+        return showsAssistantModelSwitcher ? 8 : 7
     }
 
     func clearSearchQuery() {
@@ -908,7 +1265,9 @@ final class MainViewModel {
             )
             notificationPermission = NotificationPermissionState(permission)
             dockRenderer.apply(appearance: settingsStore.dockAppearance)
+            await migrateAssistantProfilesIfNeeded()
             await loadAssistantKey()
+            await refreshBlockedCourses()
             synchronizeDock()
 
             if automaticActivityEnabled, feedURL == nil, assignments.isEmpty {
@@ -1211,6 +1570,7 @@ final class MainViewModel {
         )
         parsedPreviewEvents.removeAll(keepingCapacity: true)
 
+        let endOfDay = settingsStore.treatsMidnightAsEndOfDay
         return preview.events.enumerated().map { index, event in
             let id = Self.previewIdentifier(event: event, index: index)
             parsedPreviewEvents[id] = event
@@ -1219,7 +1579,13 @@ final class MainViewModel {
                 id: id,
                 title: metadata.title,
                 courseName: metadata.courseName,
-                dueDate: event.startDate,
+                // Shown the way it will be listed once imported, so the preview
+                // is not the one place still saying midnight.
+                dueDate: DueTimePolicy.effectiveImportedDueDate(
+                    event.startDate,
+                    treatsMidnightAsEndOfDay: endOfDay,
+                    calendar: calendar
+                ),
                 details: event.description
             )
         }
@@ -1269,11 +1635,21 @@ final class MainViewModel {
         settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
         settingsStore.calendarScale = form.calendarScale
 
+        // Every deadline on screen is re-read through the policy, so the change
+        // has to reach the list rather than waiting for the next refresh.
+        let dueTimesChanged = settingsStore.treatsMidnightAsEndOfDay
+            != form.treatsMidnightAsEndOfDay
+        settingsStore.treatsMidnightAsEndOfDay = form.treatsMidnightAsEndOfDay
+
         let remindersChanged =
             settingsStore.reminderSchedule != form.reminderSchedule
         settingsStore.reminderSchedule = form.reminderSchedule
 
         settingsStore.assistant = form.assistant
+        // Editing the address or the model edits the model it belongs to.
+        // There is no separate save step: a saved model that quietly disagreed
+        // with the fields above it would be worse than no saving at all.
+        syncActiveAssistantProfile(with: form.assistant)
 
         // Colours the user cannot read are corrected rather than stored.
         let appearance = form.dockAppearance.correctedForContrast()
@@ -1287,11 +1663,46 @@ final class MainViewModel {
         startAutomaticRefreshLoop()
         startCountdownTransitionLoop()
 
+        if dueTimesChanged {
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
+                do {
+                    try await self.reloadAssignmentsAndSynchronize()
+                } catch {
+                    self.present(error)
+                }
+            }
+        }
+
         if remindersChanged {
             scheduleDebouncedNotificationUpdate()
         } else {
             showTransientStatus("Settings updated")
         }
+    }
+
+    private func syncActiveAssistantProfile(with settings: AssistantSettings) {
+        guard let id = settings.activeProfileID else {
+            return
+        }
+        guard let existing = settingsStore.assistantProfiles.profile(withID: id),
+              existing.provider != settings.provider
+                || existing.baseURL != settings.baseURL
+                || existing.model != settings.model else {
+            return
+        }
+        var library = settingsStore.assistantProfiles
+        guard library.update(
+            id,
+            provider: settings.provider,
+            baseURL: settings.baseURL,
+            model: settings.model
+        ) else {
+            return
+        }
+        settingsStore.assistantProfiles = library
     }
 
     // MARK: - Dock appearance
@@ -1555,6 +1966,8 @@ final class MainViewModel {
         try await repository.deleteAll()
         try await feedURLStore.deleteFeedURL()
         await refreshCoordinator.clearImportSelections()
+        await courseBlocklist.clearBlockedCourses()
+        await refreshBlockedCourses()
         await notificationScheduler.cancelAll()
 
         if LaunchAtLoginController.isEnabled {
@@ -1661,8 +2074,15 @@ final class MainViewModel {
     }
 
     private func apply(_ snapshots: [AssignmentSnapshot]) {
+        let endOfDay = settingsStore.treatsMidnightAsEndOfDay
         assignments = snapshots
-            .map(AssignmentListItem.init(snapshot:))
+            .map {
+                AssignmentListItem(
+                    snapshot: $0,
+                    treatsMidnightAsEndOfDay: endOfDay,
+                    calendar: calendar
+                )
+            }
             .sorted {
                 if $0.dueDate != $1.dueDate {
                     return $0.dueDate < $1.dueDate
@@ -1705,8 +2125,15 @@ final class MainViewModel {
     private func scheduleNotifications(
         from snapshots: [AssignmentSnapshot]
     ) async throws {
+        let endOfDay = settingsStore.treatsMidnightAsEndOfDay
         try await notificationScheduler.reschedule(
-            candidates: snapshots.map(NotificationCandidate.init(snapshot:)),
+            candidates: snapshots.map {
+                NotificationCandidate(
+                    snapshot: $0,
+                    treatsMidnightAsEndOfDay: endOfDay,
+                    calendar: calendar
+                )
+            },
             schedule: settingsStore.reminderSchedule,
             now: .now,
             calendar: calendar
