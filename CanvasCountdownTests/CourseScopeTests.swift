@@ -80,29 +80,32 @@ final class CourseScopeTests: XCTestCase {
         )
     }
 
-    func testSearchAppliesWithinTheScopedUpcomingResult() async throws {
+    func testSearchReachesPastTheCourseScopeButTheListDoesNot() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
         harness.selectCourses(["PHYS200"])
         harness.viewModel.sidebarSelection = .upcoming
 
+        harness.viewModel.presentSearch()
         harness.viewModel.searchText = "Maths"
-        XCTAssertTrue(
-            harness.viewModel.filteredAssignments.isEmpty,
-            "Search must not reach past the course scope"
-        )
-
-        harness.viewModel.searchText = "lab"
         XCTAssertEqual(
-            titles(harness.viewModel.filteredAssignments),
-            ["Physics lab"]
+            titles(harness.viewModel.searchResults),
+            ["Maths sheet"],
+            "Search deliberately reaches past the course scope: hiding a result because of a filter set elsewhere would look like the event no longer exists"
         )
 
         harness.viewModel.searchText = "PHYS"
         XCTAssertEqual(
-            titles(harness.viewModel.filteredAssignments),
+            titles(harness.viewModel.searchResults),
             ["Physics lab"],
-            "Course names remain searchable inside the scope"
+            "Course names are searchable"
+        )
+
+        harness.viewModel.dismissSearch()
+        XCTAssertEqual(
+            titles(harness.viewModel.filteredAssignments),
+            ["Physics lab", "Personal errand"],
+            "Closing the panel leaves the scoped list exactly as it was"
         )
     }
 

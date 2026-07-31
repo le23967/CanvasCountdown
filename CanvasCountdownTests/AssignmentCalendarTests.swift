@@ -210,18 +210,28 @@ final class AssignmentCalendarTests: XCTestCase {
         XCTAssertEqual(calendarTitles, ["Physics lab"])
     }
 
-    func testSearchAppliesToTheCalendarToo() async throws {
+    /// Search is a panel over the window now, not a filter on what is behind
+    /// it. A month grid that emptied itself as you typed would leave you
+    /// somewhere you did not choose to be once the panel closed.
+    func testSearchLeavesTheCalendarGridAlone() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .calendar
         context.viewModel.calendarAnchor = context.viewModel.currentDate
+        let before = context.viewModel.calendarDays.flatMap(\.items).count
 
+        context.viewModel.presentSearch()
         context.viewModel.searchText = "Maths"
 
-        let calendarTitles = context.viewModel.calendarDays
-            .flatMap(\.items)
-            .map(\.title)
-        XCTAssertEqual(calendarTitles, ["Maths sheet"])
+        XCTAssertEqual(
+            context.viewModel.calendarDays.flatMap(\.items).count,
+            before
+        )
+        XCTAssertEqual(
+            context.viewModel.searchResults.map(\.title),
+            ["Maths sheet"],
+            "The answer is in the panel"
+        )
     }
 
     // MARK: - Navigation

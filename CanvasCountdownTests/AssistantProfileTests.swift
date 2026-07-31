@@ -297,19 +297,20 @@ final class AssistantProfileTests: XCTestCase {
         XCTAssertEqual(harness.viewModel.toolbarItemCount, 7)
     }
 
+    /// Search is a panel now, so it no longer evicts the switcher — or
+    /// anything else — from the toolbar.
     @MainActor
-    func testSearchModeStillCollapsesToTwoItemsWithASwitcherPresent() async throws {
+    func testOpeningSearchLeavesTheSwitcherInTheToolbar() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
         harness.viewModel.addAssistantProfile(AssistantProfile(service: .groq))
+        XCTAssertEqual(harness.viewModel.toolbarItemCount, 8)
 
         harness.viewModel.presentSearch()
 
-        XCTAssertEqual(
-            harness.viewModel.toolbarItemCount,
-            2,
-            "The field must not be pushed into the overflow menu"
-        )
+        XCTAssertEqual(harness.viewModel.toolbarItemCount, 8)
+        XCTAssertTrue(harness.viewModel.showsAssistantModelSwitcher)
+        XCTAssertTrue(harness.viewModel.showsOrdinaryToolbarActions)
     }
 
     // MARK: - What the assistant adds, and taking it back
@@ -379,7 +380,7 @@ final class AssistantProfileTests: XCTestCase {
 
         XCTAssertTrue(harness.viewModel.assignments.isEmpty)
         XCTAssertNil(
-            harness.viewModel.undoableAssistantImport,
+            harness.viewModel.undoableAddition,
             "Nothing was added, so there is nothing to offer to undo"
         )
     }
@@ -395,7 +396,7 @@ final class AssistantProfileTests: XCTestCase {
             draft("Three", day: 22),
         ])
 
-        let offer = try XCTUnwrap(harness.viewModel.undoableAssistantImport)
+        let offer = try XCTUnwrap(harness.viewModel.undoableAddition)
         XCTAssertEqual(offer.eventIDs.count, 3)
         XCTAssertEqual(offer.message, "3 tasks added")
     }
@@ -411,10 +412,10 @@ final class AssistantProfileTests: XCTestCase {
         ])
         XCTAssertEqual(harness.viewModel.assignments.count, 3)
 
-        await harness.viewModel.undoAssistantImport()
+        await harness.viewModel.undoLastAddition()
 
         XCTAssertTrue(harness.viewModel.assignments.isEmpty)
-        XCTAssertNil(harness.viewModel.undoableAssistantImport)
+        XCTAssertNil(harness.viewModel.undoableAddition)
     }
 
     /// Undo means the batch, not the library. Anything the user put there by
@@ -428,21 +429,28 @@ final class AssistantProfileTests: XCTestCase {
         )
 
         await harness.viewModel.saveAssistantDrafts([draft("Theirs", day: 20)])
-        await harness.viewModel.undoAssistantImport()
+        await harness.viewModel.undoLastAddition()
 
         XCTAssertEqual(harness.viewModel.assignments.map(\.title), ["Mine"])
     }
 
+    /// Putting the toast away is not the same as giving up the undo. The toast
+    /// is a notice; the Edit menu is the control, and it outlives the notice.
     @MainActor
-    func testDismissingTheOfferKeepsWhatWasAdded() async throws {
+    func testDismissingTheToastKeepsBothTheEventsAndTheWayBack() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
         await harness.viewModel.saveAssistantDrafts([draft("Keep me", day: 20)])
+        XCTAssertTrue(harness.viewModel.isUndoToastVisible)
 
-        harness.viewModel.dismissUndoableAssistantImport()
+        harness.viewModel.dismissUndoToast()
 
-        XCTAssertNil(harness.viewModel.undoableAssistantImport)
+        XCTAssertFalse(harness.viewModel.isUndoToastVisible)
         XCTAssertEqual(harness.viewModel.assignments.map(\.title), ["Keep me"])
+        XCTAssertTrue(
+            harness.viewModel.canUndoAddition,
+            "The menu must still be able to take it back"
+        )
     }
 
     /// Deleting a row by hand and then pressing Undo must not put an error on
@@ -459,7 +467,7 @@ final class AssistantProfileTests: XCTestCase {
         harness.viewModel.deleteManualEvent(first)
         try await Task.sleep(for: .milliseconds(120))
 
-        await harness.viewModel.undoAssistantImport()
+        await harness.viewModel.undoLastAddition()
 
         XCTAssertTrue(harness.viewModel.assignments.isEmpty)
         XCTAssertNil(harness.viewModel.errorMessage)
@@ -472,8 +480,8 @@ final class AssistantProfileTests: XCTestCase {
         await harness.viewModel.saveAssistantDrafts([draft("First", day: 20)])
 
         await harness.viewModel.saveAssistantDrafts([draft("Second", day: 21)])
-        let offer = try XCTUnwrap(harness.viewModel.undoableAssistantImport)
-        await harness.viewModel.undoAssistantImport()
+        let offer = try XCTUnwrap(harness.viewModel.undoableAddition)
+        await harness.viewModel.undoLastAddition()
 
         XCTAssertEqual(offer.message, "1 task added")
         XCTAssertEqual(
@@ -481,6 +489,112 @@ final class AssistantProfileTests: XCTestCase {
             ["First"],
             "Undo means the last thing that happened, not everything"
         )
+    }
+
+    // MARK: - Undo reaches an event added by hand, too
+
+    /// The way back must not depend on which door the event came in through.
+    @MainActor
+    func testAddingAnEventByHandCanBeUndone() async throws {
+        let harness = try makeHarness()
+        await harness.viewModel.start()
+
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(title: "Typed by hand", dueDate: date(2026, 8, 20))
+        )
+
+        let offer = try XCTUnwrap(harness.viewModel.undoableAddition)
+        XCTAssertEqual(offer.eventIDs.count, 1)
+        XCTAssertEqual(offer.message, "Added “Typed by hand”")
+        XCTAssertTrue(harness.viewModel.isUndoToastVisible)
+
+        await harness.viewModel.undoLastAddition()
+
+        XCTAssertTrue(harness.viewModel.assignments.isEmpty)
+        XCTAssertFalse(harness.viewModel.canUndoAddition)
+    }
+
+    /// Editing is not adding. Offering to "undo" an edit by deleting the event
+    /// would destroy something that existed before the edit.
+    @MainActor
+    func testEditingAnExistingEventOffersNoUndo() async throws {
+        let harness = try makeHarness()
+        await harness.viewModel.start()
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(title: "Original", dueDate: date(2026, 8, 20))
+        )
+        let saved = try XCTUnwrap(harness.viewModel.assignments.first)
+        harness.viewModel.dismissUndoToast()
+
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(
+                eventID: saved.id,
+                title: "Renamed",
+                dueDate: date(2026, 8, 20)
+            )
+        )
+
+        XCTAssertEqual(harness.viewModel.statusMessage, "Event updated")
+        XCTAssertFalse(
+            harness.viewModel.isUndoToastVisible,
+            "An edit is not an addition"
+        )
+        XCTAssertEqual(
+            harness.viewModel.assignments.map(\.title),
+            ["Renamed"]
+        )
+    }
+
+    /// The menu is the part that does not assume anyone knows a shortcut, so
+    /// it has to say what it would take back.
+    @MainActor
+    func testTheMenuNamesWhatItWouldTakeBack() async throws {
+        let harness = try makeHarness()
+        await harness.viewModel.start()
+        XCTAssertFalse(harness.viewModel.canUndoAddition)
+        XCTAssertEqual(harness.viewModel.undoAdditionMenuTitle, "Undo Adding")
+
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(title: "Reading week plan", dueDate: date(2026, 8, 20))
+        )
+        XCTAssertEqual(
+            harness.viewModel.undoAdditionMenuTitle,
+            "Undo Adding “Reading week plan”"
+        )
+
+        await harness.viewModel.saveAssistantDrafts([
+            draft("One", day: 21),
+            draft("Two", day: 22),
+        ])
+        XCTAssertEqual(
+            harness.viewModel.undoAdditionMenuTitle,
+            "Undo Adding 2 Tasks"
+        )
+    }
+
+    /// The toast counts itself down and leaves. What it offered does not leave
+    /// with it — that is what makes a ten-second toast safe to build on.
+    @MainActor
+    func testTheToastCountsDownAndTheUndoOutlivesIt() async throws {
+        let harness = try makeHarness()
+        await harness.viewModel.start()
+
+        await harness.viewModel.saveAssistantDrafts([draft("Watch me", day: 20)])
+
+        XCTAssertEqual(
+            harness.viewModel.undoToastSecondsRemaining,
+            MainViewModel.undoToastDuration
+        )
+
+        // Waiting out ten real seconds would only prove the clock works, so
+        // this checks the state the countdown lands on instead.
+        harness.viewModel.dismissUndoToast()
+
+        XCTAssertNil(harness.viewModel.undoToastSecondsRemaining)
+        XCTAssertTrue(harness.viewModel.canUndoAddition)
+
+        await harness.viewModel.undoLastAddition()
+        XCTAssertTrue(harness.viewModel.assignments.isEmpty)
     }
 
     // MARK: - The toolbar default

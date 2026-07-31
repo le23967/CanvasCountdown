@@ -131,6 +131,7 @@ final class MainViewModel {
         countdownTransitionTask?.cancel()
         notificationDebounceTask?.cancel()
         transientStatusTask?.cancel()
+        undoToastTask?.cancel()
     }
 
     var hasConfiguredFeed: Bool {
@@ -605,47 +606,119 @@ final class MainViewModel {
             for: savedIDs,
             message: savedIDs.count == 1
                 ? "1 task added"
-                : "\(savedIDs.count) tasks added"
+                : "\(savedIDs.count) tasks added",
+            menuTitle: savedIDs.count == 1
+                ? "Undo Adding 1 Task"
+                : "Undo Adding \(savedIDs.count) Tasks"
         )
     }
 
-    // MARK: - Undoing what the assistant added
+    // MARK: - Undoing an addition
 
-    /// A batch the assistant just saved, and what it would take to take it back.
-    struct UndoableAssistantImport: Equatable, Sendable {
+    /// Something just added, and what it would take to take it back.
+    ///
+    /// Covers both the assistant and the ordinary editor. Adding an event by
+    /// hand can be a mistake in exactly the same way, and there is no reason
+    /// the way back should depend on which door it came in through.
+    struct UndoableAddition: Equatable, Sendable {
         var eventIDs: [UUID]
+        /// What the toast says: "3 tasks added".
         var message: String
+        /// What the menu says: "Undo Adding 3 Tasks".
+        var menuTitle: String
     }
 
-    /// Set while a just-saved batch can still be taken back in one go. Unlike
-    /// an ordinary status message this does not time out: an undo that
-    /// disappears before it has been read is not an undo.
-    private(set) var undoableAssistantImport: UndoableAssistantImport?
+    /// How long the toast stays up. Long enough to notice and read, short
+    /// enough not to sit in the way — and it is not the only way back, so it
+    /// can afford to leave.
+    static let undoToastDuration = 10
 
-    private func offerUndo(for eventIDs: [UUID], message: String) {
+    /// The last addition, kept until it is undone or another one replaces it.
+    /// Outlives the toast on purpose: the menu is what makes this reachable by
+    /// someone who never learned a keyboard shortcut.
+    private(set) var undoableAddition: UndoableAddition?
+
+    /// Seconds left on the toast, or nil once it has gone. The addition itself
+    /// stays undoable either way.
+    private(set) var undoToastSecondsRemaining: Int?
+
+    @ObservationIgnored
+    private var undoToastTask: Task<Void, Never>?
+
+    var isUndoToastVisible: Bool {
+        undoToastSecondsRemaining != nil
+    }
+
+    var canUndoAddition: Bool {
+        undoableAddition != nil
+    }
+
+    /// The Edit menu entry. Names what it would take back, so choosing it is
+    /// not a guess.
+    var undoAdditionMenuTitle: String {
+        guard let addition = undoableAddition else {
+            return "Undo Adding"
+        }
+        return addition.menuTitle
+    }
+
+    private func offerUndo(
+        for eventIDs: [UUID],
+        message: String,
+        menuTitle: String
+    ) {
         // A pending offer is replaced rather than queued: undo means the last
         // thing that happened, and two of them at once would be ambiguous.
-        undoableAssistantImport = UndoableAssistantImport(
+        undoableAddition = UndoableAddition(
             eventIDs: eventIDs,
-            message: message
+            message: message,
+            menuTitle: menuTitle
         )
         statusMessage = nil
         transientStatusTask?.cancel()
+        startUndoToastCountdown()
     }
 
-    func dismissUndoableAssistantImport() {
-        undoableAssistantImport = nil
+    private func startUndoToastCountdown() {
+        undoToastTask?.cancel()
+        undoToastSecondsRemaining = Self.undoToastDuration
+        undoToastTask = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                guard let remaining = self.undoToastSecondsRemaining else {
+                    return
+                }
+                if remaining <= 1 {
+                    // The toast goes; the way back stays, in the Edit menu.
+                    self.undoToastSecondsRemaining = nil
+                    return
+                }
+                self.undoToastSecondsRemaining = remaining - 1
+            }
+        }
     }
 
-    /// Deletes exactly what that batch created, and nothing else.
-    func undoAssistantImport() async {
-        guard let batch = undoableAssistantImport else {
+    /// Puts the toast away without touching what was added, and without taking
+    /// the undo itself away.
+    func dismissUndoToast() {
+        undoToastTask?.cancel()
+        undoToastTask = nil
+        undoToastSecondsRemaining = nil
+    }
+
+    /// Deletes exactly what that addition created, and nothing else.
+    func undoLastAddition() async {
+        guard let addition = undoableAddition else {
             return
         }
-        undoableAssistantImport = nil
+        undoableAddition = nil
+        dismissUndoToast()
 
         var removed = 0
-        for id in batch.eventIDs {
+        for id in addition.eventIDs {
             do {
                 try await repository.delete(id: id)
                 removed += 1
@@ -664,7 +737,7 @@ final class MainViewModel {
             present(error)
         }
         showTransientStatus(
-            removed == 1 ? "1 task removed" : "\(removed) tasks removed"
+            removed == 1 ? "1 event removed" : "\(removed) events removed"
         )
     }
 
@@ -1066,9 +1139,17 @@ final class MainViewModel {
 
     // MARK: - Search
 
+    /// Search is a panel over the window, not a field wedged into the toolbar.
+    ///
+    /// The field used to replace the whole toolbar with itself and a Cancel
+    /// button, which meant the six things people came for disappeared the
+    /// moment they went looking for something. A panel takes nothing away: the
+    /// toolbar stays exactly as it was, the list stays exactly as it was, and
+    /// the results are in the panel rather than hidden behind it.
     func presentSearch() {
         isSearchModeActive = true
         isSearchFieldFocused = true
+        highlightedSearchResultID = searchResults.first?.id
     }
 
     func toggleSearch() {
@@ -1079,19 +1160,18 @@ final class MainViewModel {
         }
     }
 
-    /// Releases keyboard focus but leaves the field and its query in place.
-    /// Used when a click lands outside the field, or another toolbar control is
-    /// pressed, so the click still reaches its target.
+    /// Releases keyboard focus but leaves the panel and its query in place.
     func dismissSearchFocus() {
         isSearchFieldFocused = false
     }
 
-    /// Leaves search mode, releases focus and clears the query so the full list
-    /// comes back. Escape, Cancel, a click on empty content and a section change
-    /// all land here, so leaving search always means the same thing.
+    /// Closes the panel and clears the query. Escape, a click on the dimmed
+    /// backdrop, opening a result and a section change all land here, so
+    /// leaving search always means the same thing.
     func dismissSearch() {
         isSearchFieldFocused = false
         isSearchModeActive = false
+        highlightedSearchResultID = nil
         if !searchText.isEmpty {
             searchText = ""
         }
@@ -1101,36 +1181,127 @@ final class MainViewModel {
         dismissSearch()
     }
 
-    /// What the toolbar builds. The two are mutually exclusive: the ordinary
-    /// actions are not constructed at all in search mode, so none of them is
-    /// left invisible but still able to take a click.
+    /// The toolbar no longer changes shape for search, so every action stays
+    /// where it was put.
     var showsOrdinaryToolbarActions: Bool {
-        !isSearchModeActive
+        true
     }
 
-    var showsToolbarSearchField: Bool {
-        isSearchModeActive
-    }
-
-    /// Seven compact actions normally — eight once there is more than one saved
-    /// model to switch between — or the field plus Cancel while searching.
-    /// Keeping the search layout down to two items is what stops the field
-    /// being pushed into the toolbar's overflow menu.
+    /// Seven compact actions, or eight once there is more than one saved model
+    /// to switch between. Search no longer takes the row over.
     var toolbarItemCount: Int {
-        guard !isSearchModeActive else {
-            return 2
-        }
-        return showsAssistantModelSwitcher ? 8 : 7
+        showsAssistantModelSwitcher ? 8 : 7
     }
 
     func clearSearchQuery() {
         searchText = ""
+        highlightedSearchResultID = nil
     }
 
     /// Called before a toolbar action runs, so the field gives up focus and the
     /// action still happens on the same click.
     func prepareForToolbarAction() {
         dismissSearchFocus()
+    }
+
+    // MARK: - Search results
+
+    /// The row the keyboard is on, so Return has something to open.
+    var highlightedSearchResultID: UUID?
+
+    /// How many results the panel will show before it stops. A panel that grows
+    /// past the window is not a panel any more.
+    static let maximumSearchResults = 8
+
+    /// Everything stored, not just the section on screen.
+    ///
+    /// Searching only what is already visible would mean the answer depends on
+    /// where you happened to be standing, which is the opposite of what a
+    /// search is for. A completed assignment is still a thing you can look for.
+    var searchResults: [AssignmentListItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return []
+        }
+        return assignments
+            .filter { item in
+                item.title.localizedCaseInsensitiveContains(query)
+                    || (item.normalizedCourseName?
+                        .localizedCaseInsensitiveContains(query) ?? false)
+            }
+            .sorted { left, right in
+                // What is still ahead comes first, nearest deadline at the top;
+                // anything already past follows, most recent first.
+                let leftPast = left.dueDate < currentDate
+                let rightPast = right.dueDate < currentDate
+                if leftPast != rightPast {
+                    return !leftPast
+                }
+                if leftPast {
+                    return left.dueDate > right.dueDate
+                }
+                return left.dueDate < right.dueDate
+            }
+            .prefix(Self.maximumSearchResults)
+            .map { $0 }
+    }
+
+    var hasSearchQuery: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var highlightedSearchResult: AssignmentListItem? {
+        guard let highlightedSearchResultID else {
+            return searchResults.first
+        }
+        return searchResults.first { $0.id == highlightedSearchResultID }
+            ?? searchResults.first
+    }
+
+    /// Moves the keyboard highlight, wrapping at both ends so holding an arrow
+    /// key never dead-ends.
+    func moveSearchHighlight(by offset: Int) {
+        let results = searchResults
+        guard !results.isEmpty else {
+            highlightedSearchResultID = nil
+            return
+        }
+        guard let current = highlightedSearchResultID,
+              let index = results.firstIndex(where: { $0.id == current }) else {
+            highlightedSearchResultID = offset >= 0
+                ? results.first?.id
+                : results.last?.id
+            return
+        }
+        let next = (index + offset + results.count) % results.count
+        highlightedSearchResultID = results[next].id
+    }
+
+    /// Keeps the highlight on something that still exists as the query changes.
+    func searchQueryDidChange() {
+        let results = searchResults
+        guard let current = highlightedSearchResultID,
+              results.contains(where: { $0.id == current }) else {
+            highlightedSearchResultID = results.first?.id
+            return
+        }
+    }
+
+    /// Opens a result the way clicking its row would, and closes the panel:
+    /// the search is over once it has been answered.
+    func openSearchResult(_ item: AssignmentListItem) {
+        selectedEventID = item.id
+        dismissSearch()
+        presentEditor(for: item)
+    }
+
+    @discardableResult
+    func openHighlightedSearchResult() -> Bool {
+        guard let item = highlightedSearchResult else {
+            return false
+        }
+        openSearchResult(item)
+        return true
     }
 
     /// Kept short so a long Canvas course title cannot stretch the toolbar.
@@ -1218,17 +1389,10 @@ final class MainViewModel {
                 }
                 return item.normalizedCourseName == selectedCourse
             }
-            .filter { item in
-                let query = searchText.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                guard !query.isEmpty else {
-                    return true
-                }
-                return item.title.localizedCaseInsensitiveContains(query)
-                    || (item.normalizedCourseName?
-                        .localizedCaseInsensitiveContains(query) ?? false)
-            }
+            // Deliberately not narrowed by the search query. The panel shows
+            // what it found; rearranging the list underneath it as well would
+            // mean closing the search left you somewhere you did not choose to
+            // be.
             .sorted {
                 if $0.dueDate != $1.dueDate {
                     return $0.dueDate < $1.dueDate
@@ -1359,11 +1523,24 @@ final class MainViewModel {
     }
 
     func saveManualEvent(_ draft: ManualEventDraft) async throws {
-        _ = try await repository.saveManual(
+        let isNew = draft.eventID == nil
+        let saved = try await repository.saveManual(
             ManualAssignmentDraft(presentation: draft)
         )
         try await reloadAssignmentsAndSynchronize()
-        statusMessage = draft.eventID == nil ? "Event added" : "Event updated"
+
+        // An event typed by hand can be a mistake in the same way one the
+        // assistant proposed can, so it gets the same way back rather than a
+        // status message that only says it happened.
+        guard isNew else {
+            statusMessage = "Event updated"
+            return
+        }
+        offerUndo(
+            for: [saved.id],
+            message: "Added “\(saved.title)”",
+            menuTitle: "Undo Adding “\(saved.title)”"
+        )
     }
 
     func toggleCompleted(_ item: AssignmentListItem) {
@@ -1982,6 +2159,9 @@ final class MainViewModel {
         )
         assignments = []
         selectedCourse = nil
+        // Nothing survives the reset, so there is nothing left to undo.
+        undoableAddition = nil
+        dismissUndoToast()
         synchronizeDock()
         startAutomaticRefreshLoop()
         startCountdownTransitionLoop()

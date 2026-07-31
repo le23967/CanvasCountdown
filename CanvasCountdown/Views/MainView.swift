@@ -7,7 +7,6 @@ struct MainView: View {
 
     @State private var eventPendingDeletion: AssignmentListItem?
     @State private var hoveredEventID: UUID?
-    @FocusState private var isSearchFieldFocused: Bool
     @State private var assistantWindow = AssistantWindowController()
     @State private var draggedSidebarWidth: CGFloat?
     @State private var sidebarWidthAtDragStart: CGFloat?
@@ -34,16 +33,6 @@ struct MainView: View {
         .background(ToolbarDisplayModeConfigurator())
         .onChange(of: viewModel.assistantPresentation) { _, presentation in
             syncAssistantWindow(presentation == .separateWindow)
-        }
-        // The field's focus and the view model's copy of it are kept in step so
-        // any part of the app can release focus without reaching into the view.
-        .onChange(of: isSearchFieldFocused) { _, isFocused in
-            viewModel.isSearchFieldFocused = isFocused
-        }
-        .onChange(of: viewModel.isSearchFieldFocused) { _, isFocused in
-            if isSearchFieldFocused != isFocused {
-                isSearchFieldFocused = isFocused
-            }
         }
         .sheet(isPresented: $viewModel.isShowingManualEditor) {
             ManualEventEditorView(draft: viewModel.manualEventDraft) { draft in
@@ -123,15 +112,45 @@ struct MainView: View {
             Text("“\(item.title)” will be permanently removed.")
         }
         .safeAreaInset(edge: .bottom) {
-            // The undo offer takes precedence: it is the one banner that is
-            // worth reading, so it must not be pushed aside by a routine
-            // "Settings updated".
-            if let undoable = viewModel.undoableAssistantImport {
-                undoBanner(undoable)
-            } else if let statusMessage = viewModel.statusMessage {
+            if let statusMessage = viewModel.statusMessage {
                 statusBanner(statusMessage)
             }
         }
+        // Floating, so it covers nothing and moves nothing: the list underneath
+        // stays exactly where it was while the offer is up.
+        .overlay(alignment: .bottom) {
+            if let addition = viewModel.undoableAddition,
+               let seconds = viewModel.undoToastSecondsRemaining {
+                UndoToastView(
+                    message: addition.message,
+                    secondsRemaining: seconds,
+                    totalSeconds: MainViewModel.undoToastDuration,
+                    onUndo: {
+                        Task { await viewModel.undoLastAddition() }
+                    },
+                    onDismiss: {
+                        viewModel.dismissUndoToast()
+                    }
+                )
+                .padding(.bottom, 22)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(
+            reduceMotion ? nil : .snappy(duration: 0.22),
+            value: viewModel.isUndoToastVisible
+        )
+        // Over everything, including the toolbar, the way a search panel should
+        // be: nothing behind it is taken away to make room.
+        .overlay {
+            if viewModel.isSearchModeActive {
+                SearchOverlayView(viewModel: viewModel)
+            }
+        }
+        .animation(
+            reduceMotion ? nil : .snappy(duration: 0.18),
+            value: viewModel.isSearchModeActive
+        )
     }
 
     /// The assignments and the assistant, side by side inside the window.
@@ -423,27 +442,12 @@ struct MainView: View {
             }
         }
         .navigationTitle("Canvas Countdown")
-        // A click anywhere in the content releases search focus. Simultaneous
-        // rather than exclusive, so the click still reaches the row, menu or
-        // button underneath it.
-        .dismissesSearchOnContentClick(
-            isActive: viewModel.isSearchModeActive
-        ) {
-            exitSearchMode()
-        }
         .toolbar {
-            // Two complete layouts chosen by one switch. Each item carries a
-            // stable id: without them SwiftUI could not tell which item became
-            // which when the mode flipped, and it removed the old items without
-            // installing the new ones.
-            if viewModel.isSearchModeActive {
-                ToolbarItem(id: "search.field", placement: .primaryAction) {
-                    toolbarSearchField
-                }
-                ToolbarItem(id: "search.cancel", placement: .primaryAction) {
-                    cancelSearchButton
-                }
-            } else {
+            // One layout, always. Search used to replace the whole row with a
+            // field and a Cancel button, so the six things people came for
+            // disappeared the moment they went looking for something; it is a
+            // panel over the window now and takes nothing away.
+            Group {
                 ToolbarItem(id: "action.courseFilter", placement: .primaryAction) {
                     courseFilter
                 }
@@ -624,82 +628,13 @@ struct MainView: View {
         }
     }
 
-    /// The search field, shown only in search mode.
-    ///
-    /// It shares the toolbar with nothing but Cancel, so unlike the earlier
-    /// attempt to sit it beside the five ordinary actions, there is room for it
-    /// and macOS has no reason to move it into the overflow menu.
-    private var toolbarSearchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            TextField(
-                "Search assignments or courses",
-                text: $viewModel.searchText
-            )
-            .textFieldStyle(.plain)
-            .focused($isSearchFieldFocused)
-            .onSubmit {
-                // Return must not trap focus in the field.
-                isSearchFieldFocused = false
-            }
-            .accessibilityLabel("Search assignments or courses")
-
-            if !viewModel.searchText.isEmpty {
-                Button {
-                    viewModel.clearSearchQuery()
-                    isSearchFieldFocused = true
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Clear search")
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(
-            .quaternary.opacity(0.5),
-            in: RoundedRectangle(cornerRadius: 6)
-        )
-        // A small minimum so the field gives up width first. Cancel is the last
-        // item, and the last item is what macOS pushes into the overflow menu,
-        // so the field must be the one that shrinks in a narrow window.
-        .frame(minWidth: 90, idealWidth: 280, maxWidth: 340)
-        .onExitCommand {
-            exitSearchMode()
-        }
-    }
-
-    private var cancelSearchButton: some View {
-        Button("Cancel") {
-            exitSearchMode()
-        }
-        .help("Close search")
-        .accessibilityLabel("Close search")
-    }
-
-    /// Short and flat, and skipped entirely under Reduce Motion.
-    private var searchAnimation: Animation? {
-        reduceMotion ? nil : .easeInOut(duration: 0.18)
-    }
-
     private func enterSearchMode() {
-        withAnimation(searchAnimation) {
-            viewModel.presentSearch()
-        }
+        viewModel.presentSearch()
     }
 
     private func exitSearchMode() {
-        withAnimation(searchAnimation) {
-            viewModel.dismissSearch()
-        }
+        viewModel.dismissSearch()
     }
-
 
     /// A toolbar control with a short visible title and a fuller description.
     ///
@@ -853,8 +788,12 @@ struct MainView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if !viewModel.searchText.isEmpty || viewModel.selectedCourse != nil {
-            ContentUnavailableView.search(text: viewModel.searchText)
+        if viewModel.selectedCourse != nil {
+            ContentUnavailableView(
+                "No events in this course",
+                systemImage: "line.3.horizontal.decrease.circle",
+                description: Text("Choose another course from Filter, or All Courses to see everything.")
+            )
         } else {
             switch viewModel.sidebarSelection ?? .upcoming {
             case .upcoming:
@@ -1037,37 +976,6 @@ struct MainView: View {
     /// Deliberately does not time out. A model asked for several tasks can get
     /// several of them wrong at once, and an undo that vanishes after two
     /// seconds leaves the same tidying job it was meant to prevent.
-    private func undoBanner(
-        _ batch: MainViewModel.UndoableAssistantImport
-    ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(AssistantStyle.accent)
-                .accessibilityHidden(true)
-            Text(batch.message)
-                .lineLimit(1)
-            Spacer()
-            Button("Undo") {
-                Task { await viewModel.undoAssistantImport() }
-            }
-            .keyboardShortcut("z", modifiers: .command)
-            .help("Remove everything the assistant just added")
-            Button {
-                viewModel.dismissUndoableAssistantImport()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("Keep them")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.bar)
-        .overlay(alignment: .top) {
-            Divider()
-        }
-    }
-
     private func statusBanner(_ message: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")

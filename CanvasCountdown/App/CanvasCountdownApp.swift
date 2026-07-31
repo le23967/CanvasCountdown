@@ -131,6 +131,23 @@ struct CanvasCountdownApp: App {
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .disabled(viewModel == nil)
             }
+            // Undo lives in the Edit menu, where anyone looking for it will
+            // look, rather than only on a toast that times out or a keyboard
+            // shortcut nobody was told about. Deliberately not plain ⌘Z: that
+            // belongs to the text fields in the editor sheet, and taking it
+            // from them to save a menu item would be a poor trade.
+            CommandGroup(after: .undoRedo) {
+                Button(viewModel?.undoAdditionMenuTitle ?? "Undo Adding") {
+                    guard let viewModel else {
+                        return
+                    }
+                    Task { await viewModel.undoLastAddition() }
+                }
+                .keyboardShortcut("z", modifiers: [.command, .option])
+                .disabled(viewModel?.canUndoAddition != true)
+
+                Divider()
+            }
             CommandGroup(after: .textEditing) {
                 Button("Find") {
                     viewModel?.presentSearch()

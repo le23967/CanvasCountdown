@@ -138,41 +138,150 @@ final class ToolbarSearchTests: XCTestCase {
 
     // MARK: - Query behaviour
 
-    func testQueryFiltersAndClearingRestoresEverything() async throws {
+    /// The panel answers the query; the list behind it does not rearrange.
+    /// Closing the search should leave you exactly where you were standing.
+    func testTheQueryFillsThePanelAndLeavesTheListAlone() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .upcoming
         context.viewModel.presentSearch()
 
         context.viewModel.searchText = "lab"
+
         XCTAssertEqual(
-            context.viewModel.filteredAssignments.map(\.title),
+            context.viewModel.searchResults.map(\.title),
             ["Physics lab"]
         )
-
-        context.viewModel.clearSearchQuery()
         XCTAssertEqual(
             context.viewModel.filteredAssignments.count,
             3,
-            "Clearing the query restores the full list at once"
+            "The list underneath is not narrowed by the search"
         )
+
+        context.viewModel.clearSearchQuery()
+        XCTAssertTrue(context.viewModel.searchResults.isEmpty)
         XCTAssertTrue(
             context.viewModel.isSearchModeActive,
             "Clearing is not the same as dismissing"
         )
     }
 
-    func testDismissingSearchClearsTheQueryAndRestoresTheList() async throws {
-        let context = try makeContext()
+    /// Searching only the section on screen would make the answer depend on
+    /// where you happened to be standing.
+    func testSearchLooksThroughEverythingNotJustTheSectionOnScreen() async throws {
+        let context = try makeContext(includingCompleted: true)
         await context.viewModel.start()
         context.viewModel.sidebarSelection = .upcoming
+
+        context.viewModel.presentSearch()
+        context.viewModel.searchText = "old maths"
+
+        XCTAssertEqual(
+            context.viewModel.searchResults.map(\.title),
+            ["Old maths quiz"],
+            "A completed assignment is still something you can look for"
+        )
+    }
+
+    func testResultsPutWhatIsStillAheadFirst() async throws {
+        let context = try makeContext(includingCompleted: true)
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+
+        context.viewModel.searchText = "maths"
+
+        XCTAssertEqual(
+            context.viewModel.searchResults.map(\.title),
+            ["Maths sheet", "Old maths quiz"],
+            "What is still due comes before what has already gone"
+        )
+    }
+
+    func testTheResultListIsBounded() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+
+        // Every fixture shares a course, so this matches all of them.
+        context.viewModel.searchText = "e"
+
+        XCTAssertLessThanOrEqual(
+            context.viewModel.searchResults.count,
+            MainViewModel.maximumSearchResults
+        )
+    }
+
+    func testArrowKeysMoveTheHighlightAndWrapAround() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+        context.viewModel.searchText = "a"
+        context.viewModel.searchQueryDidChange()
+
+        let results = context.viewModel.searchResults
+        try XCTSkipIf(results.count < 2)
+        XCTAssertEqual(context.viewModel.highlightedSearchResultID, results[0].id)
+
+        context.viewModel.moveSearchHighlight(by: 1)
+        XCTAssertEqual(context.viewModel.highlightedSearchResultID, results[1].id)
+
+        context.viewModel.moveSearchHighlight(by: -1)
+        XCTAssertEqual(context.viewModel.highlightedSearchResultID, results[0].id)
+
+        context.viewModel.moveSearchHighlight(by: -1)
+        XCTAssertEqual(
+            context.viewModel.highlightedSearchResultID,
+            results.last?.id,
+            "Holding an arrow key must not dead-end"
+        )
+    }
+
+    func testOpeningAResultClosesThePanelAndOpensThatEvent() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+        context.viewModel.searchText = "physics"
+        context.viewModel.searchQueryDidChange()
+
+        XCTAssertTrue(context.viewModel.openHighlightedSearchResult())
+
+        XCTAssertFalse(
+            context.viewModel.isSearchModeActive,
+            "The search is over once it has been answered"
+        )
+        XCTAssertEqual(
+            context.viewModel.selectedItem?.title,
+            "Physics lab"
+        )
+        XCTAssertTrue(context.viewModel.searchText.isEmpty)
+    }
+
+    func testOpeningWithNoResultsDoesNothing() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        context.viewModel.presentSearch()
+        context.viewModel.searchText = "nothing matches this"
+        context.viewModel.searchQueryDidChange()
+
+        XCTAssertFalse(context.viewModel.openHighlightedSearchResult())
+        XCTAssertTrue(
+            context.viewModel.isSearchModeActive,
+            "A Return that found nothing should not close the panel"
+        )
+    }
+
+    func testDismissingSearchClearsTheQuery() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
         context.viewModel.presentSearch()
         context.viewModel.searchText = "maths"
-        XCTAssertEqual(context.viewModel.filteredAssignments.count, 1)
+        XCTAssertFalse(context.viewModel.searchResults.isEmpty)
 
         context.viewModel.dismissSearch()
 
-        XCTAssertEqual(context.viewModel.filteredAssignments.count, 3)
+        XCTAssertTrue(context.viewModel.searchText.isEmpty)
+        XCTAssertTrue(context.viewModel.searchResults.isEmpty)
+        XCTAssertNil(context.viewModel.highlightedSearchResultID)
     }
 
     // MARK: - Interaction with the rest of the window
@@ -234,57 +343,37 @@ final class ToolbarSearchTests: XCTestCase {
 
     // MARK: - The field must not compete for toolbar width
 
-    func testSearchModeReplacesTheOrdinaryToolbarActions() async throws {
+    /// The whole point of moving search out of the toolbar: looking for
+    /// something no longer takes away the things you might click instead.
+    func testSearchTakesNothingOutOfTheToolbar() async throws {
         let context = try makeContext()
         await context.viewModel.start()
+        let before = context.viewModel.toolbarItemCount
         XCTAssertTrue(context.viewModel.showsOrdinaryToolbarActions)
-        XCTAssertFalse(context.viewModel.showsToolbarSearchField)
 
         context.viewModel.presentSearch()
 
-        XCTAssertFalse(
+        XCTAssertTrue(
             context.viewModel.showsOrdinaryToolbarActions,
-            "The five actions and the search icon are gone, not merely hidden"
+            "Filter, Refresh, Add and the rest stay exactly where they were"
         )
-        XCTAssertTrue(context.viewModel.showsToolbarSearchField)
+        XCTAssertEqual(context.viewModel.toolbarItemCount, before)
     }
 
-    func testLeavingSearchModeRestoresEveryToolbarAction() async throws {
+    func testEveryToolbarActionStillWorksWhileThePanelIsOpen() async throws {
         let context = try makeContext()
         await context.viewModel.start()
         context.viewModel.presentSearch()
 
-        context.viewModel.dismissSearch()
+        context.viewModel.showCompletedAndIgnored = true
+        context.viewModel.selectCourse("PHYS200")
 
-        XCTAssertTrue(context.viewModel.showsOrdinaryToolbarActions)
-        XCTAssertFalse(context.viewModel.showsToolbarSearchField)
-    }
-
-    func testHiddenToolbarActionsCannotBeDrivenWhileSearching() async throws {
-        let context = try makeContext()
-        await context.viewModel.start()
-        context.viewModel.presentSearch()
-
-        // The ordinary actions are not built at all in this mode, so the view
-        // has nothing to route a click to.
-        XCTAssertFalse(context.viewModel.showsOrdinaryToolbarActions)
+        XCTAssertTrue(context.viewModel.showCompletedAndIgnored)
+        XCTAssertEqual(context.viewModel.selectedCourse, "PHYS200")
         XCTAssertTrue(
             context.viewModel.isSearchModeActive,
-            "Only the field and Cancel occupy the toolbar"
+            "Using the toolbar does not close the panel"
         )
-    }
-
-    func testSearchModeKeepsTheToolbarWithinTwoItems() async throws {
-        let context = try makeContext()
-        await context.viewModel.start()
-        context.viewModel.presentSearch()
-
-        // Two items instead of seven is what keeps the field out of the
-        // overflow menu at the supported minimum window width.
-        XCTAssertEqual(context.viewModel.toolbarItemCount, 2)
-
-        context.viewModel.dismissSearch()
-        XCTAssertEqual(context.viewModel.toolbarItemCount, 7)
     }
 
     // MARK: - Toolbar presentation
@@ -337,7 +426,10 @@ final class ToolbarSearchTests: XCTestCase {
         let viewModel: MainViewModel
     }
 
-    private func makeContext(longCourseName: Bool = false) throws -> Context {
+    private func makeContext(
+        longCourseName: Bool = false,
+        includingCompleted: Bool = false
+    ) throws -> Context {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
 
@@ -370,7 +462,17 @@ final class ToolbarSearchTests: XCTestCase {
                     dueDate: due(inDays: 5),
                     source: .manual
                 ),
-            ]
+            ] + (includingCompleted
+                ? [
+                    AssignmentSnapshot(
+                        title: "Old maths quiz",
+                        courseName: "MATH100",
+                        dueDate: due(inDays: -4),
+                        source: .canvasCalendarFeed,
+                        isCompleted: true
+                    ),
+                ]
+                : [])
         )
 
         let suiteName = "ToolbarSearchTests.\(UUID().uuidString)"
