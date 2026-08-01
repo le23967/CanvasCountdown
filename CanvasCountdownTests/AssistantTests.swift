@@ -35,6 +35,171 @@ final class AssistantTests: XCTestCase {
         )
     }
 
+    // MARK: - Changing drafts instead of starting again
+
+    private func draft(
+        _ title: String,
+        course: String? = nil,
+        day: Int,
+        include: Bool = true,
+        labelID: UUID? = nil
+    ) -> AssistantDraftTask {
+        AssistantDraftTask(
+            include: include,
+            title: title,
+            courseName: course,
+            labelID: labelID,
+            dueDate: date(2026, 8, day, hour: 23),
+            sourceText: "gym monday wednesday friday"
+        )
+    }
+
+    /// The whole point of a revision: the model is handed the list that exists,
+    /// so "put them under 41021" edits those rows rather than guessing again.
+    func testARevisionEditsTheDraftsItWasGiven() {
+        let existing = [draft("Workout 1", day: 3), draft("Workout 2", day: 5)]
+        let reply = """
+        {"tasks":[
+          {"id":"\(existing[0].id.uuidString)","title":"Workout 1","course":"41021","due":"2026-08-03T23:59"},
+          {"id":"\(existing[1].id.uuidString)","title":"Workout 2","course":"41021","due":"2026-08-05T23:59"}
+        ]}
+        """
+
+        let revised = ChatCompletionsAssistantService.parseRevisedDrafts(
+            reply,
+            revising: existing,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(revised.map(\.id), existing.map(\.id))
+        XCTAssertEqual(revised.map(\.courseName), ["41021", "41021"])
+    }
+
+    /// The model is never told about the tick or the label, so it cannot have
+    /// meant to change them. Corrections made by hand survive a follow-up.
+    func testARevisionKeepsTheTicksAndLabelsSetByHand() throws {
+        let label = UUID()
+        let existing = [
+            draft("Workout 1", day: 3, include: false),
+            draft("Workout 2", day: 5, labelID: label),
+        ]
+        let reply = """
+        {"tasks":[
+          {"id":"\(existing[0].id.uuidString)","title":"Workout 1","course":"Gym","due":"2026-08-03T23:59"},
+          {"id":"\(existing[1].id.uuidString)","title":"Workout 2","course":"Gym","due":"2026-08-05T23:59"}
+        ]}
+        """
+
+        let revised = ChatCompletionsAssistantService.parseRevisedDrafts(
+            reply,
+            revising: existing,
+            calendar: calendar
+        )
+
+        XCTAssertFalse(revised[0].include, "An unticked draft stays unticked")
+        XCTAssertEqual(revised[1].labelID, label, "A label put on by hand stays")
+        XCTAssertEqual(revised.map(\.courseName), ["Gym", "Gym"])
+    }
+
+    func testARevisionCanDropAndAddTasks() throws {
+        let existing = [draft("Workout 1", day: 3), draft("Workout 2", day: 5)]
+        let reply = """
+        {"tasks":[
+          {"id":"\(existing[0].id.uuidString)","title":"Workout 1","course":null,"due":"2026-08-03T23:59"},
+          {"id":"not-a-uuid","title":"Workout 3","course":null,"due":"2026-08-07T23:59"}
+        ]}
+        """
+
+        let revised = ChatCompletionsAssistantService.parseRevisedDrafts(
+            reply,
+            revising: existing,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(revised.map(\.title), ["Workout 1", "Workout 3"])
+        XCTAssertEqual(revised[0].id, existing[0].id)
+        XCTAssertNotEqual(
+            revised[1].id,
+            existing[1].id,
+            "An unreadable id becomes a new draft rather than overwriting one"
+        )
+    }
+
+    /// A follow-up that wipes the review would be worse than one that does
+    /// nothing at all.
+    func testAnUnreadableRevisionLeavesTheDraftsAlone() {
+        let existing = [draft("Workout 1", day: 3)]
+
+        XCTAssertEqual(
+            ChatCompletionsAssistantService.parseRevisedDrafts(
+                "I'm sorry, I can't do that",
+                revising: existing,
+                calendar: calendar
+            ),
+            existing
+        )
+        XCTAssertEqual(
+            ChatCompletionsAssistantService.parseRevisedDrafts(
+                #"{"tasks":[]}"#,
+                revising: existing,
+                calendar: calendar
+            ),
+            existing
+        )
+    }
+
+    /// Only the three fields it is allowed to change are ever sent.
+    func testTheDraftsSentForRevisionCarryNoLabelOrTick() throws {
+        let json = ChatCompletionsAssistantService.draftsJSON(
+            [draft("Workout 1", course: "Gym", day: 3, include: false, labelID: UUID())],
+            calendar: calendar
+        )
+
+        XCTAssertTrue(json.contains("Workout 1"))
+        XCTAssertTrue(json.contains("Gym"))
+        XCTAssertFalse(json.contains("label"), "A label is the user's, not the model's")
+        XCTAssertFalse(json.contains("include"))
+        XCTAssertFalse(json.contains("sourceText"))
+    }
+
+    /// A first draft has nothing to line up with, so an invented id there could
+    /// collide with a row already on screen.
+    func testAFirstDraftIgnoresAnyIdTheModelSends() {
+        let collision = UUID()
+        let reply = """
+        {"tasks":[{"id":"\(collision.uuidString)","title":"Essay","course":null,"due":"2026-08-03T23:59"}]}
+        """
+
+        let drafts = ChatCompletionsAssistantService.parseDrafts(
+            reply,
+            sourceText: "essay",
+            calendar: calendar
+        )
+
+        XCTAssertEqual(drafts.count, 1)
+        XCTAssertNotEqual(drafts[0].id, collision)
+    }
+
+    func testAnEmptyInstructionChangesNothingWithoutAskingTheModel() async throws {
+        var settings = AssistantSettings.defaults
+        settings.isEnabled = true
+        let service = ChatCompletionsAssistantService(
+            settings: settings,
+            apiKey: nil,
+            session: Self.refusingSession(),
+            calendar: calendar
+        )
+        let existing = [draft("Workout 1", day: 3)]
+
+        let revised = try await service.reviseDrafts(
+            existing,
+            instruction: "   ",
+            now: date(2026, 7, 28)
+        )
+
+        XCTAssertEqual(revised, existing)
+    }
+
     // MARK: - Defaults and privacy posture
 
     func testDefaultsAreAvailableButNeverSendAnythingAway() {

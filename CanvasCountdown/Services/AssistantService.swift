@@ -132,6 +132,18 @@ protocol AssistantServicing: Sendable {
         from text: String,
         now: Date
     ) async throws -> [AssistantDraftTask]
+
+    /// Changes drafts that already exist, rather than starting again.
+    ///
+    /// Without this, "put those under 41021" means retyping the sentence that
+    /// produced them, and the reply is a fresh guess that loses whatever was
+    /// already corrected by hand. The current drafts go with the request, so
+    /// the model is editing a list rather than inventing one.
+    func reviseDrafts(
+        _ drafts: [AssistantDraftTask],
+        instruction: String,
+        now: Date
+    ) async throws -> [AssistantDraftTask]
 }
 
 /// Talks to any chat completions endpoint of the common shape, which covers
@@ -261,6 +273,132 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         return Self.parseDrafts(reply, sourceText: trimmed, calendar: calendar)
     }
 
+    func reviseDrafts(
+        _ drafts: [AssistantDraftTask],
+        instruction: String,
+        now: Date = .now
+    ) async throws -> [AssistantDraftTask] {
+        let trimmed = instruction
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !drafts.isEmpty else {
+            return drafts
+        }
+
+        let dayFormatter = DateFormatter()
+        dayFormatter.calendar = calendar
+        dayFormatter.timeZone = calendar.timeZone
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.dateFormat = "yyyy-MM-dd"
+
+        let reply = try await send(
+            system: """
+            You are editing a list of draft tasks that already exists. Here it \
+            is as JSON:
+
+            \(Self.draftsJSON(drafts, calendar: calendar))
+
+            Apply the change the user asks for and reply with JSON only, in \
+            that same shape: \
+            {"tasks":[{"id":"...","title":"...","course":null,"due":"YYYY-MM-DDTHH:MM"}]}. \
+            Return the whole list, not only what changed. Keep the id of every \
+            task you are keeping, so edits line up with what is on screen; use \
+            a new id only for a task you are adding, and leave a task out only \
+            if the user asked for it to go. Today is \(dayFormatter.string(from: now)). \
+            Use 23:59 when no time is given.
+            """,
+            user: trimmed
+        )
+        return Self.parseRevisedDrafts(
+            reply,
+            revising: drafts,
+            calendar: calendar
+        )
+    }
+
+    /// The drafts as the model will be shown them. Only the three fields it is
+    /// allowed to change are included; the label and the tick are the user's
+    /// and are never sent or asked about.
+    static func draftsJSON(
+        _ drafts: [AssistantDraftTask],
+        calendar: Calendar
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+
+        let tasks: [[String: Any]] = drafts.map { draft in
+            [
+                "id": draft.id.uuidString,
+                "title": draft.title,
+                "course": draft.courseName ?? NSNull(),
+                "due": draft.dueDate.map(formatter.string(from:)) ?? NSNull(),
+            ]
+        }
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: ["tasks": tasks]
+        ), let json = String(data: data, encoding: .utf8) else {
+            return #"{"tasks":[]}"#
+        }
+        return json
+    }
+
+    /// Reads a revision without letting it undo the user's own work.
+    ///
+    /// A task the model kept keeps the tick and the label that were put on it
+    /// here, because the model was never told about either and cannot have
+    /// meant to change them. A reply that cannot be read at all returns the
+    /// drafts untouched rather than emptying the review.
+    static func parseRevisedDrafts(
+        _ reply: String,
+        revising drafts: [AssistantDraftTask],
+        calendar: Calendar
+    ) -> [AssistantDraftTask] {
+        let sourceText = drafts.first?.sourceText ?? ""
+        let parsed = parseDrafts(
+            reply,
+            sourceText: sourceText,
+            calendar: calendar,
+            preservingIDs: true
+        )
+        guard !parsed.isEmpty else {
+            return drafts
+        }
+        let existing = Dictionary(
+            drafts.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return parsed.map { task in
+            guard let previous = existing[task.id] else {
+                return task
+            }
+            var merged = task
+            merged.include = previous.include
+            merged.labelID = previous.labelID
+            return merged
+        }
+    }
+
+    /// Whether an `id` in the reply is honoured. Only a revision needs this: a
+    /// first draft has nothing to line up with, and trusting an invented id
+    /// there could collide with a task the user is already looking at.
+    static func parseDrafts(
+        _ reply: String,
+        sourceText: String,
+        calendar: Calendar,
+        preservingIDs: Bool
+    ) -> [AssistantDraftTask] {
+        parseDrafts(
+            reply,
+            sourceText: sourceText,
+            calendar: calendar,
+            identifier: preservingIDs
+                ? { ($0["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID() }
+                : { _ in UUID() }
+        )
+    }
+
     /// Reads the model's JSON without trusting it. A malformed reply yields no
     /// drafts rather than a wrong deadline, and a task with no date arrives with
     /// `dueDate` nil so review must supply one.
@@ -268,6 +406,20 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         _ reply: String,
         sourceText: String,
         calendar: Calendar
+    ) -> [AssistantDraftTask] {
+        parseDrafts(
+            reply,
+            sourceText: sourceText,
+            calendar: calendar,
+            identifier: { _ in UUID() }
+        )
+    }
+
+    private static func parseDrafts(
+        _ reply: String,
+        sourceText: String,
+        calendar: Calendar,
+        identifier: ([String: Any]) -> UUID
     ) -> [AssistantDraftTask] {
         guard let start = reply.firstIndex(of: "{"),
               let end = reply.lastIndex(of: "}"),
@@ -297,6 +449,7 @@ actor ChatCompletionsAssistantService: AssistantServicing {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let due = (entry["due"] as? String).flatMap(formatter.date(from:))
             return AssistantDraftTask(
+                id: identifier(entry),
                 title: title,
                 courseName: (course?.isEmpty ?? true) ? nil : course,
                 dueDate: due,

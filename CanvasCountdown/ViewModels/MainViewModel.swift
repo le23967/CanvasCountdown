@@ -92,6 +92,11 @@ final class MainViewModel {
     private let localModels: any LocalModelManaging
     @ObservationIgnored
     private let courseBlocklist: any CourseBlocklisting
+    /// How a request to the assistant is built. Injected so the drafting and
+    /// revision flow can be exercised without a model or a network.
+    @ObservationIgnored
+    private let assistantFactory:
+        @MainActor (AssistantSettings, String?, Calendar) -> any AssistantServicing
     @ObservationIgnored
     private var hasStarted = false
 
@@ -107,8 +112,18 @@ final class MainViewModel {
         assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore(),
         localModels: any LocalModelManaging = OllamaModelManager(),
         courseBlocklist: any CourseBlocklisting =
-            UserDefaultsCourseBlocklistStore()
+            UserDefaultsCourseBlocklistStore(),
+        assistantFactory: @escaping @MainActor (
+            AssistantSettings, String?, Calendar
+        ) -> any AssistantServicing = { settings, apiKey, calendar in
+            ChatCompletionsAssistantService(
+                settings: settings,
+                apiKey: apiKey,
+                calendar: calendar
+            )
+        }
     ) {
+        self.assistantFactory = assistantFactory
         self.courseBlocklist = courseBlocklist
         self.localModels = localModels
         self.assistantKeyStore = assistantKeyStore
@@ -359,10 +374,10 @@ final class MainViewModel {
     }
 
     private func makeAssistant() -> any AssistantServicing {
-        ChatCompletionsAssistantService(
-            settings: settingsStore.assistant,
-            apiKey: assistantAPIKey.isEmpty ? nil : assistantAPIKey,
-            calendar: calendar
+        assistantFactory(
+            settingsStore.assistant,
+            assistantAPIKey.isEmpty ? nil : assistantAPIKey,
+            calendar
         )
     }
 
@@ -527,17 +542,81 @@ final class MainViewModel {
         }
     }
 
+    /// What was typed to produce the drafts. Kept here rather than in the
+    /// panel, and deliberately not cleared once it has been sent: having to
+    /// retype the whole sentence to change one thing about the result is the
+    /// reason this used to be so tiring.
+    var assistantDraftRequest = ""
+
+    /// The follow-up field, for changing drafts that already exist.
+    var assistantRevisionInput = ""
+
+    /// Everything asked in this round, oldest first, so the drafts on screen
+    /// can be read as the result of a conversation instead of appearing from
+    /// nowhere.
+    private(set) var assistantDraftHistory: [String] = []
+
+    var canReviseAssistantDrafts: Bool {
+        !assistantDrafts.isEmpty && !isAssistantBusy
+    }
+
     func draftTask(from text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return
+        }
         isAssistantBusy = true
         assistantErrorMessage = nil
         defer { isAssistantBusy = false }
         do {
-            let drafts = try await makeAssistant().draftTasks(from: text, now: .now)
+            let drafts = try await makeAssistant().draftTasks(
+                from: trimmed,
+                now: .now
+            )
             if drafts.isEmpty {
                 assistantErrorMessage =
                     "Nothing could be read from that. Try naming the task and when it is due."
+                return
             }
             assistantDrafts = drafts
+            assistantDraftHistory = [trimmed]
+            assistantRevisionInput = ""
+        } catch {
+            assistantErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Changes the drafts already on screen.
+    ///
+    /// "Put them all under 41021" is a sentence about the list that exists, not
+    /// a new request, so it is sent with that list attached. A reply that
+    /// cannot be read leaves the drafts exactly as they were: a follow-up that
+    /// wipes the review would be worse than one that does nothing.
+    func reviseAssistantDrafts(with instruction: String) async {
+        let trimmed = instruction
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !assistantDrafts.isEmpty else {
+            return
+        }
+        isAssistantBusy = true
+        assistantErrorMessage = nil
+        defer { isAssistantBusy = false }
+
+        let before = assistantDrafts
+        do {
+            let revised = try await makeAssistant().reviseDrafts(
+                before,
+                instruction: trimmed,
+                now: .now
+            )
+            guard revised != before else {
+                assistantErrorMessage =
+                    "That did not change anything. Try naming what should be different."
+                return
+            }
+            assistantDrafts = revised
+            assistantDraftHistory.append(trimmed)
+            assistantRevisionInput = ""
         } catch {
             assistantErrorMessage = error.localizedDescription
         }
@@ -550,8 +629,17 @@ final class MainViewModel {
         assistantDrafts[index] = draft
     }
 
+    /// Removes one draft without going back to the model. Faster than asking
+    /// for it to be dropped, and it cannot misunderstand which one is meant.
+    func removeAssistantDraft(_ id: UUID) {
+        assistantDrafts.removeAll { $0.id == id }
+    }
+
     func clearAssistantDrafts() {
         assistantDrafts = []
+        assistantDraftHistory = []
+        assistantRevisionInput = ""
+        assistantErrorMessage = nil
     }
 
     /// Saves only the drafts the user kept, through the ordinary manual-event
@@ -592,7 +680,8 @@ final class MainViewModel {
             }
         }
 
-        assistantDrafts = []
+        clearAssistantDrafts()
+        assistantDraftRequest = ""
         guard !savedIDs.isEmpty else {
             return
         }

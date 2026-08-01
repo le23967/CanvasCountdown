@@ -23,9 +23,8 @@ struct AssistantPanelView: View {
     @Bindable var viewModel: MainViewModel
     let onSaveDrafts: @MainActor ([AssistantDraftTask]) async -> Void
 
-    @State private var request = ""
-
     @FocusState private var isRequestFocused: Bool
+    @FocusState private var isRevisionFocused: Bool
     @FocusState private var isQuestionFocused: Bool
 
     var body: some View {
@@ -297,25 +296,40 @@ struct AssistantPanelView: View {
             Text("Add a task in your own words")
                 .font(.subheadline.weight(.semibold))
 
-            TextField("Essay draft due next Friday at 5pm", text: $request, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...4)
-                .focused($isRequestFocused)
-                .onSubmit(draft)
-                .accessibilityLabel("Describe a task")
+            // Not cleared once it has been sent. Changing one thing about the
+            // result should not mean retyping the sentence that produced it.
+            TextField(
+                "Essay draft due next Friday at 5pm",
+                text: $viewModel.assistantDraftRequest,
+                axis: .vertical
+            )
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(2...4)
+            .focused($isRequestFocused)
+            .onSubmit(draft)
+            .accessibilityLabel("Describe a task")
 
             HStack {
-                Button("Draft Task") {
+                Button(viewModel.assistantDrafts.isEmpty
+                    ? "Draft Task"
+                    : "Start Over") {
                     draft()
                 }
                 .disabled(
                     viewModel.isAssistantBusy
-                        || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || viewModel.assistantDraftRequest
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .isEmpty
                 )
+                .help(viewModel.assistantDrafts.isEmpty
+                    ? "Read tasks out of that sentence"
+                    : "Throw these away and read that sentence again")
                 Spacer()
             }
 
             if !viewModel.assistantDrafts.isEmpty {
+                requestHistory
+
                 Text("Check these before saving")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -323,6 +337,8 @@ struct AssistantPanelView: View {
                 ForEach(viewModel.assistantDrafts) { task in
                     draftRow(task)
                 }
+
+                revisionField
 
                 HStack {
                     Button("Discard") {
@@ -339,6 +355,98 @@ struct AssistantPanelView: View {
                 }
             }
         }
+    }
+
+    /// What has been asked so far, so the drafts read as the result of a
+    /// conversation rather than appearing from nowhere.
+    @ViewBuilder
+    private var requestHistory: some View {
+        if !viewModel.assistantDraftHistory.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(
+                    Array(viewModel.assistantDraftHistory.enumerated()),
+                    id: \.offset
+                ) { index, entry in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: index == 0
+                            ? "text.bubble"
+                            : "arrow.turn.down.right")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        Text(entry)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                AssistantStyle.accent.opacity(0.07),
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "Asked so far: " +
+                    viewModel.assistantDraftHistory.joined(separator: ", then ")
+            )
+        }
+    }
+
+    /// Says something about the drafts that exist, rather than starting again.
+    private var revisionField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                TextField(
+                    "Change these — “put them under 41021”",
+                    text: $viewModel.assistantRevisionInput,
+                    axis: .vertical
+                )
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...3)
+                .focused($isRevisionFocused)
+                .onSubmit(revise)
+                .accessibilityLabel("Change these drafts")
+
+                Button {
+                    revise()
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .foregroundStyle(
+                            canRevise
+                                ? AnyShapeStyle(AssistantStyle.accent)
+                                : AnyShapeStyle(.secondary)
+                        )
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canRevise)
+                .help("Apply this change to the drafts above")
+                .accessibilityLabel("Apply change")
+            }
+
+            Text("The drafts above go with it, so it edits them instead of starting again. Your ticks and labels are kept.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var canRevise: Bool {
+        viewModel.canReviseAssistantDrafts
+            && !viewModel.assistantRevisionInput
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+    }
+
+    private func revise() {
+        guard canRevise else {
+            return
+        }
+        let text = viewModel.assistantRevisionInput
+        Task { await viewModel.reviseAssistantDrafts(with: text) }
     }
 
     private func draftRow(_ task: AssistantDraftTask) -> some View {
@@ -384,6 +492,17 @@ struct AssistantPanelView: View {
                 .accessibilityLabel("Course for \(task.title)")
 
                 labelPicker(for: task)
+
+                Button {
+                    viewModel.removeAssistantDraft(task.id)
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Remove this draft")
+                .accessibilityLabel("Remove \(task.title)")
             }
 
             if let due = task.dueDate {
@@ -476,10 +595,7 @@ struct AssistantPanelView: View {
     }
 
     private func draft() {
-        let text = request
-        Task {
-            await viewModel.draftTask(from: text)
-            request = ""
-        }
+        let text = viewModel.assistantDraftRequest
+        Task { await viewModel.draftTask(from: text) }
     }
 }
