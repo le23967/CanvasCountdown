@@ -381,7 +381,27 @@ final class MainViewModel {
         )
     }
 
-    private(set) var conversation: [AssistantMessage] = []
+    /// Kept in settings rather than here, so closing the window or quitting no
+    /// longer throws away what was asked.
+    var conversation: [AssistantMessage] {
+        settingsStore.assistantConversation.messages
+    }
+
+    /// How much of it the panel shows before offering the rest.
+    ///
+    /// Now that this is kept between launches it can run to weeks, and the
+    /// newest exchange is the one being read. Showing all of it every time
+    /// would push the question field — and the drafting section under it —
+    /// below a wall of scrollback.
+    static let recentConversationLimit = 6
+
+    var recentConversation: [AssistantMessage] {
+        Array(conversation.suffix(Self.recentConversationLimit))
+    }
+
+    var earlierConversationCount: Int {
+        max(0, conversation.count - Self.recentConversationLimit)
+    }
 
     var assistantPreference: AssistantPresentationPreference {
         settingsStore.assistant.presentation
@@ -499,7 +519,7 @@ final class MainViewModel {
             return
         }
         let history = conversation
-        conversation.append(AssistantMessage(role: .user, text: trimmed))
+        recordConversation(AssistantMessage(role: .user, text: trimmed))
         isAssistantBusy = true
         assistantErrorMessage = nil
         defer { isAssistantBusy = false }
@@ -511,7 +531,7 @@ final class MainViewModel {
                 digests: assistantDigests(),
                 now: .now
             )
-            conversation.append(
+            recordConversation(
                 AssistantMessage(
                     role: .assistant,
                     text: reply.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -522,8 +542,24 @@ final class MainViewModel {
         }
     }
 
+    private func recordConversation(_ message: AssistantMessage) {
+        settingsStore.assistantConversation.append(message)
+    }
+
+    /// Clearing now throws away something that would otherwise have kept, so
+    /// the panel asks first rather than doing it on one click.
+    var isConfirmingClearConversation = false
+
+    func requestClearConversation() {
+        guard !conversation.isEmpty else {
+            return
+        }
+        isConfirmingClearConversation = true
+    }
+
     func clearConversation() {
-        conversation = []
+        isConfirmingClearConversation = false
+        settingsStore.assistantConversation.removeAll()
         assistantErrorMessage = nil
     }
 
@@ -640,6 +676,55 @@ final class MainViewModel {
         assistantDraftHistory = []
         assistantRevisionInput = ""
         assistantErrorMessage = nil
+        isConfirmingAssistantSave = false
+    }
+
+    /// Whether the panel is showing "this is what is about to be added".
+    var isConfirmingAssistantSave = false
+
+    /// Asks before writing, rather than writing on the click.
+    ///
+    /// Saving is the one step here that leaves the panel and changes the list,
+    /// and several tasks arrive at once. Undo afterwards is not enough on its
+    /// own: the point of a review is to be told what is about to happen while
+    /// it can still simply not happen.
+    func requestSaveAssistantDrafts() {
+        guard hasSaveableDrafts else {
+            return
+        }
+        isConfirmingAssistantSave = true
+    }
+
+    func cancelSaveAssistantDrafts() {
+        isConfirmingAssistantSave = false
+    }
+
+    /// What that confirmation says, worked out here so it is the same count
+    /// that the save itself will use.
+    var assistantSaveSummary: AssistantSaveSummary {
+        let saving = assistantDrafts.filter { $0.include && $0.canBeSaved }
+        let courses = saving
+            .compactMap { draft -> String? in
+                let trimmed = draft.courseName?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                return (trimmed?.isEmpty ?? true) ? nil : trimmed
+            }
+        var seen = Set<String>()
+        let distinctCourses = courses.filter { seen.insert($0).inserted }
+        let dates = saving.compactMap(\.dueDate).sorted()
+
+        return AssistantSaveSummary(
+            savingCount: saving.count,
+            skippedCount: assistantDrafts.count - saving.count,
+            courses: distinctCourses,
+            withoutCourseCount: saving.count - courses.count,
+            earliest: dates.first,
+            latest: dates.last,
+            hasUnappliedChange: !assistantRevisionInput
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+        )
     }
 
     /// Saves only the drafts the user kept, through the ordinary manual-event

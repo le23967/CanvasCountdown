@@ -42,8 +42,12 @@ struct AssistantDraftTask: Identifiable, Equatable, Sendable {
 }
 
 /// One turn of the conversation.
-struct AssistantMessage: Identifiable, Equatable, Sendable {
-    enum Role: Equatable, Sendable {
+///
+/// Codable and dated because the conversation is kept between launches: without
+/// a record, there is no way to tell whether something has already been asked,
+/// and no way to read the answer again once the window has closed.
+struct AssistantMessage: Identifiable, Equatable, Sendable, Codable {
+    enum Role: String, Equatable, Sendable, Codable {
         case user
         case assistant
     }
@@ -51,11 +55,20 @@ struct AssistantMessage: Identifiable, Equatable, Sendable {
     let id: UUID
     let role: Role
     let text: String
+    /// When it was said, so a conversation reopened next week still says when
+    /// it happened.
+    let date: Date
 
-    init(id: UUID = UUID(), role: Role, text: String) {
+    init(
+        id: UUID = UUID(),
+        role: Role,
+        text: String,
+        date: Date = .now
+    ) {
         self.id = id
         self.role = role
         self.text = text
+        self.date = date
     }
 }
 

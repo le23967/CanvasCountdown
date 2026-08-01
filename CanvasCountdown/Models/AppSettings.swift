@@ -126,6 +126,13 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    /// What has been asked of the assistant. Kept out of `AppSettings` and out
+    /// of `reset()` for the same reason as the labels: it is a record of the
+    /// user's own asking, not a preference.
+    var assistantConversation: AssistantConversationLog {
+        didSet { persist() }
+    }
+
     /// Kept out of `AppSettings` and out of `reset()`: these are the user's own
     /// work, not a preference with a sensible default to fall back to.
     var dockThemePresets: DockThemePresetLibrary {
@@ -192,6 +199,11 @@ final class SettingsStore {
             AssistantProfileLibrary.self,
             from: defaults,
             key: Key.assistantProfiles
+        ) ?? .empty
+        assistantConversation = Self.decode(
+            AssistantConversationLog.self,
+            from: defaults,
+            key: Key.assistantConversation
         ) ?? .empty
         dockThemePresets = Self.decode(
             DockThemePresetLibrary.self,
@@ -314,6 +326,9 @@ final class SettingsStore {
         if let data = try? JSONEncoder().encode(assistantProfiles) {
             defaults.set(data, forKey: Key.assistantProfiles)
         }
+        if let data = try? JSONEncoder().encode(assistantConversation) {
+            defaults.set(data, forKey: Key.assistantConversation)
+        }
         if let data = try? JSONEncoder().encode(dockThemePresets) {
             defaults.set(data, forKey: Key.dockThemePresets)
         }
@@ -342,6 +357,7 @@ final class SettingsStore {
         static let dockAppearance = prefix + "dockAppearance"
         static let assistant = prefix + "assistant"
         static let assistantProfiles = prefix + "assistantProfiles"
+        static let assistantConversation = prefix + "assistantConversation"
         static let dockThemePresets = prefix + "dockThemePresets"
         static let eventLabels = prefix + "eventLabels"
         static let dockDisplayLanguage = prefix + "dockDisplayLanguage"

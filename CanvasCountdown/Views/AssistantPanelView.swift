@@ -27,6 +27,14 @@ struct AssistantPanelView: View {
     @FocusState private var isRevisionFocused: Bool
     @FocusState private var isQuestionFocused: Bool
 
+    /// Starts off, so opening the panel lands on the newest exchange rather
+    /// than the oldest one kept.
+    @State private var showsFullHistory = false
+
+    private var visibleConversation: [AssistantMessage] {
+        showsFullHistory ? viewModel.conversation : viewModel.recentConversation
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -122,8 +130,8 @@ struct AssistantPanelView: View {
                 Button("Open in Separate Window") {
                     viewModel.openAssistantInSeparateWindow()
                 }
-                Button("Clear Conversation") {
-                    viewModel.clearConversation()
+                Button("Clear Conversation…") {
+                    viewModel.requestClearConversation()
                 }
                 .disabled(viewModel.conversation.isEmpty)
             } label: {
@@ -216,12 +224,34 @@ struct AssistantPanelView: View {
                     .disabled(viewModel.isAssistantBusy)
                 }
             } else {
-                ForEach(viewModel.conversation) { message in
+                // The newest exchange is the one being read, and the field to
+                // ask again sits below all of this, so only the recent ones are
+                // shown until the rest is asked for.
+                if viewModel.earlierConversationCount > 0 {
+                    Button(showsFullHistory
+                        ? "Show recent only"
+                        : "Show \(viewModel.earlierConversationCount) earlier") {
+                        showsFullHistory.toggle()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+
+                // Kept between launches, so this is a record rather than a
+                // scrollback: it says which day each exchange happened on.
+                ForEach(visibleConversation) { message in
+                    if let heading = dayHeading(before: message) {
+                        Text(heading)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 4)
+                    }
                     messageBubble(message)
                 }
 
                 Button("Clear conversation") {
-                    viewModel.clearConversation()
+                    viewModel.requestClearConversation()
                 }
                 .buttonStyle(.link)
                 .font(.caption)
@@ -265,13 +295,64 @@ struct AssistantPanelView: View {
                 .accessibilityLabel("Send")
             }
         }
+        // Kept between launches now, so clearing throws away a record rather
+        // than closing a window.
+        .confirmationDialog(
+            "Clear this conversation?",
+            isPresented: $viewModel.isConfirmingClearConversation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Conversation", role: .destructive) {
+                viewModel.clearConversation()
+            }
+            Button("Keep", role: .cancel) {
+                viewModel.isConfirmingClearConversation = false
+            }
+        } message: {
+            Text("Everything asked and answered here is deleted. Your assignments are not touched.")
+        }
+    }
+
+    /// The date to put above this message, or nothing if it belongs to the same
+    /// day as the one before it.
+    ///
+    /// Read against what is on screen rather than the whole record, so the
+    /// first message shown always says which day it belongs to.
+    private func dayHeading(before message: AssistantMessage) -> String? {
+        let messages = visibleConversation
+        guard let index = messages.firstIndex(where: { $0.id == message.id }) else {
+            return nil
+        }
+        let calendar = Calendar.autoupdatingCurrent
+        if index > 0,
+           calendar.isDate(
+               messages[index - 1].date,
+               inSameDayAs: message.date
+           ) {
+            return nil
+        }
+        if calendar.isDateInToday(message.date) {
+            return "Today"
+        }
+        if calendar.isDateInYesterday(message.date) {
+            return "Yesterday"
+        }
+        return message.date.formatted(
+            .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+        )
     }
 
     private func messageBubble(_ message: AssistantMessage) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(message.role == .user ? "You" : "Assistant")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(message.role == .user ? "You" : "Assistant")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(message.date.formatted(.dateTime.hour().minute()))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+            }
             Text(message.text)
                 .font(.callout)
                 .textSelection(.enabled)
@@ -345,15 +426,37 @@ struct AssistantPanelView: View {
                         viewModel.clearAssistantDrafts()
                     }
                     Spacer()
-                    Button("Save Selected") {
-                        Task {
-                            await onSaveDrafts(viewModel.assistantDrafts)
-                        }
+                    // The ellipsis is the promise that this is not the last
+                    // step: it opens the confirmation rather than writing.
+                    Button("Save Selected…") {
+                        viewModel.requestSaveAssistantDrafts()
                     }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(
+                        hasPendingRevision ? nil : KeyboardShortcut.defaultAction
+                    )
                     .disabled(!viewModel.hasSaveableDrafts)
+                    .help("Check what will be added, then add it")
                 }
             }
+        }
+        .confirmationDialog(
+            viewModel.assistantSaveSummary.title,
+            isPresented: $viewModel.isConfirmingAssistantSave,
+            titleVisibility: .visible
+        ) {
+            Button(viewModel.assistantSaveSummary.confirmTitle) {
+                let drafts = viewModel.assistantDrafts
+                Task { await onSaveDrafts(drafts) }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelSaveAssistantDrafts()
+            }
+        } message: {
+            Text(
+                viewModel.assistantSaveSummary
+                    .detailLines()
+                    .joined(separator: "\n")
+            )
         }
     }
 
@@ -397,34 +500,41 @@ struct AssistantPanelView: View {
     }
 
     /// Says something about the drafts that exist, rather than starting again.
+    ///
+    /// The button says what it does rather than being an arrow. A bare glyph
+    /// beside a text field read as decoration, and people pressed Save Selected
+    /// instead — which meant the sentence they had just typed was thrown away
+    /// and the drafts were written unchanged.
     private var revisionField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                TextField(
-                    "Change these — “put them under 41021”",
-                    text: $viewModel.assistantRevisionInput,
-                    axis: .vertical
-                )
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...3)
-                .focused($isRevisionFocused)
-                .onSubmit(revise)
-                .accessibilityLabel("Change these drafts")
+            TextField(
+                "Change these — “put them under 41021”",
+                text: $viewModel.assistantRevisionInput,
+                axis: .vertical
+            )
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(1...3)
+            .focused($isRevisionFocused)
+            .onSubmit(revise)
+            .accessibilityLabel("Change these drafts")
 
-                Button {
+            HStack(spacing: 8) {
+                Button("Apply Change") {
                     revise()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundStyle(
-                            canRevise
-                                ? AnyShapeStyle(AssistantStyle.accent)
-                                : AnyShapeStyle(.secondary)
-                        )
                 }
-                .buttonStyle(.borderless)
+                // Return belongs to whatever is being typed. While there is a
+                // sentence in the field, it applies that rather than saving.
+                .keyboardShortcut(
+                    hasPendingRevision ? KeyboardShortcut.defaultAction : nil
+                )
                 .disabled(!canRevise)
-                .help("Apply this change to the drafts above")
-                .accessibilityLabel("Apply change")
+                .help("Rewrite the drafts above using this sentence")
+
+                if viewModel.isAssistantBusy {
+                    ProgressView().controlSize(.small)
+                }
+
+                Spacer(minLength: 0)
             }
 
             Text("The drafts above go with it, so it edits them instead of starting again. Your ticks and labels are kept.")
@@ -434,11 +544,15 @@ struct AssistantPanelView: View {
         }
     }
 
+    /// Something is typed in the follow-up field and has not been applied.
+    private var hasPendingRevision: Bool {
+        !viewModel.assistantRevisionInput
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
     private var canRevise: Bool {
-        viewModel.canReviseAssistantDrafts
-            && !viewModel.assistantRevisionInput
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty
+        viewModel.canReviseAssistantDrafts && hasPendingRevision
     }
 
     private func revise() {
