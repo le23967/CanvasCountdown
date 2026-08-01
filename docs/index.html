@@ -160,6 +160,39 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .step span{min-width:92px;text-align:center;font-size:13.5px;color:var(--fg-soft)}
 .hint{margin-top:14px;font-size:12.8px;color:var(--fg-dim)}
 
+
+/* horizontal appearance picker — snaps like a watch-face chooser ---------- */
+.picker{position:relative;margin-top:22px;padding-bottom:4px}
+.rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:14px 0 10px;scrollbar-width:none;-ms-overflow-style:none;
+  outline:none;cursor:grab;overscroll-behavior-x:contain}
+.rail::-webkit-scrollbar{display:none}
+.rail:focus-visible{box-shadow:0 0 0 2px var(--accent);border-radius:14px}
+.rail .pad{flex:0 0 calc(50% - 33px)}
+.face{flex:0 0 66px;height:66px;border-radius:16px;scroll-snap-align:center;border:0;padding:0;
+  cursor:pointer;position:relative;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.2,.8,.3,1.2),opacity .3s ease,box-shadow .3s ease;
+  transform:scale(.74);opacity:.45}
+.face .fl{font-size:7px;letter-spacing:.12em;font-weight:800}
+.face .fn{font-size:22px;font-weight:800;line-height:1;margin-top:1px;font-variant-numeric:tabular-nums}
+.face[aria-selected="true"]{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
+.face.near{transform:scale(.86);opacity:.72}
+.ticks{display:flex;justify-content:center;gap:0;margin-top:2px;height:16px}
+.tick{width:2px;height:7px;border-radius:2px;background:var(--chip-line);margin:0 8px;
+  transition:height .25s ease,background .25s ease}
+.tick.on{height:14px;background:var(--accent)}
+.needle{position:absolute;left:50%;top:6px;width:1px;height:0;pointer-events:none}
+.facename{margin-top:6px;font-size:12.6px;color:var(--fg-dim);min-height:1.3em}
+@media(prefers-reduced-motion:reduce){
+  .rail{scroll-behavior:auto}
+  .face{transition:none}
+  .tick{transition:none}
+}
+
+/* the clip was dominating the page */
+.narrow{max-width:860px;margin-left:auto;margin-right:auto}
+
 /* media ---------------------------------------------------------------- */
 .frame{border-radius:16px;overflow:hidden;background:var(--frame);
   border:1px solid var(--line);box-shadow:var(--shadow)}
@@ -271,6 +304,16 @@ footer b{color:var(--fg-soft)}
       </div>
       <p class="themetag" id="tag">Theme: <b>Default Blue</b></p>
 
+      <div class="picker">
+        <div class="rail" id="rail" tabindex="0" role="listbox"
+             aria-label="Dock appearance">
+          <div class="pad"></div>
+          <div class="pad"></div>
+        </div>
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+        <div class="needle" aria-hidden="true"></div>
+      </div>
+
       <div class="controls">
         <div class="step">
           <button type="button" id="minus" aria-label="Fewer days">−</button>
@@ -278,8 +321,8 @@ footer b{color:var(--fg-soft)}
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
       </div>
-      <p class="hint">It counts down on its own. Move across this area to change the theme — these
-        four are the app's own.</p>
+      <p class="hint">It counts down on its own. Slide the picker to change the Dock — the first
+        four ship with the app, the rest are examples of colours you can mix and save yourself.</p>
     </div>
   </div>
 </div>
@@ -293,7 +336,7 @@ footer b{color:var(--fg-soft)}
       review before anything is written — and if it gets one wrong, you say so rather than starting
       again. Nothing is saved until you confirm, and the confirmation counts what it is about to add.</p>
 
-    <figure class="rv" style="margin-top:44px">
+    <figure class="rv narrow" style="margin-top:44px">
       <div class="frame">
         <video id="clip" muted loop playsinline preload="none"
                poster="img/assistant-poster.png"
@@ -575,10 +618,20 @@ footer b{color:var(--fg-soft)}
   /* ---- the Dock tile -------------------------------------------------- */
   // The app's own built-in themes, with the hex values it actually draws.
   var THEMES = [
-    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
-    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
-    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
+    // The four the app ships with, in its own hex values.
+    { name: 'Default Blue',         built: 1, top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
+    { name: 'Days Matter Inspired', built: 1, top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
+    { name: 'Dark',                 built: 1, top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
+    { name: 'High Contrast',        built: 1, top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
+    // Mixed here as examples — the app lets you set all four colours and save
+    // the result under a name, so these are things you could make, not things
+    // that ship.
+    { name: 'Sunset',    top: '#FF9A62', bot: '#D8425F', num: '#FFFFFF', lbl: '#FFE6D8' },
+    { name: 'Forest',    top: '#57A97A', bot: '#1C5236', num: '#FFFFFF', lbl: '#DCF0E4' },
+    { name: 'Grape',     top: '#9C74FF', bot: '#4E2AA8', num: '#FFFFFF', lbl: '#ECE2FF' },
+    { name: 'Sand',      top: '#F3E6CB', bot: '#DCC59A', num: '#6B3F10', lbl: '#7C5A22' },
+    { name: 'Slate',     top: '#5A6473', bot: '#232A35', num: '#FFFFFF', lbl: '#CBD3E0' },
+    { name: 'Crimson',   top: '#FF7A7A', bot: '#A81D26', num: '#FFFFFF', lbl: '#FFE2E2' }
   ];
   var START = 14;
 
@@ -588,12 +641,15 @@ footer b{color:var(--fg-soft)}
   var tag = document.getElementById('tag');
   var stepLabel = document.getElementById('stepLabel');
   var stage = document.getElementById('stage');
-  if (!tile) { return; }
+  var rail = document.getElementById('rail');
+  var ticks = document.getElementById('ticks');
+  if (!tile || !rail) { return; }
 
   var days = START, current = -1, timer = null, manual = false, onScreen = false;
+  var faces = [];
 
   function paint(i) {
-    if (i === current) { return; }
+    if (i === current || !THEMES[i]) { return; }
     current = i;
     var t = THEMES[i];
     tile.style.setProperty('--top', t.top);
@@ -601,10 +657,16 @@ footer b{color:var(--fg-soft)}
     tile.style.setProperty('--num', t.num);
     tile.style.setProperty('--lbl', t.lbl);
     wrap.style.setProperty('--ring', t.top);
-    tag.innerHTML = 'Theme: <b>' + t.name + '</b>';
+    tag.innerHTML = 'Theme: <b>' + t.name + '</b>' +
+      (t.built ? '' : ' <span style="opacity:.7">— one you could mix</span>');
+    faces.forEach(function (f, n) {
+      f.setAttribute('aria-selected', String(n === i));
+      f.classList.toggle('near', Math.abs(n - i) === 1);
+    });
+    Array.prototype.forEach.call(ticks.children, function (d, n) {
+      d.classList.toggle('on', n === i);
+    });
     if (reduce) { return; }
-    // A short pop, and a ring that leaves the tile — the change should feel
-    // like the icon reacting, not a stylesheet swapping over.
     tile.classList.remove('pop'); wrap.classList.remove('burst');
     void tile.offsetWidth;
     tile.classList.add('pop'); wrap.classList.add('burst');
@@ -623,8 +685,69 @@ footer b{color:var(--fg-soft)}
     tile.classList.toggle('zero', days === 0);
   }
 
-  // It runs itself. Nobody should have to press a button to see the point of a
-  // countdown — but touching the stepper hands it over and it stops.
+  // Build the rail between its two spacers so the first and last can centre.
+  THEMES.forEach(function (t, i) {
+    var b = document.createElement('button');
+    b.className = 'face';
+    b.type = 'button';
+    b.setAttribute('role', 'option');
+    b.setAttribute('aria-selected', String(i === 0));
+    b.setAttribute('aria-label', t.name + (t.built ? ' (ships with the app)' : ' (example)'));
+    b.title = t.name;
+    b.style.background = 'linear-gradient(180deg,' + t.top + ',' + t.bot + ')';
+    b.innerHTML = '<span class="fl" style="color:' + t.lbl + '">DAYS</span>' +
+                  '<span class="fn" style="color:' + t.num + '">' + (i + 3) + '</span>';
+    b.addEventListener('click', function () { centre(i); });
+    rail.insertBefore(b, rail.lastElementChild);
+    faces.push(b);
+
+    var d = document.createElement('span');
+    d.className = 'tick' + (i === 0 ? ' on' : '');
+    ticks.appendChild(d);
+  });
+
+  function centre(i) {
+    var f = faces[i];
+    rail.scrollTo({ left: f.offsetLeft - (rail.clientWidth - f.offsetWidth) / 2,
+                    behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  // Whichever face is nearest the middle is the selected one.
+  var raf = null;
+  rail.addEventListener('scroll', function () {
+    if (raf) { return; }
+    raf = requestAnimationFrame(function () {
+      raf = null;
+      var mid = rail.scrollLeft + rail.clientWidth / 2, best = 0, bestD = Infinity;
+      faces.forEach(function (f, n) {
+        var d = Math.abs(f.offsetLeft + f.offsetWidth / 2 - mid);
+        if (d < bestD) { bestD = d; best = n; }
+      });
+      paint(best);
+    });
+  }, { passive: true });
+
+  rail.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); centre(Math.min(current + 1, THEMES.length - 1)); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); centre(Math.max(current - 1, 0)); }
+  });
+
+  // Drag with the pointer, the way a picker should feel.
+  var down = false, startX = 0, startLeft = 0;
+  rail.addEventListener('pointerdown', function (e) {
+    down = true; startX = e.clientX; startLeft = rail.scrollLeft; rail.style.cursor = 'grabbing';
+  });
+  rail.addEventListener('pointermove', function (e) {
+    if (!down) { return; }
+    rail.scrollLeft = startLeft - (e.clientX - startX);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+    rail.addEventListener(ev, function () {
+      if (!down) { return; }
+      down = false; rail.style.cursor = 'grab'; centre(current);
+    });
+  });
+
   function tickDown() {
     if (days > 0) {
       setDays(days - 1, true);
@@ -637,9 +760,7 @@ footer b{color:var(--fg-soft)}
     if (timer || manual || reduce) { return; }
     timer = setTimeout(tickDown, 700);
   }
-  function halt() {
-    if (timer) { clearTimeout(timer); timer = null; }
-  }
+  function halt() { if (timer) { clearTimeout(timer); timer = null; } }
 
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(function (entries) {
@@ -648,29 +769,18 @@ footer b{color:var(--fg-soft)}
         if (onScreen) { run(); } else { halt(); }
       });
     }, { threshold: 0.35 }).observe(stage);
-  } else {
-    run();
-  }
+  } else { run(); }
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { halt(); } else if (onScreen) { run(); }
   });
 
-  // Colour follows the pointer, left to right. The number is not touched by it.
-  stage.addEventListener('pointermove', function (e) {
-    var r = stage.getBoundingClientRect();
-    var x = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 0.9999);
-    paint(Math.floor(x * THEMES.length));
-  });
-
-  function takeOver(delta) {
-    manual = true; halt();
-    setDays(days + delta, true);
-  }
+  function takeOver(delta) { manual = true; halt(); setDays(days + delta, true); }
   document.getElementById('minus').addEventListener('click', function () { takeOver(-1); });
   document.getElementById('plus').addEventListener('click', function () { takeOver(1); });
 
   paint(0);
   setDays(START, false);
+  centre(0);
 }());
 
 // The download button follows whatever the newest release is, so publishing a
