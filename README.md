@@ -1,5 +1,7 @@
 # Canvas Countdown
 
+**Website: https://le23967.github.io/CanvasCountdown/**
+
 A native macOS deadline manager for Canvas LMS. It keeps your assignment
 deadlines on your Mac and draws the nearest one as a large calendar-day
 countdown in the Dock icon, so the number of days left is visible without
@@ -174,6 +176,11 @@ rather than a task with an invented deadline.
   Items**.
 - Labels are not yet a filter: they colour and name an event, but Upcoming
   cannot be narrowed to one label.
+
+## Feedback and Collaboration
+
+Bugs are best raised as [GitHub issues](https://github.com/le23967/CanvasCountdown/issues).
+For feedback or collaboration, email <operating333@gmail.com>.
 
 ## Reporting Issues
 

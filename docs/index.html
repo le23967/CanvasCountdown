@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas Countdown — Canvas LMS deadlines in your Mac's Dock</title>
+<meta name="description" content="A native macOS app that reads your Canvas LMS calendar feed and draws the days left until your next assignment straight onto the Dock icon. Free, open source, no account, nothing uploaded.">
+<meta name="author" content="le23967">
+<link rel="canonical" href="https://le23967.github.io/CanvasCountdown/">
+<link rel="icon" type="image/png" href="img/icon.png">
+<link rel="apple-touch-icon" href="img/icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Canvas Countdown">
+<meta property="og:title" content="Canvas Countdown — Canvas LMS deadlines in your Mac's Dock">
+<meta property="og:description" content="A native macOS app that reads your Canvas calendar feed and draws the days left until your next assignment straight onto the Dock icon. Free and open source.">
+<meta property="og:url" content="https://le23967.github.io/CanvasCountdown/">
+<meta property="og:image" content="https://le23967.github.io/CanvasCountdown/img/upcoming.png">
+<meta property="og:image:alt" content="Canvas Countdown showing a list of upcoming assignments with the days remaining beside each one">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Canvas Countdown — Canvas LMS deadlines in your Mac's Dock">
+<meta name="twitter:description" content="A native macOS app that puts the days left until your next Canvas assignment on your Dock icon.">
+<meta name="twitter:image" content="https://le23967.github.io/CanvasCountdown/img/upcoming.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Canvas Countdown",
+  "applicationCategory": "ProductivityApplication",
+  "operatingSystem": "macOS 14.0 or later",
+  "url": "https://le23967.github.io/CanvasCountdown/",
+  "downloadUrl": "https://github.com/le23967/CanvasCountdown/releases/latest",
+  "softwareVersion": "1.1.0",
+  "license": "https://github.com/le23967/CanvasCountdown/blob/main/LICENSE",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": {
+    "@type": "Person",
+    "name": "le23967",
+    "url": "https://github.com/le23967"
+  },
+  "description": "A native macOS deadline manager for Canvas LMS. It reads your Canvas calendar feed and draws the number of days until your nearest assignment as a large countdown on the Dock icon.",
+  "screenshot": "https://le23967.github.io/CanvasCountdown/img/upcoming.png"
+}
+</script>
+
+<style>
+:root{
+  --bg:#ffffff; --bg-alt:#f5f6f8; --fg:#12141a; --fg-soft:#5b6170;
+  --line:#e3e5ea; --accent:#2563eb; --accent-soft:#eaf0fe;
+  --card:#ffffff; --shadow:0 18px 50px rgba(15,23,42,.13);
+  --radius:14px; --max:1080px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d0f14; --bg-alt:#14171f; --fg:#f2f4f8; --fg-soft:#a2a9b8;
+    --line:#262b36; --accent:#6f9bff; --accent-soft:#182338;
+    --card:#161a22; --shadow:0 18px 50px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+
+/* header */
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:14px;height:58px}
+.nav img{width:26px;height:26px;border-radius:6px}
+.nav strong{font-size:15px;letter-spacing:-.01em}
+.nav .spacer{flex:1}
+.nav a{color:var(--fg-soft);font-size:14px}
+.nav a:hover{color:var(--fg);text-decoration:none}
+@media(max-width:620px){.nav .hide-sm{display:none}}
+
+/* hero */
+.hero{padding:72px 0 56px;text-align:center;background:
+  radial-gradient(700px 320px at 50% -40px,var(--accent-soft),transparent 70%)}
+.hero img.icon{width:104px;height:104px;margin:0 auto 22px;border-radius:23px;box-shadow:var(--shadow)}
+h1{font-size:clamp(2.1rem,5.2vw,3.3rem);line-height:1.08;letter-spacing:-.03em;margin:0 0 16px;font-weight:700}
+.tagline{font-size:clamp(1.02rem,2.3vw,1.22rem);color:var(--fg-soft);max-width:640px;margin:0 auto 30px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center}
+.btn{display:inline-block;padding:13px 26px;border-radius:11px;font-weight:600;font-size:15px;
+  border:1px solid transparent;transition:transform .12s ease,box-shadow .12s ease}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 8px 22px rgba(37,99,235,.32)}
+.btn-secondary{background:var(--card);color:var(--fg);border-color:var(--line)}
+.meta{margin-top:14px;font-size:13.5px;color:var(--fg-soft)}
+.meta code{font-size:12.5px;background:var(--bg-alt);padding:2px 6px;border-radius:5px}
+
+/* dock illustration */
+.dockstrip{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:42px auto 0;
+  padding:12px 16px;background:var(--bg-alt);border:1px solid var(--line);
+  border-radius:20px;width:max-content;max-width:100%}
+.dockstrip .dot{width:44px;height:44px;border-radius:11px;background:linear-gradient(180deg,#cfd4de,#aeb5c4);opacity:.55}
+@media(prefers-color-scheme:dark){.dockstrip .dot{background:linear-gradient(180deg,#39404f,#272d38)}}
+.tile{width:64px;height:64px;border-radius:15px;background:linear-gradient(180deg,#4b8de0,#1f5bb5);
+  color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 8px 20px rgba(31,91,181,.42);flex:0 0 auto}
+.tile .lbl{font-size:9px;letter-spacing:.14em;font-weight:700;opacity:.95}
+.tile .num{font-size:30px;font-weight:700;line-height:1;margin-top:2px;font-variant-numeric:tabular-nums}
+.dockcap{text-align:center;color:var(--fg-soft);font-size:13.5px;margin-top:12px}
+
+/* sections */
+/* the header is sticky, so an anchored jump must clear it */
+section{padding:64px 0;border-top:1px solid var(--line);scroll-margin-top:60px}
+section.alt{background:var(--bg-alt)}
+h2{font-size:clamp(1.5rem,3.2vw,2.05rem);letter-spacing:-.02em;margin:0 0 12px;font-weight:700}
+h3{font-size:1.12rem;margin:0 0 7px;letter-spacing:-.01em}
+.lead{color:var(--fg-soft);max-width:660px;margin:0 0 36px}
+
+.shot{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  box-shadow:var(--shadow);background:var(--card)}
+.shot figcaption{padding:11px 15px;font-size:13.5px;color:var(--fg-soft);border-top:1px solid var(--line)}
+figure{margin:0}
+
+.row{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-bottom:56px}
+.row:last-child{margin-bottom:0}
+.row.flip .txt{order:2}
+@media(max-width:820px){.row{grid-template-columns:1fr;gap:22px}.row.flip .txt{order:0}}
+.row p{color:var(--fg-soft);margin:0 0 10px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.card p{color:var(--fg-soft);font-size:14.5px;margin:0}
+.card .ic{font-size:20px;margin-bottom:10px;display:block}
+
+ul.plain{list-style:none;padding:0;margin:0}
+ul.plain li{padding:11px 0;border-bottom:1px solid var(--line);color:var(--fg-soft);font-size:15px}
+ul.plain li:last-child{border-bottom:0}
+ul.plain b{color:var(--fg);font-weight:600}
+
+.steps{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:s;position:relative;padding:0 0 20px 44px;color:var(--fg-soft)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:28px;height:28px;
+  border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:14px;
+  display:flex;align-items:center;justify-content:center}
+.steps b{color:var(--fg)}
+
+.note{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);
+  border-radius:var(--radius);padding:17px 19px;font-size:14.5px;color:var(--fg)}
+
+.contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:18px}
+.contact .card a{font-weight:600;word-break:break-all}
+
+footer{padding:40px 0 56px;border-top:1px solid var(--line);color:var(--fg-soft);font-size:14px}
+footer .fl{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+footer p{margin:0 0 8px;max-width:720px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <img src="img/icon.png" alt="">
+    <strong>Canvas Countdown</strong>
+    <span class="spacer"></span>
+    <a href="#features" class="hide-sm">Features</a>
+    <a href="#install" class="hide-sm">Install</a>
+    <a href="#privacy" class="hide-sm">Privacy</a>
+    <a href="#contact">Contact</a>
+    <a href="https://github.com/le23967/CanvasCountdown">GitHub</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <img class="icon" src="img/icon.png" alt="Canvas Countdown app icon">
+    <h1>Your next deadline, on your Dock.</h1>
+    <p class="tagline">Canvas Countdown reads your Canvas LMS calendar feed and draws the number of
+      days until your nearest assignment straight onto the Dock icon — so you know where you stand
+      without opening anything.</p>
+
+    <div class="cta">
+      <a class="btn btn-primary" id="download" href="https://github.com/le23967/CanvasCountdown/releases/latest">Download for macOS</a>
+      <a class="btn btn-secondary" href="https://github.com/le23967/CanvasCountdown">View source</a>
+    </div>
+    <p class="meta" id="relmeta">Free and open source · macOS 14 or later · Apple silicon and Intel</p>
+
+    <div class="dockstrip" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span>
+      <div class="tile"><span class="lbl">DAYS</span><span class="num">6</span></div>
+      <span class="dot"></span><span class="dot"></span>
+    </div>
+    <p class="dockcap">The Dock icon counts down on its own, all day, without the window open.</p>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="lead">Everything below is a real screenshot of the app running. The coursework shown
+      is made up for the pictures.</p>
+
+    <div class="row">
+      <div class="txt">
+        <h3>Every deadline, sorted by how long you have</h3>
+        <p>Assignments arrive from your Canvas calendar feed and are listed with the days remaining
+          beside each one. The nearest one is pinned to the top so the answer to “what is next?” is
+          the first thing on screen.</p>
+        <p>Canvas deadlines that arrive as 00:00 are shown as <b>11:59&nbsp;PM</b>, because that is
+          what they actually mean. Only the clock is corrected — the day and the countdown never
+          move, and switching the setting off restores the original times.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/upcoming.png" alt="The Upcoming list, showing the next deadline in a large card and each assignment with the number of days left" loading="lazy" width="1600" height="1067">
+        <figcaption>Upcoming — the nearest deadline first, days left beside every row.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row flip">
+      <div class="txt">
+        <h3>A calendar by day, week, month or year</h3>
+        <p>The same deadlines laid out as a grid, at whichever scale suits what you are planning.
+          Type a date to jump straight to it.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/calendar.png" alt="Month view of the calendar with assignments placed on their due dates" loading="lazy" width="1600" height="1067">
+        <figcaption>Calendar — Day, Week, Month and Year, with today marked.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row">
+      <div class="txt">
+        <h3>Add tasks by describing them</h3>
+        <p>Type a sentence and the optional assistant turns it into draft tasks you review before
+          anything is saved. Get one wrong and you do not start over: a follow-up like
+          <em>“put them all under COMP2050”</em> edits the drafts already on screen, and the ticks
+          and labels you set by hand are kept.</p>
+        <p>It runs against a model on your own Mac, or any service that speaks the common
+          chat-completions API — save as many as you like and switch between them.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/assistant.png" alt="The assistant panel showing drafted tasks, each with a course, a label picker and a due date, ready for review" loading="lazy" width="1600" height="1067">
+        <figcaption>Drafts are reviewed and edited before they are saved. Nothing is written yet.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row flip">
+      <div class="txt">
+        <h3>Nothing is added without a way back</h3>
+        <p>Saving several tasks at once asks first, and says exactly what it is about to do: how
+          many, under which course, over what dates, and how many rows are being left out.</p>
+        <p>After it happens, a panel offers <b>Undo</b> for ten seconds — and it stays in the Edit
+          menu once the panel goes, so you never have to know a keyboard shortcut to take something
+          back.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/confirm.png" alt="A confirmation reading Add 8 tasks, listing the courses, the date range, and that they can be undone" loading="lazy" width="1600" height="1067">
+        <figcaption>The confirmation counts what will be added before it is written.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row">
+      <div class="txt">
+        <h3>Undo, in plain sight</h3>
+        <p>A floating panel with a ten-second countdown. One click puts everything back.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/undo.png" alt="A small floating panel reading 8 tasks added with a countdown and an Undo button" loading="lazy" width="1600" height="1067">
+        <figcaption>Ten seconds to change your mind, then it moves to the Edit menu.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row flip">
+      <div class="txt">
+        <h3>Search from anywhere</h3>
+        <p>A panel in the middle of the screen, the way Spotlight works. It looks through every
+          assignment you have, not only the section you happen to be looking at.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/search.png" alt="A floating search panel in the centre of the window with a matching assignment highlighted" loading="lazy" width="1600" height="1067">
+        <figcaption>Arrow keys to move, Return to open, Escape to close.</figcaption>
+      </figure>
+    </div>
+
+    <div class="row">
+      <div class="txt">
+        <h3>Set up once, then leave it alone</h3>
+        <p>Paste your Canvas feed URL and it refreshes on its own. Reminders fire days before, the
+          day before, or on the day. Courses the feed added by mistake can be removed for good.</p>
+      </div>
+      <figure class="shot">
+        <img src="img/settings.png" alt="Settings showing the Canvas feed field, automatic refresh interval, the 11:59 PM due-time option and notification schedule" loading="lazy" width="1600" height="1067">
+        <figcaption>The feed URL is held in the macOS Keychain, never in preferences.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Also in there</h2>
+    <div class="grid">
+      <div class="card"><span class="ic">🏷️</span><h3>Your own labels</h3>
+        <p>Colour-coded marks you name yourself — Important, Reading, Society — that stay on an event
+          between launches.</p></div>
+      <div class="card"><span class="ic">📸</span><h3>Import from a screenshot</h3>
+        <p>Point it at a picture of a subject outline and it reads the dates out of it for you to
+          check.</p></div>
+      <div class="card"><span class="ic">🔔</span><h3>Reminders you choose</h3>
+        <p>Notifications at the offsets you set, not a fixed schedule someone else picked.</p></div>
+      <div class="card"><span class="ic">🎨</span><h3>Dock themes</h3>
+        <p>Change the colours and the wording on the Dock tile, and save the ones you like.</p></div>
+      <div class="card"><span class="ic">🌐</span><h3>English or 中文</h3>
+        <p>The Dock label reads DAYS or 倒数日, whichever you prefer.</p></div>
+      <div class="card"><span class="ic">✅</span><h3>515 automated tests</h3>
+        <p>Countdowns across daylight saving, feed parsing, and every screen — run on every change.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Installing it</h2>
+    <p class="lead">The build is signed ad-hoc rather than notarized by Apple, which costs a
+      developer account. That means one extra step the very first time.</p>
+    <ol class="steps">
+      <li>Download the <b>.dmg</b> from the button above, or from the
+        <a href="https://github.com/le23967/CanvasCountdown/releases/latest">latest release</a>.</li>
+      <li>Open it and drag <b>Canvas Countdown</b> into <b>Applications</b>.</li>
+      <li><b>Right-click the app in Applications and choose Open</b>, then confirm. Double-clicking
+        it the normal way is blocked by Gatekeeper the first time.</li>
+      <li>If macOS still refuses, open <b>System Settings → Privacy &amp; Security</b>, find the
+        message about Canvas Countdown and choose <b>Open Anyway</b>.</li>
+      <li>In the app, paste your <b>Canvas calendar feed URL</b> — in Canvas, go to
+        <b>Calendar → Calendar Feed</b> and copy the address.</li>
+    </ol>
+    <p class="note">After the first launch it opens like any other app. It needs
+      <b>macOS 14 (Sonoma) or later</b>; macOS 13 and earlier cannot run it, because the app is
+      built on SwiftData and Observation, which Apple ships only from macOS 14.</p>
+  </div>
+</section>
+
+<section id="privacy" class="alt">
+  <div class="wrap">
+    <h2>Where your data goes</h2>
+    <p class="lead">Nowhere, unless you send it somewhere on purpose.</p>
+    <ul class="plain">
+      <li><b>No account and no server.</b> There is nothing to sign up for. The app talks to your
+        institution's Canvas feed and to nothing else of its own.</li>
+      <li><b>No analytics and no tracking.</b> Nothing is counted, logged or phoned home.</li>
+      <li><b>Your feed URL lives in the macOS Keychain</b>, never in preferences or diagnostics —
+        it is a private address that shows your whole timetable.</li>
+      <li><b>Your deadlines stay on your Mac</b>, in a local database inside the app's sandbox.</li>
+      <li><b>The assistant is optional and off the network by default.</b> Pointed at a model
+        running on your own Mac, nothing is uploaded at all. If you choose a cloud service instead,
+        the app says so in the panel, every time, before you ask anything.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <h2>Feedback and collaboration</h2>
+    <p class="lead">Found a bug, want a feature, or interested in working together? Both go to the
+      same person.</p>
+    <div class="contact">
+      <div class="card">
+        <span class="ic">✉️</span><h3>Email</h3>
+        <p><a href="mailto:operating333@gmail.com?subject=Canvas%20Countdown">operating333@gmail.com</a><br>
+          For feedback, collaboration and anything else.</p>
+      </div>
+      <div class="card">
+        <span class="ic">🐛</span><h3>Report an issue</h3>
+        <p><a href="https://github.com/le23967/CanvasCountdown/issues">GitHub Issues</a><br>
+          Best for bugs — say what you expected and what happened.</p>
+      </div>
+      <div class="card">
+        <span class="ic">💻</span><h3>Source code</h3>
+        <p><a href="https://github.com/le23967/CanvasCountdown">github.com/le23967/CanvasCountdown</a><br>
+          Swift 6, SwiftUI, AppKit and SwiftData.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fl">
+      <a href="https://github.com/le23967/CanvasCountdown">GitHub</a>
+      <a href="https://github.com/le23967/CanvasCountdown/releases">Releases</a>
+      <a href="https://github.com/le23967/CanvasCountdown/blob/main/LICENSE">Licence</a>
+      <a href="mailto:operating333@gmail.com">operating333@gmail.com</a>
+    </div>
+    <p><b>Copyright © 2026 le23967.</b> Released under the MIT Licence. You may use, change and
+      redistribute this software, including in your own work, provided the copyright notice and the
+      licence text stay with it. Removing the attribution, or presenting the work as someone else's,
+      is what the licence does not permit.</p>
+    <p>Canvas is a product of Instructure, Inc. This project is not affiliated with, endorsed by or
+      sponsored by Instructure. Coursework shown in the screenshots is invented.</p>
+  </div>
+</footer>
+
+<script>
+// The download button follows whatever the newest release is, so publishing a
+// release is all it takes to update this page. If the API cannot be reached the
+// link already points at /releases/latest, which always resolves.
+(function () {
+  var api = 'https://api.github.com/repos/le23967/CanvasCountdown/releases/latest';
+  fetch(api, { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (rel) {
+      var dmg = (rel.assets || []).filter(function (a) {
+        return /\.dmg$/i.test(a.name);
+      })[0];
+      var btn = document.getElementById('download');
+      var version = (rel.tag_name || '').replace(/^v/, '');
+      if (dmg) {
+        btn.href = dmg.browser_download_url;
+        btn.textContent = version
+          ? 'Download ' + version + ' for macOS'
+          : 'Download for macOS';
+      }
+      var bits = ['Free and open source', 'macOS 14 or later', 'Apple silicon and Intel'];
+      if (dmg) {
+        bits.push((dmg.size / 1048576).toFixed(1) + ' MB');
+      }
+      if (rel.published_at) {
+        bits.push('updated ' + new Date(rel.published_at).toLocaleDateString(undefined, {
+          year: 'numeric', month: 'short', day: 'numeric'
+        }));
+      }
+      document.getElementById('relmeta').textContent = bits.join(' · ');
+    })
+    .catch(function () { /* keep the static fallback link and text */ });
+}());
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://le23967.github.io/CanvasCountdown/sitemap.xml
