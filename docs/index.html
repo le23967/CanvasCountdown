@@ -132,19 +132,18 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .tile{--top:#3D7AD1;--bot:#21448C;--num:#FFFFFF;--lbl:#EAF1FF;
   width:88px;height:88px;border-radius:20px;border:0;padding:0;
   background:linear-gradient(180deg,var(--top),var(--bot));
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   box-shadow:0 14px 30px rgba(0,0,0,.42);
   transition:background .45s ease,transform .42s cubic-bezier(.2,.9,.3,1.5)}
 .tile.pop{transform:scale(1.13)}
-.tile .lbl{font-size:10.5px;letter-spacing:.16em;font-weight:800;color:var(--lbl);transition:color .45s}
-.tile .num{font-size:40px;font-weight:800;line-height:1;margin-top:2px;color:var(--num);
+.tile .lbl{font-size:10.5px;line-height:1;letter-spacing:.16em;font-weight:800;
+  color:var(--lbl);transition:color .45s}
+.tile .num{font-size:40px;font-weight:800;line-height:1;color:var(--num);
   font-variant-numeric:tabular-nums;transition:color .45s}
-.tile .num.tick{animation:tick .34s ease}
+.tile .num.tick{animation:tick .3s cubic-bezier(.25,.8,.3,1)}
 @keyframes tick{
-  0%{transform:translateY(0);opacity:1}
-  40%{transform:translateY(-9px);opacity:0}
-  60%{transform:translateY(9px);opacity:0}
-  100%{transform:translateY(0);opacity:1}
+  0%{opacity:.15;transform:scale(.82)}
+  100%{opacity:1;transform:scale(1)}
 }
 .tile.zero{animation:heartbeat 1.1s ease-in-out infinite}
 @keyframes heartbeat{0%,100%{transform:scale(1)}45%{transform:scale(1.07)}}
@@ -171,11 +170,11 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .rail .pad{flex:0 0 calc(50% - 33px)}
 .face{flex:0 0 66px;height:66px;border-radius:16px;scroll-snap-align:center;border:0;padding:0;
   cursor:pointer;position:relative;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
+  align-items:center;justify-content:center;gap:2px;
   transition:transform .3s cubic-bezier(.2,.8,.3,1.2),opacity .3s ease,box-shadow .3s ease;
   transform:scale(.74);opacity:.45}
-.face .fl{font-size:7px;letter-spacing:.12em;font-weight:800}
-.face .fn{font-size:22px;font-weight:800;line-height:1;margin-top:1px;font-variant-numeric:tabular-nums}
+.face .fl{font-size:7px;line-height:1;letter-spacing:.12em;font-weight:800}
+.face .fn{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .face[aria-selected="true"]{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
 .face.near{transform:scale(.86);opacity:.72}
 .ticks{display:flex;justify-content:center;gap:0;margin-top:2px;height:16px}
@@ -675,14 +674,16 @@ footer b{color:var(--fg-soft)}
 
   function setDays(n, animate) {
     days = Math.max(0, Math.min(99, n));
+    num.textContent = days;
     if (animate && !reduce) {
       num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick');
-      setTimeout(function () { num.textContent = days; }, 150);
-    } else {
-      num.textContent = days;
     }
     stepLabel.textContent = days === 0 ? 'Due today' : days === 1 ? '1 day left' : days + ' days left';
     tile.classList.toggle('zero', days === 0);
+    faces.forEach(function (f) {
+      var n = f.querySelector('.fn');
+      if (n) { n.textContent = days; }
+    });
   }
 
   // Build the rail between its two spacers so the first and last can centre.
@@ -696,7 +697,7 @@ footer b{color:var(--fg-soft)}
     b.title = t.name;
     b.style.background = 'linear-gradient(180deg,' + t.top + ',' + t.bot + ')';
     b.innerHTML = '<span class="fl" style="color:' + t.lbl + '">DAYS</span>' +
-                  '<span class="fn" style="color:' + t.num + '">' + (i + 3) + '</span>';
+                  '<span class="fn" style="color:' + t.num + '">' + START + '</span>';
     b.addEventListener('click', function () { centre(i); });
     rail.insertBefore(b, rail.lastElementChild);
     faces.push(b);
