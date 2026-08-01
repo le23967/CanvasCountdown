@@ -16,7 +16,7 @@
 <meta property="og:description" content="A native macOS app that reads your Canvas calendar feed and draws the days left until your next assignment straight onto the Dock icon. Free and open source.">
 <meta property="og:url" content="https://le23967.github.io/CanvasCountdown/">
 <meta property="og:image" content="https://le23967.github.io/CanvasCountdown/img/upcoming.png">
-<meta property="og:image:alt" content="Canvas Countdown showing a list of upcoming assignments with the days remaining beside each one">
+<meta property="og:image:alt" content="Canvas Countdown showing upcoming assignments with the days remaining beside each one">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Canvas Countdown — Canvas LMS deadlines in your Mac's Dock">
 <meta name="twitter:description" content="A native macOS app that puts the days left until your next Canvas assignment on your Dock icon.">
@@ -35,11 +35,7 @@
   "license": "https://github.com/le23967/CanvasCountdown/blob/main/LICENSE",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "author": {
-    "@type": "Person",
-    "name": "le23967",
-    "url": "https://github.com/le23967"
-  },
+  "author": { "@type": "Person", "name": "le23967", "url": "https://github.com/le23967" },
   "description": "A native macOS deadline manager for Canvas LMS. It reads your Canvas calendar feed and draws the number of days until your nearest assignment as a large countdown on the Dock icon.",
   "screenshot": "https://le23967.github.io/CanvasCountdown/img/upcoming.png"
 }
@@ -47,490 +43,455 @@
 
 <style>
 :root{
-  --bg:#ffffff; --bg-alt:#f5f6f8; --fg:#12141a; --fg-soft:#5b6170;
-  --line:#e3e5ea; --accent:#2563eb; --accent-soft:#eaf0fe;
-  --card:#ffffff; --shadow:0 18px 50px rgba(15,23,42,.13);
-  --radius:14px; --max:1080px;
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0d0f14; --bg-alt:#14171f; --fg:#f2f4f8; --fg-soft:#a2a9b8;
-    --line:#262b36; --accent:#6f9bff; --accent-soft:#182338;
-    --card:#161a22; --shadow:0 18px 50px rgba(0,0,0,.5);
-  }
+  --ink:#f5f6f8; --ink-soft:#a0a6b4; --ink-dim:#6d7484;
+  --paper:#ffffff; --paper-ink:#0e1116; --paper-soft:#5b6170;
+  --line-dark:#23262f; --line-light:#e4e6eb;
+  --accent:#2f7bff; --accent-soft:#dce9ff;
+  --max:1120px; --gut:clamp(20px,5vw,48px);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{
-  margin:0; background:var(--bg); color:var(--fg);
-  font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
+  margin:0;background:#000;color:var(--ink);
+  font:17px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
 }
-img{max-width:100%;height:auto;display:block}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+img,video{max-width:100%;height:auto;display:block}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
 
-/* header */
-header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
-  backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--line)}
-.nav{display:flex;align-items:center;gap:14px;height:58px}
-.nav img{width:26px;height:26px;border-radius:6px}
-.nav strong{font-size:15px;letter-spacing:-.01em}
-.nav .spacer{flex:1}
-.nav a{color:var(--fg-soft);font-size:14px}
-.nav a:hover{color:var(--fg);text-decoration:none}
-@media(max-width:620px){.nav .hide-sm{display:none}}
+/* chapters ------------------------------------------------------------- */
+.dark{background:#000;color:var(--ink)}
+.deep{background:#0a0c10;color:var(--ink)}
+.light{background:var(--paper);color:var(--paper-ink)}
+section{padding:clamp(80px,13vh,150px) 0;scroll-margin-top:56px;overflow:hidden}
+.light .muted{color:var(--paper-soft)}
+.dark .muted,.deep .muted{color:var(--ink-soft)}
 
-/* hero */
-.hero{padding:72px 0 56px;text-align:center;background:
-  radial-gradient(700px 320px at 50% -40px,var(--accent-soft),transparent 70%)}
-.hero img.icon{width:104px;height:104px;margin:0 auto 22px;border-radius:23px;box-shadow:var(--shadow)}
-h1{font-size:clamp(2.1rem,5.2vw,3.3rem);line-height:1.08;letter-spacing:-.03em;margin:0 0 16px;font-weight:700}
-.tagline{font-size:clamp(1.02rem,2.3vw,1.22rem);color:var(--fg-soft);max-width:640px;margin:0 auto 30px}
-.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center}
-.btn{display:inline-block;padding:13px 26px;border-radius:11px;font-weight:600;font-size:15px;
-  border:1px solid transparent;transition:transform .12s ease,box-shadow .12s ease}
-.btn:hover{text-decoration:none;transform:translateY(-1px)}
-.btn-primary{background:var(--accent);color:#fff;box-shadow:0 8px 22px rgba(37,99,235,.32)}
-.btn-secondary{background:var(--card);color:var(--fg);border-color:var(--line)}
-.meta{margin-top:14px;font-size:13.5px;color:var(--fg-soft)}
-.meta code{font-size:12.5px;background:var(--bg-alt);padding:2px 6px;border-radius:5px}
+h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.035em;line-height:1.04}
+h1{font-size:clamp(2.6rem,7.4vw,5.2rem)}
+h2{font-size:clamp(2rem,4.6vw,3.4rem);margin-bottom:18px}
+h3{font-size:clamp(1.25rem,2.1vw,1.6rem);letter-spacing:-.02em;margin-bottom:10px}
+.kicker{font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+  font-weight:700;color:var(--accent);margin-bottom:18px}
+.lede{font-size:clamp(1.06rem,1.9vw,1.35rem);line-height:1.5;max-width:56ch;color:var(--ink-soft)}
+.light .lede{color:var(--paper-soft)}
+.center{text-align:center}
+.center .lede{margin-left:auto;margin-right:auto}
 
-/* interactive dock */
-.dockstrip{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:40px auto 0;
-  padding:12px 16px;background:var(--bg-alt);border:1px solid var(--line);
-  border-radius:20px;width:max-content;max-width:100%}
-.dockstrip .dot{width:44px;height:44px;border-radius:11px;background:linear-gradient(180deg,#cfd4de,#aeb5c4);opacity:.55}
-@media(prefers-color-scheme:dark){.dockstrip .dot{background:linear-gradient(180deg,#39404f,#272d38)}}
-.tile{--top:#3D7AD1;--bottom:#21448C;--num:#FFFFFF;--lbl:#EAF1FF;
-  width:78px;height:78px;border-radius:18px;
-  background:linear-gradient(180deg,var(--top),var(--bottom));
+/* nav ------------------------------------------------------------------ */
+header{position:sticky;top:0;z-index:50;background:rgba(0,0,0,.72);
+  backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line-dark)}
+.nav{display:flex;align-items:center;gap:16px;height:52px}
+.nav img{width:24px;height:24px;border-radius:6px}
+.nav b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.nav .sp{flex:1}
+.nav a.lnk{font-size:13.5px;color:var(--ink-soft)}
+.nav a.lnk:hover{color:var(--ink)}
+@media(max-width:680px){.nav .sm{display:none}}
+
+/* hero ----------------------------------------------------------------- */
+.hero{padding:clamp(64px,11vh,120px) 0 clamp(56px,9vh,110px);text-align:center;position:relative}
+.hero::before{content:"";position:absolute;inset:-30% 0 auto;height:70%;pointer-events:none;
+  background:radial-gradient(60% 60% at 50% 40%,rgba(47,123,255,.20),transparent 70%)}
+.hero .wrap{position:relative}
+.hero h1{margin-bottom:22px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+.btn{display:inline-block;padding:14px 30px;border-radius:999px;font-weight:600;font-size:15.5px;
+  transition:transform .18s cubic-bezier(.2,.9,.3,1.2),opacity .18s}
+.btn:hover{transform:translateY(-2px)}
+.btn-p{background:var(--accent);color:#fff}
+.btn-s{border:1px solid #333846;color:var(--ink)}
+.meta{margin-top:16px;font-size:13.5px;color:var(--ink-dim)}
+
+/* the dock playground -------------------------------------------------- */
+.stage{margin-top:clamp(44px,7vh,80px)}
+.dockbar{display:flex;align-items:flex-end;justify-content:center;gap:12px;
+  padding:14px 20px;border-radius:24px;width:max-content;max-width:100%;margin:0 auto;
+  background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);
+  backdrop-filter:blur(10px)}
+.dot{width:46px;height:46px;border-radius:12px;flex:0 0 auto;
+  background:linear-gradient(180deg,#2c313c,#20242d)}
+.tile{--top:#3D7AD1;--bot:#21448C;--num:#FFFFFF;--lbl:#EAF1FF;
+  width:88px;height:88px;border-radius:20px;flex:0 0 auto;border:0;padding:0;
+  background:linear-gradient(180deg,var(--top),var(--bot));
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  box-shadow:0 10px 24px rgba(0,0,0,.28);flex:0 0 auto;cursor:pointer;border:0;padding:0;
-  transition:transform .28s cubic-bezier(.2,.9,.3,1.3),box-shadow .28s ease,background .45s ease}
-.tile:hover,.tile:focus-visible{transform:translateY(-9px) scale(1.06);box-shadow:0 18px 34px rgba(0,0,0,.34)}
-.tile:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
-.tile .lbl{font-size:10px;letter-spacing:.15em;font-weight:800;color:var(--lbl);transition:color .45s ease}
-.tile .num{font-size:36px;font-weight:800;line-height:1;margin-top:1px;color:var(--num);
-  font-variant-numeric:tabular-nums;transition:color .45s ease}
-.tile .num.roll{animation:roll .42s ease}
-@keyframes roll{
-  0%{transform:translateY(0);opacity:1}
-  45%{transform:translateY(-13px);opacity:0}
-  55%{transform:translateY(13px);opacity:0}
-  100%{transform:translateY(0);opacity:1}
-}
-@media(prefers-reduced-motion:reduce){
-  .tile,.tile .num,.tile .lbl{transition:none}
-  .tile .num.roll{animation:none}
-  .tile:hover,.tile:focus-visible{transform:none}
-}
-.dockcap{text-align:center;color:var(--fg-soft);font-size:13.5px;margin-top:14px}
-.themes{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:18px}
-.sw{width:38px;height:38px;border-radius:11px;border:2px solid var(--line);cursor:pointer;padding:0;
-  position:relative;transition:transform .14s ease,border-color .14s ease}
-.sw:hover{transform:translateY(-2px)}
-.sw[aria-pressed="true"]{border-color:var(--accent);transform:translateY(-2px)}
-.picker{display:flex;gap:18px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:16px;
-  font-size:13px;color:var(--fg-soft)}
-.picker label{display:flex;align-items:center;gap:7px}
-.picker input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:7px;
-  background:none;cursor:pointer;padding:1px}
-.picker .reset{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0}
-.picker .reset:hover{text-decoration:underline}
+  box-shadow:0 14px 30px rgba(0,0,0,.5);
+  transition:background .5s ease,transform .3s cubic-bezier(.2,.9,.3,1.3)}
+.tile .lbl{font-size:10.5px;letter-spacing:.16em;font-weight:800;color:var(--lbl);transition:color .5s}
+.tile .num{font-size:40px;font-weight:800;line-height:1;margin-top:2px;color:var(--num);
+  font-variant-numeric:tabular-nums;transition:color .5s}
+.tile.urgent{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
 
-/* sections */
-/* the header is sticky, so an anchored jump must clear it */
-section{padding:64px 0;border-top:1px solid var(--line);scroll-margin-top:60px}
-section.alt{background:var(--bg-alt)}
-h2{font-size:clamp(1.5rem,3.2vw,2.05rem);letter-spacing:-.02em;margin:0 0 12px;font-weight:700}
-h3{font-size:1.12rem;margin:0 0 7px;letter-spacing:-.01em}
-.lead{color:var(--fg-soft);max-width:660px;margin:0 0 36px}
+.themetag{margin-top:16px;font-size:13.5px;color:var(--ink-dim);min-height:1.4em}
+.themetag b{color:var(--ink-soft);font-weight:600}
+.controls{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:20px}
+.step{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px}
+.step button{width:32px;height:32px;border-radius:999px;border:0;background:none;color:var(--ink);
+  font-size:18px;cursor:pointer;line-height:1}
+.step button:hover{background:rgba(255,255,255,.1)}
+.step span{min-width:88px;text-align:center;font-size:13.5px;color:var(--ink-soft)}
+.ghost{padding:9px 20px;border-radius:999px;font-size:13.5px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.16);background:none;color:var(--ink)}
+.ghost:hover{background:rgba(255,255,255,.07)}
+.hint{margin-top:14px;font-size:12.8px;color:var(--ink-dim)}
 
-.shot{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
-  box-shadow:var(--shadow);background:var(--card)}
-.shot figcaption{padding:11px 15px;font-size:13.5px;color:var(--fg-soft);border-top:1px solid var(--line)}
+/* media ---------------------------------------------------------------- */
+.frame{border-radius:16px;overflow:hidden;background:#0d1015;
+  border:1px solid var(--line-dark);box-shadow:0 30px 80px rgba(0,0,0,.55)}
+.light .frame{background:#fff;border-color:var(--line-light);box-shadow:0 30px 70px rgba(15,23,42,.14)}
 figure{margin:0}
+figcaption{margin-top:14px;font-size:13.5px;color:var(--ink-dim);text-align:center}
+.light figcaption{color:var(--paper-soft)}
 
-.row{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;margin-bottom:56px}
-.row:last-child{margin-bottom:0}
-.row.flip .txt{order:2}
-@media(max-width:820px){.row{grid-template-columns:1fr;gap:22px}.row.flip .txt{order:0}}
-.row p{color:var(--fg-soft);margin:0 0 10px}
+.split{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(28px,5vw,64px);align-items:center}
+.split+.split{margin-top:clamp(56px,9vh,110px)}
+.split.rev .txt{order:2}
+@media(max-width:860px){.split{grid-template-columns:1fr}.split.rev .txt{order:0}}
+.split p{margin:0 0 12px}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
-.card p{color:var(--fg-soft);font-size:14.5px;margin:0}
-.card .ic{font-size:20px;margin-bottom:10px;display:block}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:40px}
+.card{border:1px solid var(--line-dark);border-radius:16px;padding:24px;background:#0d1015}
+.light .card{border-color:var(--line-light);background:#fafbfc}
+.card p{margin:0;font-size:14.5px}
+.card .g{font-size:22px;display:block;margin-bottom:12px}
 
-ul.plain{list-style:none;padding:0;margin:0}
-ul.plain li{padding:11px 0;border-bottom:1px solid var(--line);color:var(--fg-soft);font-size:15px}
-ul.plain li:last-child{border-bottom:0}
-ul.plain b{color:var(--fg);font-weight:600}
+/* comparison ----------------------------------------------------------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--line-light);border-radius:16px;margin-top:36px}
+table{border-collapse:collapse;width:100%;min-width:780px;font-size:14.5px}
+th,td{padding:15px 16px;text-align:left;border-bottom:1px solid var(--line-light);vertical-align:top}
+thead th{background:#fafbfc;font-size:13.5px;white-space:nowrap;border-bottom:2px solid var(--line-light)}
+tbody th{width:26%;font-weight:600}
+tr:last-child th,tr:last-child td{border-bottom:0}
+td{color:var(--paper-soft)}
+td small{display:block;font-size:12.4px;margin-top:3px;line-height:1.42;color:#7c8493}
+td.y{color:#0f7a41;font-weight:650}
+td.n{color:#a3323a;font-weight:650}
+td.p{color:#8a5d05;font-weight:650}
+.appname{display:flex;align-items:center;gap:8px}
+.mk{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#fff;flex:0 0 auto;overflow:hidden}
+.mk img{width:100%;height:100%}
+.mk.a{background:#5d6b85}.mk.b{background:#8a6a72}.mk.c{background:#6e737d}
+.fine{margin-top:18px;font-size:12.8px;color:var(--paper-soft);max-width:88ch}
 
-.steps{counter-reset:s;list-style:none;padding:0;margin:0}
-.steps li{counter-increment:s;position:relative;padding:0 0 20px 44px;color:var(--fg-soft)}
-.steps li::before{content:counter(s);position:absolute;left:0;top:-1px;width:28px;height:28px;
-  border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:14px;
+/* misc ----------------------------------------------------------------- */
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:34px 0 0}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 22px 46px;color:var(--ink-soft)}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:-2px;width:30px;height:30px;
+  border-radius:999px;background:rgba(47,123,255,.16);color:#8ab4ff;font-weight:700;font-size:14px;
   display:flex;align-items:center;justify-content:center}
-.steps b{color:var(--fg)}
+ol.steps b{color:var(--ink)}
+ul.plain{list-style:none;padding:0;margin:34px 0 0}
+ul.plain li{padding:15px 0;border-bottom:1px solid var(--line-dark);color:var(--ink-soft)}
+ul.plain li:last-child{border-bottom:0}
+ul.plain b{color:var(--ink)}
+.note{margin-top:30px;padding:18px 20px;border-radius:14px;font-size:14.5px;
+  background:rgba(47,123,255,.1);border:1px solid rgba(47,123,255,.24)}
 
-.note{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);
-  border-radius:var(--radius);padding:17px 19px;font-size:14.5px;color:var(--fg)}
+footer{background:#000;border-top:1px solid var(--line-dark);padding:52px 0 66px;
+  color:var(--ink-dim);font-size:13.8px}
+footer .fl{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+footer a{color:var(--ink-soft)}
+footer a:hover{color:var(--ink)}
+footer p{margin:0 0 10px;max-width:78ch}
+footer b{color:var(--ink-soft)}
 
-/* comparison */
-.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);
-  border-radius:var(--radius);background:var(--card)}
-table.cmp{border-collapse:collapse;width:100%;min-width:720px;font-size:14.5px}
-table.cmp th,table.cmp td{padding:14px 15px;text-align:left;border-bottom:1px solid var(--line);
-  vertical-align:top}
-table.cmp thead th{position:sticky;top:0;background:var(--card);border-bottom:2px solid var(--line);
-  font-size:14px;white-space:nowrap;z-index:1}
-table.cmp tbody th{font-weight:600;color:var(--fg);width:31%}
-table.cmp tr:last-child th,table.cmp tr:last-child td{border-bottom:0}
-table.cmp td{color:var(--fg-soft)}
-table.cmp td small{display:block;font-size:12.4px;opacity:.82;margin-top:2px;line-height:1.4}
-table.cmp td.y{color:#137a44;font-weight:600}
-table.cmp td.n{color:#a8353a;font-weight:600}
-table.cmp td.p{color:#9a6708;font-weight:600}
-table.cmp td.dash{color:var(--fg-soft);opacity:.6}
-@media(prefers-color-scheme:dark){
-  table.cmp td.y{color:#4ec98a}table.cmp td.n{color:#ff8a90}table.cmp td.p{color:#e8b055}
+/* scroll reveal -------------------------------------------------------- */
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .75s cubic-bezier(.22,.7,.3,1),transform .75s cubic-bezier(.22,.7,.3,1)}
+.rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .tile,.tile .num,.tile .lbl,.btn{transition:none}
+  .tile.urgent{animation:none}
 }
-table.cmp td.y small,table.cmp td.n small,table.cmp td.p small{color:var(--fg-soft);font-weight:400}
-.app{display:flex;align-items:center;gap:8px}
-.mark{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:800;color:#fff;flex:0 0 auto;overflow:hidden}
-.mark img{width:100%;height:100%}
-.mark.cc{background:none}
-.mark.m-tick{background:#5a6b86}
-.mark.m-days{background:#8a6a72;font-size:12px}
-.mark.m-cal{background:#6e737d;font-size:12px}
-.foot{margin-top:16px;font-size:13px;color:var(--fg-soft);max-width:820px}
-
-.contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:18px}
-.contact .card a{font-weight:600;word-break:break-all}
-
-footer{padding:40px 0 56px;border-top:1px solid var(--line);color:var(--fg-soft);font-size:14px}
-footer .fl{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-footer p{margin:0 0 8px;max-width:720px}
 </style>
 </head>
 <body>
 
 <header>
   <div class="wrap nav">
-    <img src="img/icon.png" alt="">
-    <strong>Canvas Countdown</strong>
-    <span class="spacer"></span>
-    <a href="#features" class="hide-sm">Features</a>
-    <a href="#compare" class="hide-sm">Compare</a>
-    <a href="#install" class="hide-sm">Install</a>
-    <a href="#privacy" class="hide-sm">Privacy</a>
-    <a href="#contact">Contact</a>
-    <a href="https://github.com/le23967/CanvasCountdown">GitHub</a>
+    <img src="img/icon.png" alt=""><b>Canvas Countdown</b>
+    <span class="sp"></span>
+    <a class="lnk sm" href="#watch">Watch</a>
+    <a class="lnk sm" href="#compare">Compare</a>
+    <a class="lnk sm" href="#install">Install</a>
+    <a class="lnk sm" href="#privacy">Privacy</a>
+    <a class="lnk" href="#contact">Contact</a>
+    <a class="lnk" href="https://github.com/le23967/CanvasCountdown">GitHub</a>
   </div>
 </header>
 
-<div class="hero">
+<!-- hero -->
+<div class="dark hero">
   <div class="wrap">
-    <img class="icon" src="img/icon.png" alt="Canvas Countdown app icon">
-    <h1>Your next deadline, on your Dock.</h1>
-    <p class="tagline">Canvas Countdown reads your Canvas LMS calendar feed and draws the number of
-      days until your nearest assignment straight onto the Dock icon — so you know where you stand
-      without opening anything.</p>
+    <p class="kicker rv">For macOS</p>
+    <h1 class="rv">Your next deadline,<br>on your Dock.</h1>
+    <p class="lede center rv" style="margin-top:20px">Canvas Countdown reads the calendar feed your
+      university already publishes and draws the days remaining onto the Dock icon — so you know
+      where you stand without opening anything.</p>
 
-    <div class="cta">
-      <a class="btn btn-primary" id="download" href="https://github.com/le23967/CanvasCountdown/releases/latest">Download for macOS</a>
-      <a class="btn btn-secondary" href="https://github.com/le23967/CanvasCountdown">View source</a>
+    <div class="cta rv">
+      <a class="btn btn-p" id="download" href="https://github.com/le23967/CanvasCountdown/releases/latest">Download for macOS</a>
+      <a class="btn btn-s" href="https://github.com/le23967/CanvasCountdown">View source</a>
     </div>
-    <p class="meta" id="relmeta">Free and open source · macOS 14 or later · Apple silicon and Intel</p>
+    <p class="meta rv" id="relmeta">Free and open source · macOS 14 or later · Apple silicon and Intel</p>
 
-    <div class="dockstrip">
-      <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
-      <button class="tile" id="tile" aria-label="Dock icon preview. Point at it or press Enter to change the theme and the number.">
-        <span class="lbl" id="tileLabel">DAYS</span>
-        <span class="num" id="tileNum">6</span>
-      </button>
-      <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+    <div class="stage rv" id="stage">
+      <div class="dockbar">
+        <span class="dot"></span><span class="dot"></span>
+        <div class="tile" id="tile"><span class="lbl">DAYS</span><span class="num" id="num">14</span></div>
+        <span class="dot"></span><span class="dot"></span>
+      </div>
+      <p class="themetag" id="tag">Theme: <b>Default Blue</b></p>
+
+      <div class="controls">
+        <div class="step">
+          <button type="button" id="minus" aria-label="Fewer days">−</button>
+          <span id="stepLabel">14 days left</span>
+          <button type="button" id="plus" aria-label="More days">+</button>
+        </div>
+        <button class="ghost" type="button" id="run">Count down to zero</button>
+      </div>
+      <p class="hint">Move across this area — the Dock theme follows your pointer. The four themes
+        are the app's own.</p>
     </div>
-    <p class="dockcap">Point at the icon — the colours and the number change.
-      <span id="themeName">Default Blue</span>.</p>
-
-    <div class="themes" id="themes" role="group" aria-label="Dock themes"></div>
-
-    <div class="picker">
-      <label>Top <input type="color" id="cTop" value="#3D7AD1" aria-label="Background top colour"></label>
-      <label>Bottom <input type="color" id="cBottom" value="#21448C" aria-label="Background bottom colour"></label>
-      <label>Number <input type="color" id="cNum" value="#FFFFFF" aria-label="Number colour"></label>
-      <button class="reset" id="reset" type="button">Reset</button>
-    </div>
-    <p class="dockcap">These are the app's own Dock themes — you can also mix your own in Settings
-      and save it.</p>
   </div>
 </div>
 
-<section id="features">
+<!-- the clip -->
+<section class="deep" id="watch">
   <div class="wrap">
-    <h2>What it does</h2>
-    <p class="lead">Everything below is a real screenshot of the app running. The coursework shown
-      is made up for the pictures.</p>
+    <p class="kicker rv">Watch</p>
+    <h2 class="rv">Describe a semester. Correct it in a sentence.</h2>
+    <p class="lede rv">Type what you have to do. The optional assistant turns it into drafts you
+      review before anything is written — and if it gets one wrong, you say so rather than starting
+      again. Nothing is saved until you confirm, and the confirmation counts what it is about to add.</p>
 
-    <div class="row">
-      <div class="txt">
-        <h3>Every deadline, sorted by how long you have</h3>
-        <p>Assignments arrive from your Canvas calendar feed and are listed with the days remaining
-          beside each one. The nearest one is pinned to the top so the answer to “what is next?” is
-          the first thing on screen.</p>
-        <p>Canvas deadlines that arrive as 00:00 are shown as <b>11:59&nbsp;PM</b>, because that is
-          what they actually mean. Only the clock is corrected — the day and the countdown never
-          move, and switching the setting off restores the original times.</p>
+    <figure class="rv" style="margin-top:44px">
+      <div class="frame">
+        <video id="clip" muted loop playsinline preload="none"
+               poster="img/assistant-poster.png"
+               aria-label="Drafting tasks from a sentence, correcting them with a follow-up, confirming, then undoing">
+          <source src="vid/assistant.mp4" type="video/mp4">
+        </video>
       </div>
-      <figure class="shot">
-        <img src="img/upcoming.png" alt="The Upcoming list, showing the next deadline in a large card and each assignment with the number of days left" loading="lazy" width="1600" height="1067">
-        <figcaption>Upcoming — the nearest deadline first, days left beside every row.</figcaption>
-      </figure>
+      <figcaption>Recorded from the app. The coursework is invented for the demo.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- what it does -->
+<section class="light">
+  <div class="wrap">
+    <p class="kicker rv">What it does</p>
+    <h2 class="rv">Everything due, in the order it is due.</h2>
+
+    <div class="split rv" style="margin-top:52px">
+      <div class="txt">
+        <h3>Sorted by how long you have</h3>
+        <p class="muted">Assignments arrive from your Canvas feed and are listed with the days
+          remaining beside each one, nearest first.</p>
+        <p class="muted">Deadlines that arrive as 00:00 are shown as <b>11:59&nbsp;PM</b>, because
+          that is what they mean. Only the clock is corrected — the day and the countdown never
+          move, and turning the setting off restores the original times.</p>
+      </div>
+      <figure><div class="frame"><img src="img/upcoming.png" alt="Upcoming assignments listed with days remaining" loading="lazy" width="1600" height="1067"></div></figure>
     </div>
 
-    <div class="row flip">
+    <div class="split rev rv">
       <div class="txt">
-        <h3>A calendar by day, week, month or year</h3>
-        <p>The same deadlines laid out as a grid, at whichever scale suits what you are planning.
-          Type a date to jump straight to it.</p>
+        <h3>A calendar at four scales</h3>
+        <p class="muted">Day, week, month and year, with today marked. Type a date to jump to it.</p>
       </div>
-      <figure class="shot">
-        <img src="img/calendar.png" alt="Month view of the calendar with assignments placed on their due dates" loading="lazy" width="1600" height="1067">
-        <figcaption>Calendar — Day, Week, Month and Year, with today marked.</figcaption>
-      </figure>
+      <figure><div class="frame"><img src="img/calendar.png" alt="Month view with assignments on their due dates" loading="lazy" width="1600" height="1067"></div></figure>
     </div>
 
-    <div class="row">
-      <div class="txt">
-        <h3>Add tasks by describing them</h3>
-        <p>Type a sentence and the optional assistant turns it into draft tasks you review before
-          anything is saved. Get one wrong and you do not start over: a follow-up like
-          <em>“put them all under COMP2050”</em> edits the drafts already on screen, and the ticks
-          and labels you set by hand are kept.</p>
-        <p>It runs against a model on your own Mac, or any service that speaks the common
-          chat-completions API — save as many as you like and switch between them.</p>
-      </div>
-      <figure class="shot">
-        <img src="img/assistant.png" alt="The assistant panel showing drafted tasks, each with a course, a label picker and a due date, ready for review" loading="lazy" width="1600" height="1067">
-        <figcaption>Drafts are reviewed and edited before they are saved. Nothing is written yet.</figcaption>
-      </figure>
-    </div>
-
-    <div class="row flip">
-      <div class="txt">
-        <h3>Nothing is added without a way back</h3>
-        <p>Saving several tasks at once asks first, and says exactly what it is about to do: how
-          many, under which course, over what dates, and how many rows are being left out.</p>
-        <p>After it happens, a panel offers <b>Undo</b> for ten seconds — and it stays in the Edit
-          menu once the panel goes, so you never have to know a keyboard shortcut to take something
-          back.</p>
-      </div>
-      <figure class="shot">
-        <img src="img/confirm.png" alt="A confirmation reading Add 8 tasks, listing the courses, the date range, and that they can be undone" loading="lazy" width="1600" height="1067">
-        <figcaption>The confirmation counts what will be added before it is written.</figcaption>
-      </figure>
-    </div>
-
-    <div class="row">
-      <div class="txt">
-        <h3>Undo, in plain sight</h3>
-        <p>A floating panel with a ten-second countdown. One click puts everything back.</p>
-      </div>
-      <figure class="shot">
-        <img src="img/undo.png" alt="A small floating panel reading 8 tasks added with a countdown and an Undo button" loading="lazy" width="1600" height="1067">
-        <figcaption>Ten seconds to change your mind, then it moves to the Edit menu.</figcaption>
-      </figure>
-    </div>
-
-    <div class="row flip">
+    <div class="split rv">
       <div class="txt">
         <h3>Search from anywhere</h3>
-        <p>A panel in the middle of the screen, the way Spotlight works. It looks through every
-          assignment you have, not only the section you happen to be looking at.</p>
+        <p class="muted">A panel in the middle of the screen, the way Spotlight works. It looks
+          through every assignment, not only the section on screen.</p>
       </div>
-      <figure class="shot">
-        <img src="img/search.png" alt="A floating search panel in the centre of the window with a matching assignment highlighted" loading="lazy" width="1600" height="1067">
-        <figcaption>Arrow keys to move, Return to open, Escape to close.</figcaption>
-      </figure>
+      <figure><div class="frame"><img src="img/search.png" alt="A floating search panel with a matching assignment highlighted" loading="lazy" width="1600" height="1067"></div></figure>
     </div>
 
-    <div class="row">
+    <div class="split rev rv">
       <div class="txt">
-        <h3>Set up once, then leave it alone</h3>
-        <p>Paste your Canvas feed URL and it refreshes on its own. Reminders fire days before, the
-          day before, or on the day. Courses the feed added by mistake can be removed for good.</p>
+        <h3>Set it up once</h3>
+        <p class="muted">Paste your Canvas feed URL and it refreshes on its own. Reminders fire at
+          the offsets you choose. Courses the feed added by mistake can be removed for good, and
+          your own colour-coded labels stay on an event between launches.</p>
       </div>
-      <figure class="shot">
-        <img src="img/settings.png" alt="Settings showing the Canvas feed field, automatic refresh interval, the 11:59 PM due-time option and notification schedule" loading="lazy" width="1600" height="1067">
-        <figcaption>The feed URL is held in the macOS Keychain, never in preferences.</figcaption>
+      <figure><div class="frame"><img src="img/settings.png" alt="Settings showing the feed field, refresh interval, due-time option and reminders" loading="lazy" width="1600" height="1067"></div></figure>
+    </div>
+  </div>
+</section>
+
+<!-- undo -->
+<section class="dark">
+  <div class="wrap center">
+    <p class="kicker rv">Reversible</p>
+    <h2 class="rv">Nothing is added without a way back.</h2>
+    <p class="lede center rv">Saving several tasks at once asks first, and says what it is about to
+      do. Afterwards a panel offers Undo for ten seconds — then it moves to the Edit menu, so you
+      never have to know a keyboard shortcut to take something back.</p>
+    <div class="cards">
+      <figure class="card rv" style="padding:0;overflow:hidden">
+        <img src="img/confirm.png" alt="A confirmation reading Add 8 tasks with the courses and date range" loading="lazy">
+      </figure>
+      <figure class="card rv" style="padding:0;overflow:hidden">
+        <img src="img/undo.png" alt="A floating panel reading 8 tasks added with a countdown and an Undo button" loading="lazy">
       </figure>
     </div>
   </div>
 </section>
 
-<section class="alt">
+<!-- comparison -->
+<section class="light" id="compare">
   <div class="wrap">
-    <h2>Also in there</h2>
-    <div class="grid">
-      <div class="card"><span class="ic">🏷️</span><h3>Your own labels</h3>
-        <p>Colour-coded marks you name yourself — Important, Reading, Society — that stay on an event
-          between launches.</p></div>
-      <div class="card"><span class="ic">📸</span><h3>Import from a screenshot</h3>
-        <p>Point it at a picture of a subject outline and it reads the dates out of it for you to
-          check.</p></div>
-      <div class="card"><span class="ic">🔔</span><h3>Reminders you choose</h3>
-        <p>Notifications at the offsets you set, not a fixed schedule someone else picked.</p></div>
-      <div class="card"><span class="ic">🎨</span><h3>Dock themes</h3>
-        <p>Change the colours and the wording on the Dock tile, and save the ones you like.</p></div>
-      <div class="card"><span class="ic">🌐</span><h3>English or 中文</h3>
-        <p>The Dock label reads DAYS or 倒数日, whichever you prefer.</p></div>
-      <div class="card"><span class="ic">✅</span><h3>515 automated tests</h3>
-        <p>Countdowns across daylight saving, feed parsing, and every screen — run on every change.</p></div>
-    </div>
-  </div>
-</section>
+    <p class="kicker rv">How it compares</p>
+    <h2 class="rv">The difference is where the deadlines come from.</h2>
+    <p class="lede rv">A countdown app will show a countdown. The question is whether you had to
+      type in fifty of them yourself, and whether they update when the unit outline changes.</p>
 
-<section id="compare">
-  <div class="wrap">
-    <h2>How it compares</h2>
-    <p class="lead">Canvas Countdown is not trying to replace a to-do app or a calendar. It does one
-      thing those are not built for: it takes the deadlines your university already publishes and
-      keeps the number of days left in front of you.</p>
-
-    <div class="tablewrap">
-      <table class="cmp">
+    <div class="tablewrap rv">
+      <table>
         <thead>
           <tr>
-            <th scope="col">&nbsp;</th>
-            <th scope="col"><span class="app"><span class="mark cc"><img src="img/icon.png" alt=""></span>Canvas&nbsp;Countdown</span></th>
-            <th scope="col"><span class="app"><span class="mark m-tick" aria-hidden="true">✓</span>TickTick</span></th>
-            <th scope="col"><span class="app"><span class="mark m-days" aria-hidden="true">7</span>Days&nbsp;Matter</span></th>
-            <th scope="col"><span class="app"><span class="mark m-cal" aria-hidden="true">▦</span>Apple&nbsp;Calendar</span></th>
+            <th>&nbsp;</th>
+            <th><span class="appname"><span class="mk"><img src="img/icon.png" alt=""></span>Canvas&nbsp;Countdown</span></th>
+            <th><span class="appname"><span class="mk a" aria-hidden="true">✓</span>TickTick</span></th>
+            <th><span class="appname"><span class="mk b" aria-hidden="true">7</span>Days&nbsp;Matter</span></th>
+            <th><span class="appname"><span class="mk c" aria-hidden="true">▦</span>Apple&nbsp;Calendar</span></th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row">Days left drawn on the Dock icon</th>
-            <td class="y">Yes<small>the whole point</small></td>
-            <td class="n">No</td>
-            <td class="n">No<small>widgets and menu bar</small></td>
+            <th>Where the deadlines come from</th>
+            <td class="y">Your Canvas feed<small>pasted once, refreshes itself</small></td>
+            <td class="p">Calendar subscription<small>a Premium feature</small></td>
+            <td class="n">Typed in by hand<small>one event at a time</small></td>
+            <td class="y">Your Canvas feed<small>free, read-only events</small></td>
+          </tr>
+          <tr>
+            <th>Days left on the Dock icon</th>
+            <td class="y">Yes<small>straight from the feed</small></td>
+            <td class="n">No<small>the badge counts tasks, not days</small></td>
+            <td class="y">Yes<small>for events you entered yourself</small></td>
             <td class="n">No<small>shows today's date</small></td>
           </tr>
           <tr>
-            <th scope="row">Subscribe to a Canvas calendar feed</th>
-            <td class="y">Yes<small>paste the URL, free</small></td>
-            <td class="p">Premium<small>calendar subscriptions are a paid feature</small></td>
-            <td class="n">No<small>events are entered by hand</small></td>
-            <td class="y">Yes<small>free</small></td>
+            <th>Turns one sentence into several tasks</th>
+            <td class="y">Yes<small>reviewed before saving</small></td>
+            <td class="y">Yes<small>cloud, third-party AI providers</small></td>
+            <td class="n">No</td>
+            <td class="p">One event<small>natural language, no splitting</small></td>
           </tr>
           <tr>
-            <th scope="row">Built around coursework</th>
-            <td class="y">Yes<small>courses, labels, 11:59&nbsp;PM</small></td>
+            <th>Can work without sending anything out</th>
+            <td class="y">Yes<small>optional local model; deadlines stay on the Mac</small></td>
+            <td class="n">No<small>cloud sync; AI goes to third parties</small></td>
+            <td class="p">Partly<small>native app, but sync is via iCity</small></td>
+            <td class="p">Partly<small>“On My Mac” calendars; the feed still needs the network</small></td>
+          </tr>
+          <tr>
+            <th>Built around coursework</th>
+            <td class="y">Yes<small>courses, labels, 11:59 PM</small></td>
             <td class="p">General to-do app</td>
             <td class="p">General countdowns</td>
             <td class="p">General calendar</td>
           </tr>
           <tr>
-            <th scope="row">Turns a sentence into tasks</th>
-            <td class="y">Yes<small>reviewed before saving</small></td>
-            <td class="y">Yes<small>AI features, cloud</small></td>
-            <td class="n">No</td>
-            <td class="n">No</td>
-          </tr>
-          <tr>
-            <th scope="row">That can run entirely on your Mac</th>
-            <td class="y">Yes<small>point it at a local model</small></td>
-            <td class="n">No<small>processed on their servers</small></td>
-            <td class="dash">—</td>
-            <td class="dash">—</td>
-          </tr>
-          <tr>
-            <th scope="row">Price</th>
+            <th>Price</th>
             <td class="y">Free<small>open source, MIT</small></td>
-            <td class="p">Freemium<small>Premium about US$35.99/year</small></td>
-            <td class="p">Freemium</td>
+            <td class="p">Freemium<small>Premium ~US$35.99/yr promo, list US$49.99</small></td>
+            <td class="p">US$0.99<small>one-time, Mac App Store</small></td>
             <td class="y">Included with macOS</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <p class="foot">Checked August 2026 against each app's own documentation and store listing.
-      TickTick added a Countdown feature in 2025 and AI features in 2026, so the comparison above is
-      about <em>where</em> the countdown lives and <em>where</em> the AI runs, not whether they exist.
-      Days Matter syncs its own events out to iCal rather than subscribing to a feed. If anything
-      here has gone out of date, <a href="mailto:operating333@gmail.com?subject=Comparison%20correction">tell
-      me and I will correct it</a>. TickTick, Days&nbsp;Matter and Apple Calendar are trademarks of
-      their respective owners; the marks above are drawn here, not their logos.</p>
+    <p class="fine">Checked August 2026 against each app's own documentation and store listing.
+      TickTick has had a Countdown feature since 2025 and AI since 2026 — the rows above are about
+      <em>where</em> the countdown lives and <em>where</em> the AI runs, not whether they exist.
+      Days Matter syncs its own events out to iCal rather than subscribing to a feed. The free
+      Days&nbsp;Matter product is the separate iPhone app, Days&nbsp;Matter&nbsp;Air. If anything
+      here has gone out of date,
+      <a href="mailto:operating333@gmail.com?subject=Comparison%20correction" style="color:var(--accent)">tell
+      me and I will correct it</a>. TickTick, Days&nbsp;Matter and Apple&nbsp;Calendar are
+      trademarks of their respective owners; the marks above are drawn here, not their logos.</p>
+
+    <p class="fine"><b>Worth knowing about the feed itself</b>, whichever app reads it: Canvas
+      publishes events and assignments but not To&nbsp;Do items, covers about 366 days ahead and 30
+      behind, and caps the file at 1,000 items. That applies to Canvas Countdown as much as to
+      anything else.</p>
   </div>
 </section>
 
-<section id="install">
+<!-- install -->
+<section class="deep" id="install">
   <div class="wrap">
-    <h2>Installing it</h2>
-    <p class="lead">The build is signed ad-hoc rather than notarized by Apple, which costs a
-      developer account. That means one extra step the very first time.</p>
-    <ol class="steps">
-      <li>Download the <b>.dmg</b> from the button above, or from the
-        <a href="https://github.com/le23967/CanvasCountdown/releases/latest">latest release</a>.</li>
+    <p class="kicker rv">Installing</p>
+    <h2 class="rv">One extra step, the first time.</h2>
+    <p class="lede rv">The build is signed ad-hoc rather than notarized by Apple, which costs a
+      developer account.</p>
+    <ol class="steps rv">
+      <li>Download the <b>.dmg</b> above, or from the
+        <a href="https://github.com/le23967/CanvasCountdown/releases/latest" style="color:#8ab4ff">latest release</a>.</li>
       <li>Open it and drag <b>Canvas Countdown</b> into <b>Applications</b>.</li>
-      <li><b>Right-click the app in Applications and choose Open</b>, then confirm. Double-clicking
-        it the normal way is blocked by Gatekeeper the first time.</li>
-      <li>If macOS still refuses, open <b>System Settings → Privacy &amp; Security</b>, find the
-        message about Canvas Countdown and choose <b>Open Anyway</b>.</li>
+      <li><b>Right-click the app and choose Open</b>, then confirm. Double-clicking is blocked by
+        Gatekeeper the first time.</li>
+      <li>If macOS still refuses, open <b>System Settings → Privacy &amp; Security</b> and choose
+        <b>Open Anyway</b>.</li>
       <li>In the app, paste your <b>Canvas calendar feed URL</b> — in Canvas, go to
-        <b>Calendar → Calendar Feed</b> and copy the address.</li>
+        <b>Calendar → Calendar Feed</b>.</li>
     </ol>
-    <p class="note">After the first launch it opens like any other app. It needs
-      <b>macOS 14 (Sonoma) or later</b>; macOS 13 and earlier cannot run it, because the app is
-      built on SwiftData and Observation, which Apple ships only from macOS 14.</p>
+    <p class="note rv">Needs <b>macOS 14 (Sonoma) or later</b>. macOS 13 and earlier cannot run it:
+      the app is built on SwiftData and Observation, which Apple ships only from macOS 14.</p>
   </div>
 </section>
 
-<section id="privacy" class="alt">
+<!-- privacy -->
+<section class="dark" id="privacy">
   <div class="wrap">
-    <h2>Where your data goes</h2>
-    <p class="lead">Nowhere, unless you send it somewhere on purpose.</p>
-    <ul class="plain">
-      <li><b>No account and no server.</b> There is nothing to sign up for. The app talks to your
-        institution's Canvas feed and to nothing else of its own.</li>
-      <li><b>No analytics and no tracking.</b> Nothing is counted, logged or phoned home.</li>
+    <p class="kicker rv">Privacy</p>
+    <h2 class="rv">Nowhere, unless you send it somewhere.</h2>
+    <ul class="plain rv">
+      <li><b>No account and no server.</b> Nothing to sign up for. It talks to your institution's
+        Canvas feed and nothing else of its own.</li>
+      <li><b>No analytics, no tracking.</b> Nothing counted, logged or phoned home.</li>
       <li><b>Your feed URL lives in the macOS Keychain</b>, never in preferences or diagnostics —
         it is a private address that shows your whole timetable.</li>
       <li><b>Your deadlines stay on your Mac</b>, in a local database inside the app's sandbox.</li>
-      <li><b>The assistant is optional and off the network by default.</b> Pointed at a model
-        running on your own Mac, nothing is uploaded at all. If you choose a cloud service instead,
-        the app says so in the panel, every time, before you ask anything.</li>
+      <li><b>The assistant is optional and local by default.</b> Pointed at a model on your own Mac,
+        nothing is uploaded. Choose a cloud service instead and the panel says so, every time,
+        before you ask anything.</li>
     </ul>
   </div>
 </section>
 
-<section id="contact">
+<!-- contact -->
+<section class="light" id="contact">
   <div class="wrap">
-    <h2>Feedback and collaboration</h2>
-    <p class="lead">Found a bug, want a feature, or interested in working together? Both go to the
-      same person.</p>
-    <div class="contact">
-      <div class="card">
-        <span class="ic">✉️</span><h3>Email</h3>
-        <p><a href="mailto:operating333@gmail.com?subject=Canvas%20Countdown">operating333@gmail.com</a><br>
-          For feedback, collaboration and anything else.</p>
-      </div>
-      <div class="card">
-        <span class="ic">🐛</span><h3>Report an issue</h3>
-        <p><a href="https://github.com/le23967/CanvasCountdown/issues">GitHub Issues</a><br>
-          Best for bugs — say what you expected and what happened.</p>
-      </div>
-      <div class="card">
-        <span class="ic">💻</span><h3>Source code</h3>
-        <p><a href="https://github.com/le23967/CanvasCountdown">github.com/le23967/CanvasCountdown</a><br>
-          Swift 6, SwiftUI, AppKit and SwiftData.</p>
-      </div>
+    <p class="kicker rv">Get in touch</p>
+    <h2 class="rv">Feedback and collaboration.</h2>
+    <p class="lede rv">Found a bug, want a feature, or interested in working together?</p>
+    <div class="cards">
+      <div class="card rv"><span class="g">✉️</span><h3>Email</h3>
+        <p class="muted"><a href="mailto:operating333@gmail.com?subject=Canvas%20Countdown" style="color:var(--accent);font-weight:600">operating333@gmail.com</a><br>
+          Feedback, collaboration, anything else.</p></div>
+      <div class="card rv"><span class="g">🐛</span><h3>Report an issue</h3>
+        <p class="muted"><a href="https://github.com/le23967/CanvasCountdown/issues" style="color:var(--accent);font-weight:600">GitHub Issues</a><br>
+          Say what you expected and what happened.</p></div>
+      <div class="card rv"><span class="g">💻</span><h3>Source code</h3>
+        <p class="muted"><a href="https://github.com/le23967/CanvasCountdown" style="color:var(--accent);font-weight:600">github.com/le23967/CanvasCountdown</a><br>
+          Swift 6, SwiftUI, AppKit, SwiftData.</p></div>
     </div>
   </div>
 </section>
@@ -548,129 +509,135 @@ footer p{margin:0 0 8px;max-width:720px}
       licence text stay with it. Removing the attribution, or presenting the work as someone else's,
       is what the licence does not permit.</p>
     <p>Canvas is a product of Instructure, Inc. This project is not affiliated with, endorsed by or
-      sponsored by Instructure. Coursework shown in the screenshots is invented.</p>
+      sponsored by Instructure. All coursework shown on this page is invented.</p>
   </div>
 </footer>
 
 <script>
-// The Dock preview. These four are the app's own built-in themes, with the same
-// hex values it ships, so what is shown here is what gets drawn on the Dock.
 (function () {
-  var THEMES = [
-    { name: 'Default Blue',         top: '#3D7AD1', bottom: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
-    { name: 'Days Matter Inspired', top: '#F5F5F7', bottom: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
-    { name: 'Dark',                 top: '#2B2B2F', bottom: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        top: '#000000', bottom: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
-  ];
-  var NUMBERS = [6, 3, 12, 1, 21, 8, 45, 2];
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  /* ---- scroll reveals ------------------------------------------------ */
+  var revealables = document.querySelectorAll('.rv');
+  if (reduce || !('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(revealables, function (el) { el.classList.add('in'); });
+  } else {
+    var seen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) { return; }
+        var sibs = Array.prototype.slice.call(e.target.parentNode.children)
+                    .filter(function (n) { return n.classList.contains('rv'); });
+        e.target.style.transitionDelay = Math.min(sibs.indexOf(e.target), 4) * 70 + 'ms';
+        e.target.classList.add('in');
+        seen.unobserve(e.target);
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.08 });
+    Array.prototype.forEach.call(revealables, function (el) { seen.observe(el); });
+  }
+
+  /* ---- the clip plays only while it is on screen ---------------------- */
+  var clip = document.getElementById('clip');
+  if (clip && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          if (clip.preload === 'none') { clip.preload = 'auto'; clip.load(); }
+          var p = clip.play();
+          if (p && p.catch) { p.catch(function () {}); }
+        } else {
+          clip.pause();
+        }
+      });
+    }, { threshold: 0.25 }).observe(clip);
+  }
+
+  /* ---- the Dock tile -------------------------------------------------- */
+  // The app's own built-in themes, with the hex values it actually draws.
+  var THEMES = [
+    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
+    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
+    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
+    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
+  ];
   var tile = document.getElementById('tile');
-  var num = document.getElementById('tileNum');
-  var label = document.getElementById('themeName');
-  var swatches = document.getElementById('themes');
-  var cTop = document.getElementById('cTop');
-  var cBottom = document.getElementById('cBottom');
-  var cNum = document.getElementById('cNum');
+  var num = document.getElementById('num');
+  var tag = document.getElementById('tag');
+  var stepLabel = document.getElementById('stepLabel');
+  var stage = document.getElementById('stage');
   if (!tile) { return; }
 
-  var themeIndex = 0;
-  var numberIndex = 0;
+  var days = 14, running = null, current = -1;
 
-  function paint(t) {
+  function paint(i) {
+    if (i === current) { return; }
+    current = i;
+    var t = THEMES[i];
     tile.style.setProperty('--top', t.top);
-    tile.style.setProperty('--bottom', t.bottom);
+    tile.style.setProperty('--bot', t.bot);
     tile.style.setProperty('--num', t.num);
     tile.style.setProperty('--lbl', t.lbl);
-    cTop.value = t.top; cBottom.value = t.bottom; cNum.value = t.num;
-    if (t.name) { label.textContent = t.name; }
-    Array.prototype.forEach.call(swatches.children, function (b, i) {
-      b.setAttribute('aria-pressed', String(i === themeIndex));
-    });
+    tag.innerHTML = 'Theme: <b>' + t.name + '</b>';
   }
 
-  function rollNumber() {
-    numberIndex = (numberIndex + 1) % NUMBERS.length;
-    num.classList.remove('roll');
-    void num.offsetWidth;             // restart the animation
-    num.classList.add('roll');
-    setTimeout(function () { num.textContent = NUMBERS[numberIndex]; }, 190);
+  function setDays(n) {
+    days = Math.max(0, Math.min(99, n));
+    num.textContent = days;
+    stepLabel.textContent = days === 0 ? 'Due today' : days === 1 ? '1 day left' : days + ' days left';
+    tile.classList.toggle('urgent', days === 0 && !reduce);
   }
 
-  // Pointing at it is the interaction; a tap or Enter does the same on touch
-  // and by keyboard.
-  function advance() {
-    themeIndex = (themeIndex + 1) % THEMES.length;
-    paint(THEMES[themeIndex]);
-    rollNumber();
-  }
-  tile.addEventListener('mouseenter', advance);
-  tile.addEventListener('click', advance);
-
-  THEMES.forEach(function (t, i) {
-    var b = document.createElement('button');
-    b.className = 'sw';
-    b.type = 'button';
-    b.title = t.name;
-    b.setAttribute('aria-label', t.name);
-    b.setAttribute('aria-pressed', String(i === 0));
-    b.style.background = 'linear-gradient(180deg,' + t.top + ',' + t.bottom + ')';
-    b.addEventListener('click', function () {
-      themeIndex = i;
-      paint(t);
-    });
-    swatches.appendChild(b);
+  // Colour follows the pointer left to right. The number does not move on its
+  // own — that is yours to set.
+  stage.addEventListener('pointermove', function (e) {
+    var r = stage.getBoundingClientRect();
+    var x = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 0.9999);
+    paint(Math.floor(x * THEMES.length));
   });
 
-  function custom() {
-    themeIndex = -1;
-    paint({
-      name: 'Your own',
-      top: cTop.value, bottom: cBottom.value, num: cNum.value,
-      lbl: cNum.value
-    });
+  document.getElementById('minus').addEventListener('click', function () { stop(); setDays(days - 1); });
+  document.getElementById('plus').addEventListener('click', function () { stop(); setDays(days + 1); });
+
+  function stop() {
+    if (running) { clearInterval(running); running = null; }
   }
-  [cTop, cBottom, cNum].forEach(function (input) {
-    input.addEventListener('input', custom);
-  });
-  document.getElementById('reset').addEventListener('click', function () {
-    themeIndex = 0;
-    paint(THEMES[0]);
+  document.getElementById('run').addEventListener('click', function () {
+    stop();
+    if (days === 0) { setDays(14); }
+    if (reduce) { setDays(0); return; }
+    running = setInterval(function () {
+      setDays(days - 1);
+      if (days === 0) { stop(); }
+    }, 140);
   });
 
-  paint(THEMES[0]);
+  paint(0);
+  setDays(14);
 }());
 
 // The download button follows whatever the newest release is, so publishing a
-// release is all it takes to update this page. If the API cannot be reached the
-// link already points at /releases/latest, which always resolves.
+// release is the whole of updating this page. Without it the link already
+// points at /releases/latest, which always resolves.
 (function () {
-  var api = 'https://api.github.com/repos/le23967/CanvasCountdown/releases/latest';
-  fetch(api, { headers: { Accept: 'application/vnd.github+json' } })
+  fetch('https://api.github.com/repos/le23967/CanvasCountdown/releases/latest',
+        { headers: { Accept: 'application/vnd.github+json' } })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function (rel) {
-      var dmg = (rel.assets || []).filter(function (a) {
-        return /\.dmg$/i.test(a.name);
-      })[0];
+      var dmg = (rel.assets || []).filter(function (a) { return /\.dmg$/i.test(a.name); })[0];
       var btn = document.getElementById('download');
       var version = (rel.tag_name || '').replace(/^v/, '');
       if (dmg) {
         btn.href = dmg.browser_download_url;
-        btn.textContent = version
-          ? 'Download ' + version + ' for macOS'
-          : 'Download for macOS';
+        btn.textContent = version ? 'Download ' + version + ' for macOS' : 'Download for macOS';
       }
       var bits = ['Free and open source', 'macOS 14 or later', 'Apple silicon and Intel'];
-      if (dmg) {
-        bits.push((dmg.size / 1048576).toFixed(1) + ' MB');
-      }
+      if (dmg) { bits.push((dmg.size / 1048576).toFixed(1) + ' MB'); }
       if (rel.published_at) {
-        bits.push('updated ' + new Date(rel.published_at).toLocaleDateString(undefined, {
-          year: 'numeric', month: 'short', day: 'numeric'
-        }));
+        bits.push('updated ' + new Date(rel.published_at).toLocaleDateString(undefined,
+                  { year: 'numeric', month: 'short', day: 'numeric' }));
       }
       document.getElementById('relmeta').textContent = bits.join(' · ');
     })
-    .catch(function () { /* keep the static fallback link and text */ });
+    .catch(function () {});
 }());
 </script>
 </body>
