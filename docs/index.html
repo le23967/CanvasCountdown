@@ -140,8 +140,8 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
   color:var(--lbl);transition:color .45s}
 .tile .num{font-size:40px;font-weight:800;line-height:1;color:var(--num);
   font-variant-numeric:tabular-nums;transition:color .45s}
-.tile .num.tick{animation:tick .3s cubic-bezier(.25,.8,.3,1)}
-@keyframes tick{
+.tile .num.bump{animation:bump .3s cubic-bezier(.25,.8,.3,1)}
+@keyframes bump{
   0%{opacity:.15;transform:scale(.82)}
   100%{opacity:1;transform:scale(1)}
 }
@@ -178,15 +178,15 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .face[aria-selected="true"]{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
 .face.near{transform:scale(.86);opacity:.72}
 .ticks{display:flex;justify-content:center;gap:0;margin-top:2px;height:16px}
-.tick{width:2px;height:7px;border-radius:2px;background:var(--chip-line);margin:0 8px;
+.pip{width:2px;height:7px;border-radius:2px;background:var(--chip-line);margin:0 8px;
   transition:height .25s ease,background .25s ease}
-.tick.on{height:14px;background:var(--accent)}
+.pip.on{height:14px;background:var(--accent)}
 .needle{position:absolute;left:50%;top:6px;width:1px;height:0;pointer-events:none}
 .facename{margin-top:6px;font-size:12.6px;color:var(--fg-dim);min-height:1.3em}
 @media(prefers-reduced-motion:reduce){
   .rail{scroll-behavior:auto}
   .face{transition:none}
-  .tick{transition:none}
+  .pip{transition:none}
 }
 
 /* the clip was dominating the page */
@@ -260,7 +260,7 @@ footer b{color:var(--fg-soft)}
   html{scroll-behavior:auto}
   .rv{opacity:1;transform:none;transition:none}
   .tile,.tile .num,.tile .lbl,.btn{transition:none}
-  .tile.zero,.tile .num.tick,.tilewrap.burst::after{animation:none}
+  .tile.zero,.tile .num.bump,.tilewrap.burst::after{animation:none}
   .tile.pop{transform:none}
 }
 </style>
@@ -676,7 +676,7 @@ footer b{color:var(--fg-soft)}
     days = Math.max(0, Math.min(99, n));
     num.textContent = days;
     if (animate && !reduce) {
-      num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick');
+      num.classList.remove('bump'); void num.offsetWidth; num.classList.add('bump');
     }
     stepLabel.textContent = days === 0 ? 'Due today' : days === 1 ? '1 day left' : days + ' days left';
     tile.classList.toggle('zero', days === 0);
@@ -703,7 +703,7 @@ footer b{color:var(--fg-soft)}
     faces.push(b);
 
     var d = document.createElement('span');
-    d.className = 'tick' + (i === 0 ? ' on' : '');
+    d.className = 'pip' + (i === 0 ? ' on' : '');
     ticks.appendChild(d);
   });
 
