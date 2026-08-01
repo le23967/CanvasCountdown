@@ -43,16 +43,32 @@
 
 <style>
 :root{
-  --ink:#f5f6f8; --ink-soft:#a0a6b4; --ink-dim:#6d7484;
-  --paper:#ffffff; --paper-ink:#0e1116; --paper-soft:#5b6170;
-  --line-dark:#23262f; --line-light:#e4e6eb;
-  --accent:#2f7bff; --accent-soft:#dce9ff;
+  /* One theme. Light by default, dark when the system asks for it — the page
+     never mixes the two, and no section inverts against its neighbour. */
+  --bg:#ffffff; --bg-elev:#f6f7f9;
+  --fg:#0d1015; --fg-soft:#5a6070; --fg-dim:#868c9a;
+  --line:#e3e5ea;
+  --accent:#1f6feb; --accent-soft:rgba(31,111,235,.10); --accent-ring:rgba(31,111,235,.32);
+  --frame:#ffffff; --shadow:0 30px 70px rgba(15,23,42,.13);
+  --chip:rgba(10,14,22,.05); --chip-line:rgba(10,14,22,.10);
   --max:1120px; --gut:clamp(20px,5vw,48px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --bg-elev:#0a0c11;
+    --fg:#f4f6f8; --fg-soft:#a1a7b5; --fg-dim:#6d7484;
+    --line:#22252e;
+    --accent:#5b9bff; --accent-soft:rgba(91,155,255,.13); --accent-ring:rgba(91,155,255,.36);
+    --frame:#0d1015; --shadow:0 30px 80px rgba(0,0,0,.6);
+    --chip:rgba(255,255,255,.06); --chip-line:rgba(255,255,255,.10);
+    color-scheme:dark;
+  }
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{
-  margin:0;background:#000;color:var(--ink);
+  margin:0;background:var(--bg);color:var(--fg);
   font:17px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
 }
@@ -60,91 +76,95 @@ img,video{max-width:100%;height:auto;display:block}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
 
-/* chapters ------------------------------------------------------------- */
-.dark{background:#000;color:var(--ink)}
-.deep{background:#0a0c10;color:var(--ink)}
-.light{background:var(--paper);color:var(--paper-ink)}
-section{padding:clamp(80px,13vh,150px) 0;scroll-margin-top:56px;overflow:hidden}
-.light .muted{color:var(--paper-soft)}
-.dark .muted,.deep .muted{color:var(--ink-soft)}
+/* Rhythm comes from a slight lift, never from inverting the theme. */
+section{padding:clamp(80px,13vh,150px) 0;scroll-margin-top:56px;overflow:hidden;background:var(--bg)}
+section.elev{background:var(--bg-elev)}
+.muted{color:var(--fg-soft)}
 
-h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.035em;line-height:1.04}
+h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.035em;line-height:1.05}
 h1{font-size:clamp(2.6rem,7.4vw,5.2rem)}
 h2{font-size:clamp(2rem,4.6vw,3.4rem);margin-bottom:18px}
 h3{font-size:clamp(1.25rem,2.1vw,1.6rem);letter-spacing:-.02em;margin-bottom:10px}
 .kicker{font-size:13px;letter-spacing:.16em;text-transform:uppercase;
   font-weight:700;color:var(--accent);margin-bottom:18px}
-.lede{font-size:clamp(1.06rem,1.9vw,1.35rem);line-height:1.5;max-width:56ch;color:var(--ink-soft)}
-.light .lede{color:var(--paper-soft)}
+.lede{font-size:clamp(1.06rem,1.9vw,1.35rem);line-height:1.5;max-width:56ch;color:var(--fg-soft)}
 .center{text-align:center}
 .center .lede{margin-left:auto;margin-right:auto}
 
-/* nav ------------------------------------------------------------------ */
-header{position:sticky;top:0;z-index:50;background:rgba(0,0,0,.72);
-  backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line-dark)}
+header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 78%,transparent);
+  backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;gap:16px;height:52px}
 .nav img{width:24px;height:24px;border-radius:6px}
 .nav b{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
 .nav .sp{flex:1}
-.nav a.lnk{font-size:13.5px;color:var(--ink-soft)}
-.nav a.lnk:hover{color:var(--ink)}
+.nav a.lnk{font-size:13.5px;color:var(--fg-soft)}
+.nav a.lnk:hover{color:var(--fg)}
 @media(max-width:680px){.nav .sm{display:none}}
 
-/* hero ----------------------------------------------------------------- */
-.hero{padding:clamp(64px,11vh,120px) 0 clamp(56px,9vh,110px);text-align:center;position:relative}
+.hero{padding:clamp(64px,11vh,120px) 0 clamp(56px,9vh,110px);text-align:center;position:relative;background:var(--bg)}
 .hero::before{content:"";position:absolute;inset:-30% 0 auto;height:70%;pointer-events:none;
-  background:radial-gradient(60% 60% at 50% 40%,rgba(47,123,255,.20),transparent 70%)}
+  background:radial-gradient(58% 58% at 50% 40%,var(--accent-soft),transparent 70%)}
 .hero .wrap{position:relative}
 .hero h1{margin-bottom:22px}
 .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:34px}
 .btn{display:inline-block;padding:14px 30px;border-radius:999px;font-weight:600;font-size:15.5px;
-  transition:transform .18s cubic-bezier(.2,.9,.3,1.2),opacity .18s}
+  transition:transform .18s cubic-bezier(.2,.9,.3,1.2)}
 .btn:hover{transform:translateY(-2px)}
 .btn-p{background:var(--accent);color:#fff}
-.btn-s{border:1px solid #333846;color:var(--ink)}
-.meta{margin-top:16px;font-size:13.5px;color:var(--ink-dim)}
+.btn-s{border:1px solid var(--line);color:var(--fg)}
+.meta{margin-top:16px;font-size:13.5px;color:var(--fg-dim)}
 
-/* the dock playground -------------------------------------------------- */
-.stage{margin-top:clamp(44px,7vh,80px)}
+/* the Dock stage ------------------------------------------------------- */
+.stage{margin-top:clamp(44px,7vh,80px);position:relative}
 .dockbar{display:flex;align-items:flex-end;justify-content:center;gap:12px;
   padding:14px 20px;border-radius:24px;width:max-content;max-width:100%;margin:0 auto;
-  background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);
-  backdrop-filter:blur(10px)}
-.dot{width:46px;height:46px;border-radius:12px;flex:0 0 auto;
-  background:linear-gradient(180deg,#2c313c,#20242d)}
+  background:var(--chip);border:1px solid var(--chip-line);backdrop-filter:blur(10px)}
+.dot{width:46px;height:46px;border-radius:12px;flex:0 0 auto;background:var(--chip-line)}
+.tilewrap{position:relative;flex:0 0 auto;display:flex}
+/* the burst: a ring that leaves the tile when the theme changes */
+.tilewrap::after{content:"";position:absolute;inset:0;border-radius:20px;pointer-events:none;
+  border:2px solid var(--ring,#3D7AD1);opacity:0;transform:scale(1)}
+.tilewrap.burst::after{animation:burst .62s cubic-bezier(.2,.75,.3,1)}
+@keyframes burst{
+  0%{opacity:.85;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.85)}
+}
 .tile{--top:#3D7AD1;--bot:#21448C;--num:#FFFFFF;--lbl:#EAF1FF;
-  width:88px;height:88px;border-radius:20px;flex:0 0 auto;border:0;padding:0;
+  width:88px;height:88px;border-radius:20px;border:0;padding:0;
   background:linear-gradient(180deg,var(--top),var(--bot));
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  box-shadow:0 14px 30px rgba(0,0,0,.5);
-  transition:background .5s ease,transform .3s cubic-bezier(.2,.9,.3,1.3)}
-.tile .lbl{font-size:10.5px;letter-spacing:.16em;font-weight:800;color:var(--lbl);transition:color .5s}
+  box-shadow:0 14px 30px rgba(0,0,0,.42);
+  transition:background .45s ease,transform .42s cubic-bezier(.2,.9,.3,1.5)}
+.tile.pop{transform:scale(1.13)}
+.tile .lbl{font-size:10.5px;letter-spacing:.16em;font-weight:800;color:var(--lbl);transition:color .45s}
 .tile .num{font-size:40px;font-weight:800;line-height:1;margin-top:2px;color:var(--num);
-  font-variant-numeric:tabular-nums;transition:color .5s}
-.tile.urgent{animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+  font-variant-numeric:tabular-nums;transition:color .45s}
+.tile .num.tick{animation:tick .34s ease}
+@keyframes tick{
+  0%{transform:translateY(0);opacity:1}
+  40%{transform:translateY(-9px);opacity:0}
+  60%{transform:translateY(9px);opacity:0}
+  100%{transform:translateY(0);opacity:1}
+}
+.tile.zero{animation:heartbeat 1.1s ease-in-out infinite}
+@keyframes heartbeat{0%,100%{transform:scale(1)}45%{transform:scale(1.07)}}
 
-.themetag{margin-top:16px;font-size:13.5px;color:var(--ink-dim);min-height:1.4em}
-.themetag b{color:var(--ink-soft);font-weight:600}
-.controls{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:20px}
-.step{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px}
-.step button{width:32px;height:32px;border-radius:999px;border:0;background:none;color:var(--ink);
+.themetag{margin-top:18px;font-size:13.5px;color:var(--fg-dim);min-height:1.4em}
+.themetag b{color:var(--fg-soft);font-weight:600}
+.controls{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:18px}
+.step{display:flex;align-items:center;gap:2px;background:var(--chip);
+  border:1px solid var(--chip-line);border-radius:999px;padding:4px}
+.step button{width:32px;height:32px;border-radius:999px;border:0;background:none;color:var(--fg);
   font-size:18px;cursor:pointer;line-height:1}
-.step button:hover{background:rgba(255,255,255,.1)}
-.step span{min-width:88px;text-align:center;font-size:13.5px;color:var(--ink-soft)}
-.ghost{padding:9px 20px;border-radius:999px;font-size:13.5px;cursor:pointer;
-  border:1px solid rgba(255,255,255,.16);background:none;color:var(--ink)}
-.ghost:hover{background:rgba(255,255,255,.07)}
-.hint{margin-top:14px;font-size:12.8px;color:var(--ink-dim)}
+.step button:hover{background:var(--chip-line)}
+.step span{min-width:92px;text-align:center;font-size:13.5px;color:var(--fg-soft)}
+.hint{margin-top:14px;font-size:12.8px;color:var(--fg-dim)}
 
 /* media ---------------------------------------------------------------- */
-.frame{border-radius:16px;overflow:hidden;background:#0d1015;
-  border:1px solid var(--line-dark);box-shadow:0 30px 80px rgba(0,0,0,.55)}
-.light .frame{background:#fff;border-color:var(--line-light);box-shadow:0 30px 70px rgba(15,23,42,.14)}
+.frame{border-radius:16px;overflow:hidden;background:var(--frame);
+  border:1px solid var(--line);box-shadow:var(--shadow)}
 figure{margin:0}
-figcaption{margin-top:14px;font-size:13.5px;color:var(--ink-dim);text-align:center}
-.light figcaption{color:var(--paper-soft)}
+figcaption{margin-top:14px;font-size:13.5px;color:var(--fg-dim);text-align:center}
 
 .split{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(28px,5vw,64px);align-items:center}
 .split+.split{margin-top:clamp(56px,9vh,110px)}
@@ -153,53 +173,54 @@ figcaption{margin-top:14px;font-size:13.5px;color:var(--ink-dim);text-align:cent
 .split p{margin:0 0 12px}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:40px}
-.card{border:1px solid var(--line-dark);border-radius:16px;padding:24px;background:#0d1015}
-.light .card{border-color:var(--line-light);background:#fafbfc}
+.card{border:1px solid var(--line);border-radius:16px;padding:24px;background:var(--frame)}
 .card p{margin:0;font-size:14.5px}
 .card .g{font-size:22px;display:block;margin-bottom:12px}
 
 /* comparison ----------------------------------------------------------- */
-.tablewrap{overflow-x:auto;border:1px solid var(--line-light);border-radius:16px;margin-top:36px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;margin-top:36px;
+  background:var(--frame)}
 table{border-collapse:collapse;width:100%;min-width:780px;font-size:14.5px}
-th,td{padding:15px 16px;text-align:left;border-bottom:1px solid var(--line-light);vertical-align:top}
-thead th{background:#fafbfc;font-size:13.5px;white-space:nowrap;border-bottom:2px solid var(--line-light)}
+th,td{padding:15px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{background:var(--bg-elev);font-size:13.5px;white-space:nowrap;border-bottom:2px solid var(--line)}
 tbody th{width:26%;font-weight:600}
 tr:last-child th,tr:last-child td{border-bottom:0}
-td{color:var(--paper-soft)}
-td small{display:block;font-size:12.4px;margin-top:3px;line-height:1.42;color:#7c8493}
+td{color:var(--fg-soft)}
+td small{display:block;font-size:12.4px;margin-top:3px;line-height:1.42;color:var(--fg-dim)}
 td.y{color:#0f7a41;font-weight:650}
 td.n{color:#a3323a;font-weight:650}
 td.p{color:#8a5d05;font-weight:650}
+@media(prefers-color-scheme:dark){
+  td.y{color:#4ec98a}td.n{color:#ff8a90}td.p{color:#e8b055}
+}
 .appname{display:flex;align-items:center;gap:8px}
 .mk{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
   font-size:12px;font-weight:800;color:#fff;flex:0 0 auto;overflow:hidden}
 .mk img{width:100%;height:100%}
 .mk.a{background:#5d6b85}.mk.b{background:#8a6a72}.mk.c{background:#6e737d}
-.fine{margin-top:18px;font-size:12.8px;color:var(--paper-soft);max-width:88ch}
+.fine{margin-top:18px;font-size:12.8px;color:var(--fg-soft);max-width:88ch}
 
-/* misc ----------------------------------------------------------------- */
 ol.steps{counter-reset:s;list-style:none;padding:0;margin:34px 0 0}
-ol.steps li{counter-increment:s;position:relative;padding:0 0 22px 46px;color:var(--ink-soft)}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 22px 46px;color:var(--fg-soft)}
 ol.steps li::before{content:counter(s);position:absolute;left:0;top:-2px;width:30px;height:30px;
-  border-radius:999px;background:rgba(47,123,255,.16);color:#8ab4ff;font-weight:700;font-size:14px;
+  border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:14px;
   display:flex;align-items:center;justify-content:center}
-ol.steps b{color:var(--ink)}
+ol.steps b{color:var(--fg)}
 ul.plain{list-style:none;padding:0;margin:34px 0 0}
-ul.plain li{padding:15px 0;border-bottom:1px solid var(--line-dark);color:var(--ink-soft)}
+ul.plain li{padding:15px 0;border-bottom:1px solid var(--line);color:var(--fg-soft)}
 ul.plain li:last-child{border-bottom:0}
-ul.plain b{color:var(--ink)}
-.note{margin-top:30px;padding:18px 20px;border-radius:14px;font-size:14.5px;
-  background:rgba(47,123,255,.1);border:1px solid rgba(47,123,255,.24)}
+ul.plain b{color:var(--fg)}
+.note{margin-top:30px;padding:18px 20px;border-radius:14px;font-size:14.5px;color:var(--fg);
+  background:var(--accent-soft);border:1px solid var(--accent-ring)}
 
-footer{background:#000;border-top:1px solid var(--line-dark);padding:52px 0 66px;
-  color:var(--ink-dim);font-size:13.8px}
+footer{background:var(--bg);border-top:1px solid var(--line);padding:52px 0 66px;
+  color:var(--fg-dim);font-size:13.8px}
 footer .fl{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px}
-footer a{color:var(--ink-soft)}
-footer a:hover{color:var(--ink)}
+footer a{color:var(--fg-soft)}
+footer a:hover{color:var(--fg)}
 footer p{margin:0 0 10px;max-width:78ch}
-footer b{color:var(--ink-soft)}
+footer b{color:var(--fg-soft)}
 
-/* scroll reveal -------------------------------------------------------- */
 .rv{opacity:0;transform:translateY(26px);
   transition:opacity .75s cubic-bezier(.22,.7,.3,1),transform .75s cubic-bezier(.22,.7,.3,1)}
 .rv.in{opacity:1;transform:none}
@@ -207,7 +228,8 @@ footer b{color:var(--ink-soft)}
   html{scroll-behavior:auto}
   .rv{opacity:1;transform:none;transition:none}
   .tile,.tile .num,.tile .lbl,.btn{transition:none}
-  .tile.urgent{animation:none}
+  .tile.zero,.tile .num.tick,.tilewrap.burst::after{animation:none}
+  .tile.pop{transform:none}
 }
 </style>
 </head>
@@ -227,7 +249,7 @@ footer b{color:var(--ink-soft)}
 </header>
 
 <!-- hero -->
-<div class="dark hero">
+<div class="hero">
   <div class="wrap">
     <p class="kicker rv">For macOS</p>
     <h1 class="rv">Your next deadline,<br>on your Dock.</h1>
@@ -244,7 +266,7 @@ footer b{color:var(--ink-soft)}
     <div class="stage rv" id="stage">
       <div class="dockbar">
         <span class="dot"></span><span class="dot"></span>
-        <div class="tile" id="tile"><span class="lbl">DAYS</span><span class="num" id="num">14</span></div>
+        <div class="tilewrap" id="tilewrap"><div class="tile" id="tile"><span class="lbl">DAYS</span><span class="num" id="num">14</span></div></div>
         <span class="dot"></span><span class="dot"></span>
       </div>
       <p class="themetag" id="tag">Theme: <b>Default Blue</b></p>
@@ -255,16 +277,15 @@ footer b{color:var(--ink-soft)}
           <span id="stepLabel">14 days left</span>
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
-        <button class="ghost" type="button" id="run">Count down to zero</button>
       </div>
-      <p class="hint">Move across this area — the Dock theme follows your pointer. The four themes
-        are the app's own.</p>
+      <p class="hint">It counts down on its own. Move across this area to change the theme — these
+        four are the app's own.</p>
     </div>
   </div>
 </div>
 
 <!-- the clip -->
-<section class="deep" id="watch">
+<section class="elev" id="watch">
   <div class="wrap">
     <p class="kicker rv">Watch</p>
     <h2 class="rv">Describe a semester. Correct it in a sentence.</h2>
@@ -286,7 +307,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- what it does -->
-<section class="light">
+<section>
   <div class="wrap">
     <p class="kicker rv">What it does</p>
     <h2 class="rv">Everything due, in the order it is due.</h2>
@@ -333,7 +354,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- undo -->
-<section class="dark">
+<section class="elev">
   <div class="wrap center">
     <p class="kicker rv">Reversible</p>
     <h2 class="rv">Nothing is added without a way back.</h2>
@@ -352,7 +373,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- comparison -->
-<section class="light" id="compare">
+<section id="compare">
   <div class="wrap">
     <p class="kicker rv">How it compares</p>
     <h2 class="rv">The difference is where the deadlines come from.</h2>
@@ -435,7 +456,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- install -->
-<section class="deep" id="install">
+<section class="elev" id="install">
   <div class="wrap">
     <p class="kicker rv">Installing</p>
     <h2 class="rv">One extra step, the first time.</h2>
@@ -458,7 +479,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- privacy -->
-<section class="dark" id="privacy">
+<section id="privacy">
   <div class="wrap">
     <p class="kicker rv">Privacy</p>
     <h2 class="rv">Nowhere, unless you send it somewhere.</h2>
@@ -477,7 +498,7 @@ footer b{color:var(--ink-soft)}
 </section>
 
 <!-- contact -->
-<section class="light" id="contact">
+<section class="elev" id="contact">
   <div class="wrap">
     <p class="kicker rv">Get in touch</p>
     <h2 class="rv">Feedback and collaboration.</h2>
@@ -559,14 +580,17 @@ footer b{color:var(--ink-soft)}
     { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
     { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
   ];
+  var START = 14;
+
   var tile = document.getElementById('tile');
+  var wrap = document.getElementById('tilewrap');
   var num = document.getElementById('num');
   var tag = document.getElementById('tag');
   var stepLabel = document.getElementById('stepLabel');
   var stage = document.getElementById('stage');
   if (!tile) { return; }
 
-  var days = 14, running = null, current = -1;
+  var days = START, current = -1, timer = null, manual = false, onScreen = false;
 
   function paint(i) {
     if (i === current) { return; }
@@ -576,42 +600,77 @@ footer b{color:var(--ink-soft)}
     tile.style.setProperty('--bot', t.bot);
     tile.style.setProperty('--num', t.num);
     tile.style.setProperty('--lbl', t.lbl);
+    wrap.style.setProperty('--ring', t.top);
     tag.innerHTML = 'Theme: <b>' + t.name + '</b>';
+    if (reduce) { return; }
+    // A short pop, and a ring that leaves the tile — the change should feel
+    // like the icon reacting, not a stylesheet swapping over.
+    tile.classList.remove('pop'); wrap.classList.remove('burst');
+    void tile.offsetWidth;
+    tile.classList.add('pop'); wrap.classList.add('burst');
+    setTimeout(function () { tile.classList.remove('pop'); }, 240);
   }
 
-  function setDays(n) {
+  function setDays(n, animate) {
     days = Math.max(0, Math.min(99, n));
-    num.textContent = days;
+    if (animate && !reduce) {
+      num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick');
+      setTimeout(function () { num.textContent = days; }, 150);
+    } else {
+      num.textContent = days;
+    }
     stepLabel.textContent = days === 0 ? 'Due today' : days === 1 ? '1 day left' : days + ' days left';
-    tile.classList.toggle('urgent', days === 0 && !reduce);
+    tile.classList.toggle('zero', days === 0);
   }
 
-  // Colour follows the pointer left to right. The number does not move on its
-  // own — that is yours to set.
+  // It runs itself. Nobody should have to press a button to see the point of a
+  // countdown — but touching the stepper hands it over and it stops.
+  function tickDown() {
+    if (days > 0) {
+      setDays(days - 1, true);
+      timer = setTimeout(tickDown, 620);
+    } else {
+      timer = setTimeout(function () { setDays(START, true); timer = setTimeout(tickDown, 900); }, 2200);
+    }
+  }
+  function run() {
+    if (timer || manual || reduce) { return; }
+    timer = setTimeout(tickDown, 700);
+  }
+  function halt() {
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        onScreen = e.isIntersecting;
+        if (onScreen) { run(); } else { halt(); }
+      });
+    }, { threshold: 0.35 }).observe(stage);
+  } else {
+    run();
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { halt(); } else if (onScreen) { run(); }
+  });
+
+  // Colour follows the pointer, left to right. The number is not touched by it.
   stage.addEventListener('pointermove', function (e) {
     var r = stage.getBoundingClientRect();
     var x = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 0.9999);
     paint(Math.floor(x * THEMES.length));
   });
 
-  document.getElementById('minus').addEventListener('click', function () { stop(); setDays(days - 1); });
-  document.getElementById('plus').addEventListener('click', function () { stop(); setDays(days + 1); });
-
-  function stop() {
-    if (running) { clearInterval(running); running = null; }
+  function takeOver(delta) {
+    manual = true; halt();
+    setDays(days + delta, true);
   }
-  document.getElementById('run').addEventListener('click', function () {
-    stop();
-    if (days === 0) { setDays(14); }
-    if (reduce) { setDays(0); return; }
-    running = setInterval(function () {
-      setDays(days - 1);
-      if (days === 0) { stop(); }
-    }, 140);
-  });
+  document.getElementById('minus').addEventListener('click', function () { takeOver(-1); });
+  document.getElementById('plus').addEventListener('click', function () { takeOver(1); });
 
   paint(0);
-  setDays(14);
+  setDays(START, false);
 }());
 
 // The download button follows whatever the newest release is, so publishing a
