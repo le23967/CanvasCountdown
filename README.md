@@ -47,13 +47,15 @@ no paid dependency.
 
 ## Requirements
 
-- macOS 15.0 or later
+- macOS 14.0 (Sonoma) or later
+- macOS 13 and earlier cannot run it: the app is built on SwiftData
+  and Observation, which Apple ships only from macOS 14
 - Apple silicon or Intel (the app ships as a universal binary)
 - A Canvas Calendar Feed URL from your own institution's Canvas
 
 ## Installation
 
-1. Download `CanvasCountdown-1.0.0.dmg` from the
+1. Download `CanvasCountdown-1.1.0.dmg` from the
    [latest release](https://github.com/le23967/CanvasCountdown/releases/latest).
 2. Open the DMG and drag **Canvas Countdown** into **Applications**.
 3. **This build is ad-hoc signed and is not notarized by Apple.** The first
@@ -257,6 +259,13 @@ login-item changes. A test run therefore cannot read the Keychain feed URL,
 contact Canvas, or touch the production database. `LaunchIsolationTests` guards
 each of those properties.
 
-## Licence
+## Licence and Copyright
 
-MIT. See [LICENSE](LICENSE).
+Copyright © 2026 le23967. Released under the MIT Licence — see
+[LICENSE](LICENSE).
+
+The MIT Licence lets anyone use, change and redistribute this code, including
+in their own products, on one condition: the copyright notice above and the
+licence text must be kept with any copy or substantial portion of it. Removing
+the attribution, or passing the work off as someone else's, is the thing the
+licence does not allow.
