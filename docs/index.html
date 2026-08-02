@@ -160,27 +160,40 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .hint{margin-top:14px;font-size:12.8px;color:var(--fg-dim)}
 
 
-/* appearance picker — a handful of representative looks, all on show ------- */
-.picker{margin-top:22px}
-.rail{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:14px 0 2px}
-.facebtn{border:0;background:none;padding:0;cursor:pointer;font:inherit;
-  display:flex;flex-direction:column;align-items:center;gap:9px;
-  color:var(--fg-dim);transition:color .3s ease}
-.facebtn:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:16px}
-.face{width:62px;height:62px;border-radius:16px;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:2px;
-  transition:transform .3s cubic-bezier(.2,.8,.3,1.2),opacity .3s ease,box-shadow .3s ease;
-  transform:scale(.9);opacity:.62}
+/* horizontal carousel picker — a dial of appearances, with a scale -------- */
+.picker{position:relative;margin-top:20px}
+.rail{display:flex;gap:14px;overflow-x:auto;
+  padding:20px calc(50% - 33px) 14px;
+  scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
+  scrollbar-width:none;-ms-overflow-style:none;outline:none;cursor:grab;
+  /* touch and trackpad keep their own scrolling; only the mouse is taken over */
+  touch-action:pan-x pan-y;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 13%,#000 87%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 13%,#000 87%,transparent)}
+.rail::-webkit-scrollbar{display:none}
+.rail:focus-visible{box-shadow:0 0 0 2px var(--accent);border-radius:18px}
+.rail.dragging{cursor:grabbing;user-select:none}
+/* scale and fade are written per frame from the scroll position, so the row
+   answers the hand continuously instead of stepping between two states. No
+   CSS transition on transform: it would lag a frame behind every write. */
+.face{flex:0 0 66px;height:66px;border-radius:16px;scroll-snap-align:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;transform-origin:50% 55%;transition:box-shadow .3s ease}
 .face .fl{font-size:7px;line-height:1;letter-spacing:.12em;font-weight:800}
 .face .fn{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.facebtn:hover .face{opacity:.82;transform:scale(.96)}
-.facebtn[aria-pressed="true"] .face{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
-.facebtn[aria-pressed="true"]{color:var(--fg-soft)}
-/* the name sits under each one, so nothing has to be hovered to be read */
-.facename{font-size:12px;line-height:1.2;letter-spacing:.01em}
-@media(prefers-reduced-motion:reduce){
-  .face{transition:none}
-}
+.face.on{box-shadow:0 10px 24px rgba(0,0,0,.34)}
+
+/* the scale: the marks travel with the row, the needle stands still, so the
+   whole run of appearances has a length you can feel your way along */
+.ruler{position:relative;height:20px;margin-top:2px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
+.rulerinner{position:absolute;top:6px;left:50%;display:flex;gap:7px;margin-left:-1px;
+  will-change:transform}
+.pip{width:2px;height:6px;border-radius:2px;background:var(--chip-line);flex:0 0 auto}
+.pip.tall{height:11px;background:var(--line)}
+.needle{position:absolute;left:50%;top:2px;width:2px;height:15px;border-radius:2px;
+  background:var(--accent);transform:translateX(-1px)}
 
 /* the clip was dominating the page */
 .narrow{max-width:860px;margin-left:auto;margin-right:auto}
@@ -297,7 +310,12 @@ footer b{color:var(--fg-soft)}
       <p class="themetag" id="tag">Theme: <b>Default Blue</b></p>
 
       <div class="picker">
-        <div class="rail" id="rail" role="group" aria-label="Dock appearance"></div>
+        <div class="rail" id="rail" tabindex="0" role="listbox"
+             aria-label="Dock appearance"></div>
+        <div class="ruler" aria-hidden="true">
+          <div class="rulerinner" id="rulerinner"></div>
+          <div class="needle"></div>
+        </div>
       </div>
 
       <div class="controls">
@@ -307,9 +325,9 @@ footer b{color:var(--fg-soft)}
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
       </div>
-      <p class="hint">It counts down on its own. Pick an appearance to try it on:
-        the first four ship with the app, and the last two are examples of what you
-        can mix and save under a name.</p>
+      <p class="hint">It counts down on its own. Drag the row, or use the arrow keys — whichever
+        appearance ends up under the needle is the one the tile takes. Twelve of them: the first
+        four ship with the app, and the rest are examples of what you can mix and save under a name.</p>
     </div>
   </div>
 </div>
@@ -603,16 +621,24 @@ footer b{color:var(--fg-soft)}
   }
 
   /* ---- the Dock tile -------------------------------------------------- */
-  // The four the app ships with, drawn with its real hex values, and two
-  // examples of what you can mix yourself. A few representative looks rather
-  // than a catalogue — the point is what the tile can look like, not how many.
+  // Twelve chosen by hand rather than generated. The app's own four come first
+  // with the hex values it really draws; the rest are examples of what you can
+  // mix, picked to read as their own thing rather than points on a colour wheel.
+  // Two of them are pale faces with a dark number, which keeps the run from
+  // being ten variations on a bright square.
   var THEMES = [
-    { name: 'Default Blue',         short: 'Blue',          top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
-    { name: 'Days Matter Inspired', short: 'Days Matter',   top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
-    { name: 'Dark',                 short: 'Dark',          top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        short: 'High Contrast', top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
-    { name: 'Sunset', mixed: 1,     short: 'Sunset',        top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
-    { name: 'Forest', mixed: 1,     short: 'Forest',        top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' }
+    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
+    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
+    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
+    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
+    { name: 'Sunset',  mixed: 1, top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
+    { name: 'Forest',  mixed: 1, top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' },
+    { name: 'Grape',   mixed: 1, top: '#A177FF', bot: '#46209E', num: '#FFFFFF', lbl: '#EDE4FF' },
+    { name: 'Sand',    mixed: 1, top: '#F6E9CE', bot: '#E0C89B', num: '#6B3E0F', lbl: '#7A5A24' },
+    { name: 'Ocean',   mixed: 1, top: '#4FC3D9', bot: '#10495E', num: '#FFFFFF', lbl: '#DCF4FA' },
+    { name: 'Crimson', mixed: 1, top: '#FF6E6E', bot: '#96131C', num: '#FFFFFF', lbl: '#FFE0E0' },
+    { name: 'Slate',   mixed: 1, top: '#6B7688', bot: '#1F2733', num: '#FFFFFF', lbl: '#CFD7E2' },
+    { name: 'Mint',    mixed: 1, top: '#E8F7EE', bot: '#CDE9D8', num: '#1B6B44', lbl: '#2F7A55' }
   ];
   var START = 14;
 
@@ -623,10 +649,11 @@ footer b{color:var(--fg-soft)}
   var stepLabel = document.getElementById('stepLabel');
   var stage = document.getElementById('stage');
   var rail = document.getElementById('rail');
+  var rulerinner = document.getElementById('rulerinner');
   if (!tile || !rail) { return; }
 
-  var days = START, current = null, timer = null, manual = false, onScreen = false;
-  var faces = [];
+  var days = START, current = -1, timer = null, manual = false, onScreen = false;
+  var faces = [], points = [], PITCH = 80;
 
   function apply(t) {
     tile.style.setProperty('--top', t.top);
@@ -638,16 +665,26 @@ footer b{color:var(--fg-soft)}
       (t.mixed ? ' <span style="opacity:.7">— one you could mix</span>' : '');
   }
 
-  function select(i) {
-    if (i === current) { return; }
-    current = i;
-    apply(THEMES[i]);
-    faces.forEach(function (f, n) { f.setAttribute('aria-pressed', String(n === i)); });
+  // The ring that leaves the tile. Fired once when the row comes to rest, not
+  // on every appearance the needle passes on the way — a flick across the
+  // twelve would otherwise set off a dozen of them.
+  function burst() {
     if (reduce) { return; }
     tile.classList.remove('pop'); wrap.classList.remove('burst');
     void tile.offsetWidth;
     tile.classList.add('pop'); wrap.classList.add('burst');
     setTimeout(function () { tile.classList.remove('pop'); }, 240);
+  }
+
+  function select(i) {
+    if (i === current) { return; }
+    current = i;
+    apply(THEMES[i]);
+    faces.forEach(function (f, n) {
+      f.classList.toggle('on', n === i);
+      f.setAttribute('aria-selected', String(n === i));
+    });
+    rail.setAttribute('aria-activedescendant', faces[i].id);
   }
 
   function setDays(n, animate) {
@@ -664,31 +701,246 @@ footer b{color:var(--fg-soft)}
     });
   }
 
-  // One button per appearance, each with its name under it — everything on
-  // offer is visible at once, so there is nothing to scroll for.
+  /* ---- the carousel --------------------------------------------------- */
+  // One face per appearance. The rail is the single tab stop and the faces are
+  // its options, so the whole dial is one control to a keyboard.
   THEMES.forEach(function (t, i) {
-    var b = document.createElement('button');
-    b.className = 'facebtn';
-    b.type = 'button';
-    b.setAttribute('aria-pressed', 'false');
-    b.title = t.name;
-    b.setAttribute('aria-label', t.name + (t.mixed ? ' (one you could mix)' : ' (ships with the app)'));
-    b.innerHTML =
-      '<span class="face" style="background:linear-gradient(180deg,' + t.top + ',' + t.bot + ')">' +
-        '<span class="fl" style="color:' + t.lbl + '">DAYS</span>' +
-        '<span class="fn" style="color:' + t.num + '">' + START + '</span>' +
-      '</span>' +
-      '<span class="facename">' + t.short + '</span>';
-    b.addEventListener('click', function () { select(i); });
-    b.addEventListener('keydown', function (e) {
-      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
-      e.preventDefault();
-      var n = (i + (e.key === 'ArrowRight' ? 1 : -1) + THEMES.length) % THEMES.length;
-      faces[n].focus();
-      select(n);
+    var f = document.createElement('div');
+    f.className = 'face';
+    f.id = 'face-' + i;
+    f.setAttribute('role', 'option');
+    f.setAttribute('aria-selected', 'false');
+    f.title = t.name;
+    f.setAttribute('aria-label', t.name + (t.mixed ? ' (one you could mix)' : ' (ships with the app)'));
+    f.style.background = 'linear-gradient(180deg,' + t.top + ',' + t.bot + ')';
+    f.innerHTML = '<span class="fl" style="color:' + t.lbl + '">DAYS</span>' +
+                  '<span class="fn" style="color:' + t.num + '">' + START + '</span>';
+    f.addEventListener('click', function () { goTo(i); });
+    rail.appendChild(f);
+    faces.push(f);
+  });
+
+  // The scale reads across the whole run rather than repeating: a tall mark per
+  // appearance, three short ones between, so the needle's position tells you
+  // where in the twelve you are as well as that you are on one of them.
+  var SUB = 4, TICK = 9, TICK_SPAN = SUB * TICK;   // TICK = 2px pip + 7px gap in the CSS
+  for (var p = 0; p <= (THEMES.length - 1) * SUB; p++) {
+    var pip = document.createElement('span');
+    pip.className = 'pip' + (p % SUB === 0 ? ' tall' : '');
+    rulerinner.appendChild(pip);
+  }
+
+  // Measured rather than assumed, so a resize or a different font can't put the
+  // snap points out of step with where the faces actually are.
+  function measure() {
+    var mid = rail.clientWidth / 2;
+    points = faces.map(function (f) { return f.offsetLeft + f.offsetWidth / 2 - mid; });
+    if (points.length > 1) { PITCH = points[1] - points[0]; }
+  }
+
+  function nearestIndex(pos) {
+    var best = 0, bestD = Infinity;
+    for (var i = 0; i < points.length; i++) {
+      var d = Math.abs(points[i] - pos);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  // Everything that follows the scroll position, in one pass: the faces grow
+  // and fade by how far they are from the needle, the scale slides under it,
+  // and the tile takes whichever appearance is nearest.
+  function paint() {
+    var pos = rail.scrollLeft;
+    for (var i = 0; i < faces.length; i++) {
+      var d = Math.abs(points[i] - pos) / PITCH;
+      if (d > 2.2) { d = 2.2; }
+      faces[i].style.transform = 'scale(' + (1 - 0.19 * d).toFixed(3) + ')';
+      faces[i].style.opacity = (1 - 0.26 * d).toFixed(3);
+    }
+    rulerinner.style.transform =
+      'translateX(' + (-(pos - points[0]) / PITCH * TICK_SPAN).toFixed(2) + 'px)';
+    select(nearestIndex(pos));
+  }
+
+  /* ---- driving the rail ------------------------------------------------ */
+  // Mandatory snap and smooth behaviour both fight a hand-driven scrollLeft:
+  // snap yanks every move back to the nearest point, which is what made the old
+  // dial feel stuck. They stand aside for the drag and the glide, and come back
+  // afterwards so the wheel and the keyboard still snap natively.
+  var COAST = 0.325;   // s — how far a flick is projected
+  var SETTLE = 0.5;    // s — how long the glide takes to arrive
+  var frame = null, pointerId = null, samples = [], dragging = false;
+  var clickGuard = false, startX = 0, startScroll = 0, startIndex = 0;
+
+  function unsnap() {
+    rail.style.scrollSnapType = 'none';
+    rail.style.scrollBehavior = 'auto';
+  }
+  function settled() {
+    rail.style.scrollSnapType = '';
+    rail.style.scrollBehavior = '';
+    if (current !== startIndex) { burst(); }
+    startIndex = current;
+  }
+
+  // One motion, not two. Where the flick would come to rest picks the target,
+  // and a critically damped spring — started at the speed the hand let go with
+  // — carries the row there. Coasting to a stop and then running a separate
+  // snap is what reads as stiff. Solved per frame rather than integrated, so it
+  // comes out the same on a 60Hz screen and a 120Hz one.
+  function glide(target, v0) {
+    var w = 5 / SETTLE;
+    var A = rail.scrollLeft - target;
+    var B = v0 + w * A;
+    var t0 = performance.now();
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(function step(now) {
+      var t = (now - t0) / 1000;
+      var decay = Math.exp(-w * t);
+      var x = target + (A + B * t) * decay;
+      var v = (B - w * (A + B * t)) * decay;
+      rail.scrollLeft = x;
+      paint();
+      if (Math.abs(x - target) < 0.5 && Math.abs(v) < 30) {
+        rail.scrollLeft = target;   // land exactly, so putting snap back is a no-op
+        paint();
+        frame = null;
+        settled();
+        return;
+      }
+      frame = requestAnimationFrame(step);
     });
-    rail.appendChild(b);
-    faces.push(b);
+  }
+
+  function goTo(i) {
+    i = Math.max(0, Math.min(THEMES.length - 1, i));
+    measure();
+    startIndex = current;
+    unsnap();
+    if (reduce) { rail.scrollLeft = points[i]; paint(); settled(); return; }
+    glide(points[i], 0);
+  }
+
+  // Averaged over the last stretch of pointer history rather than taken from
+  // the final two events: one stationary event before the release would
+  // otherwise read as zero, which is the classic dead stop. It also means a
+  // deliberate pause before letting go correctly counts as no flick at all.
+  function velocity() {
+    var now = performance.now(), recent = [];
+    for (var i = 0; i < samples.length; i++) {
+      if (now - samples[i].t <= 90) { recent.push(samples[i]); }
+    }
+    if (recent.length < 2) { return 0; }
+    var a = recent[0], b = recent[recent.length - 1];
+    if (b.t <= a.t) { return 0; }
+    var v = -(b.x - a.x) / (b.t - a.t) * 1000;   // pointer right, scrollLeft down
+    return Math.max(-6000, Math.min(6000, v));
+  }
+
+  rail.addEventListener('pointerdown', function (e) {
+    // Touch and trackpad already have inertia and snapping of their own, and
+    // taking those over only ever makes them worse.
+    if (e.pointerType !== 'mouse' || e.button !== 0) { return; }
+    cancelAnimationFrame(frame); frame = null;
+    pointerId = e.pointerId;
+    dragging = false;
+    startIndex = current;
+    startX = e.clientX;
+    startScroll = rail.scrollLeft;
+    samples = [{ t: e.timeStamp, x: e.clientX }];
+    measure();
+    unsnap();
+    // Keeps the drag alive past the edge of the rail. Not every pointer can be
+    // captured, and a refusal is no reason to drop the drag.
+    try { rail.setPointerCapture(e.pointerId); } catch (err) {}
+    // Stops the text selection and native element drag that start here; focus
+    // goes back by hand, since preventing the default would have skipped it.
+    e.preventDefault();
+    rail.focus({ preventScroll: true });
+  });
+
+  rail.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== pointerId) { return; }
+    // Coalesced events carry the real path between frames, which is what a
+    // high-polling mouse needs for the release speed to come out right.
+    var path = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (var i = 0; i < path.length; i++) {
+      samples.push({ t: path[i].timeStamp || e.timeStamp, x: path[i].clientX });
+    }
+    if (samples.length > 60) { samples.splice(0, samples.length - 60); }
+
+    var dx = e.clientX - startX;
+    if (!dragging) {
+      if (Math.abs(dx) < 4) { return; }   // still a click, not a drag
+      dragging = true;
+      clickGuard = true;
+      rail.classList.add('dragging');
+    }
+    // Written straight from the event: the browser already delivers these once
+    // a frame, so handing it to rAF would only add a frame of lag. Absolute
+    // rather than incremental, so a long drag cannot drift.
+    rail.scrollLeft = startScroll - dx;
+    paint();
+  });
+
+  function release(e) {
+    if (e.pointerId !== pointerId) { return; }
+    pointerId = null;
+    rail.classList.remove('dragging');
+    try {
+      if (rail.hasPointerCapture(e.pointerId)) { rail.releasePointerCapture(e.pointerId); }
+    } catch (err) {}
+    if (!dragging) { settled(); return; }
+    dragging = false;
+    var span = rail.scrollWidth - rail.clientWidth;
+    var v = velocity();
+    var landing = Math.max(0, Math.min(span, rail.scrollLeft + v * COAST));
+    var target = points[nearestIndex(landing)];
+    if (reduce) { rail.scrollLeft = target; paint(); settled(); }
+    else { glide(target, v); }
+    // A drag that ends off the rail is followed by no click at all, and a
+    // guard left standing would swallow the next real one.
+    setTimeout(function () { clickGuard = false; }, 0);
+  }
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    rail.addEventListener(ev, release);
+  });
+
+  // Capture phase, so a face never sees the click that ends a drag.
+  rail.addEventListener('click', function (e) {
+    if (!clickGuard) { return; }
+    clickGuard = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+
+  rail.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  rail.addEventListener('selectstart', function (e) { if (dragging) { e.preventDefault(); } });
+
+  rail.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); goTo(current + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(current - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); goTo(0); }
+    else if (e.key === 'End') { e.preventDefault(); goTo(THEMES.length - 1); }
+  });
+
+  // The wheel, a trackpad and a touch keep their native scrolling; this only
+  // keeps the faces and the scale in step with it.
+  var painting = false;
+  rail.addEventListener('scroll', function () {
+    if (painting) { return; }
+    painting = true;
+    requestAnimationFrame(function () { painting = false; paint(); });
+  }, { passive: true });
+
+  window.addEventListener('resize', function () {
+    measure();
+    unsnap();
+    rail.scrollLeft = points[current < 0 ? 0 : current];
+    rail.style.scrollSnapType = '';
+    rail.style.scrollBehavior = '';
+    paint();
   });
 
   function tickDown() {
@@ -719,7 +971,14 @@ footer b{color:var(--fg-soft)}
   document.getElementById('plus').addEventListener('click', function () { takeOver(1); });
 
   setDays(START, false);
-  select(0);   // Default Blue, the one the app starts on
+  // Start on Default Blue, the one the app itself starts on.
+  measure();
+  unsnap();
+  rail.scrollLeft = points[0];
+  rail.style.scrollSnapType = '';
+  rail.style.scrollBehavior = '';
+  paint();
+  startIndex = current;
 }());
 
 // The download button follows whatever the newest release is, so publishing a
