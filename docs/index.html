@@ -322,9 +322,9 @@ footer b{color:var(--fg-soft)}
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
       </div>
-      <p class="hint">It counts down on its own. Slide the dial either way — it never runs out. Four
-        of these ship with the app; the rest keep going because you can set any colours you like and
-        save them under a name.</p>
+      <p class="hint">It counts down on its own. Slide the dial either way — it wraps around.
+        Twelve appearances: the first four ship with the app, and the rest are examples of what you
+        can mix and save under a name.</p>
     </div>
   </div>
 </div>
@@ -619,69 +619,29 @@ footer b{color:var(--fg-soft)}
 
   /* ---- the Dock tile -------------------------------------------------- */
   // The app's own built-in themes, with the hex values it actually draws.
-  // The four the app ships with, in its own hex values.
-  var BUILT_IN = [
+  // A set chosen by hand rather than generated. The first four are the app's
+  // own, with its real hex values; the rest are examples of what you can mix,
+  // picked to be distinct from one another rather than points on a colour wheel.
+  var THEMES = [
     { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
     { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
     { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
-  ];
-  var HUES = [
-    [345,'Crimson'],[10,'Red'],[24,'Ember'],[38,'Amber'],[50,'Gold'],[68,'Olive'],
-    [88,'Lime'],[108,'Green'],[135,'Jade'],[158,'Emerald'],[172,'Teal'],[188,'Cyan'],
-    [202,'Sky'],[216,'Azure'],[232,'Blue'],[248,'Indigo'],[264,'Violet'],[280,'Purple'],
-    [296,'Orchid'],[312,'Magenta'],[328,'Rose']
+    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
+    { name: 'Sunset',  mixed: 1, top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
+    { name: 'Forest',  mixed: 1, top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' },
+    { name: 'Grape',   mixed: 1, top: '#A177FF', bot: '#46209E', num: '#FFFFFF', lbl: '#EDE4FF' },
+    { name: 'Sand',    mixed: 1, top: '#F6E9CE', bot: '#E0C89B', num: '#6B3E0F', lbl: '#7A5A24' },
+    { name: 'Ocean',   mixed: 1, top: '#4FC3D9', bot: '#10495E', num: '#FFFFFF', lbl: '#DCF4FA' },
+    { name: 'Crimson', mixed: 1, top: '#FF6E6E', bot: '#96131C', num: '#FFFFFF', lbl: '#FFE0E0' },
+    { name: 'Slate',   mixed: 1, top: '#6B7688', bot: '#1F2733', num: '#FFFFFF', lbl: '#CFD7E2' },
+    { name: 'Mint',    mixed: 1, top: '#E8F7EE', bot: '#CDE9D8', num: '#1B6B44', lbl: '#2F7A55' }
   ];
   var START = 14;
 
-  // A mixed hash rather than a ramp. A ramp made position -k and +k mirror each
-  // other, which is exactly what it looked like: the same colours on both sides.
-  function hash(n) {
-    var x = Math.imul(n | 0, 2654435761) >>> 0;
-    x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0;
-    x ^= x >>> 13; x = Math.imul(x, 3266489917) >>> 0;
-    x ^= x >>> 16;
-    return x >>> 0;
-  }
-  function hsl(h, sat, light) { return 'hsl(' + h + ' ' + sat + '% ' + light + '%)'; }
-
-  // Everything outside the built-in four is derived from its own index, so the
-  // rail never repeats and never runs out. Saturation, lightness and whether the
-  // face is light or dark all vary, so neighbours are not the same idea twice.
+  // The list wraps, so the rail can be pushed either way without running into
+  // an end — but it is twelve things, not an endless generator.
   function themeAt(i) {
-    if (i >= 0 && i < BUILT_IN.length) { return BUILT_IN[i]; }
-    var h = hash(i * 7919 + 104729);
-    // Hue walks by the golden angle so each face is as far from the one beside
-    // it as it can be. The index is shifted into positive territory first, so
-    // the run is monotonic and cannot mirror itself around the middle.
-    var hue = ((i + 1024) * 137.50776) % 360;
-    var pick = HUES[0];
-    for (var q = 0; q < HUES.length; q++) {
-      var d = Math.abs(((HUES[q][0] - hue + 540) % 360) - 180);
-      var bd = Math.abs(((pick[0] - hue + 540) % 360) - 180);
-      if (d < bd) { pick = HUES[q]; }
-    }
-    var sat = 46 + ((h >>> 9) % 40);
-    var pale = ((h >>> 19) % 5) === 0;          // an occasional light face
-    var spread = 16 + ((h >>> 13) % 16);
-    if (pale) {
-      var l = 90 + ((h >>> 23) % 6);
-      return {
-        top: hsl(hue, Math.min(sat, 30), l),
-        bot: hsl(hue, Math.min(sat, 34), l - 8),
-        num: hsl(hue, Math.max(sat, 62), 40),
-        lbl: hsl(hue, 22, 42),
-        name: pick[1], mixed: true
-      };
-    }
-    var mid = 44 + ((h >>> 17) % 18);
-    return {
-      top: hsl(hue, sat, mid + 10),
-      bot: hsl((hue + spread - 8 + 360) % 360, Math.min(sat + 8, 92), mid - 16),
-      num: '#FFFFFF',
-      lbl: hsl(hue, Math.min(sat, 50), 90),
-      name: pick[1], mixed: true
-    };
+    return THEMES[((i % THEMES.length) + THEMES.length) % THEMES.length];
   }
 
   var tile = document.getElementById('tile');
