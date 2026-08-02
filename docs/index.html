@@ -160,35 +160,25 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .hint{margin-top:14px;font-size:12.8px;color:var(--fg-dim)}
 
 
-/* horizontal appearance picker — endless in both directions --------------- */
-.picker{position:relative;margin-top:22px}
-.rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
-  padding:14px calc(50% - 33px) 10px;scrollbar-width:none;-ms-overflow-style:none;
-  outline:none;cursor:grab;overscroll-behavior-x:contain}
-.rail::-webkit-scrollbar{display:none}
-.rail:focus-visible{box-shadow:0 0 0 2px var(--accent);border-radius:14px}
-.face{flex:0 0 66px;height:66px;border-radius:16px;scroll-snap-align:center;border:0;padding:0;
-  cursor:pointer;position:relative;display:flex;flex-direction:column;
+/* appearance picker — a handful of representative looks, all on show ------- */
+.picker{margin-top:22px}
+.rail{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;padding:14px 0 2px}
+.facebtn{border:0;background:none;padding:0;cursor:pointer;font:inherit;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  color:var(--fg-dim);transition:color .3s ease}
+.facebtn:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:16px}
+.face{width:62px;height:62px;border-radius:16px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2px;
   transition:transform .3s cubic-bezier(.2,.8,.3,1.2),opacity .3s ease,box-shadow .3s ease;
-  transform:scale(.74);opacity:.45}
+  transform:scale(.9);opacity:.62}
 .face .fl{font-size:7px;line-height:1;letter-spacing:.12em;font-weight:800}
 .face .fn{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.face[aria-selected="true"]{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
-.face.near{transform:scale(.86);opacity:.72}
-
-/* a dial rather than a fixed row: the marks slide past a standing needle */
-.ruler{position:relative;height:22px;margin-top:4px;overflow:hidden;
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);
-  mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
-.rulerinner{position:absolute;top:6px;left:50%;display:flex;gap:18px;will-change:transform}
-.pip{width:2px;height:7px;border-radius:2px;background:var(--chip-line);flex:0 0 auto}
-.pip.tall{height:11px}
-.needle{position:absolute;left:50%;top:2px;width:2px;height:15px;border-radius:2px;
-  background:var(--accent);transform:translateX(-1px)}
-.facename{margin-top:6px;font-size:12.6px;color:var(--fg-dim);min-height:1.3em}
+.facebtn:hover .face{opacity:.82;transform:scale(.96)}
+.facebtn[aria-pressed="true"] .face{transform:scale(1);opacity:1;box-shadow:0 10px 22px rgba(0,0,0,.34)}
+.facebtn[aria-pressed="true"]{color:var(--fg-soft)}
+/* the name sits under each one, so nothing has to be hovered to be read */
+.facename{font-size:12px;line-height:1.2;letter-spacing:.01em}
 @media(prefers-reduced-motion:reduce){
-  .rail{scroll-behavior:auto}
   .face{transition:none}
 }
 
@@ -307,12 +297,7 @@ footer b{color:var(--fg-soft)}
       <p class="themetag" id="tag">Theme: <b>Default Blue</b></p>
 
       <div class="picker">
-        <div class="rail" id="rail" tabindex="0" role="listbox"
-             aria-label="Dock appearance"></div>
-        <div class="ruler" aria-hidden="true">
-          <div class="rulerinner" id="rulerinner"></div>
-          <div class="needle"></div>
-        </div>
+        <div class="rail" id="rail" role="group" aria-label="Dock appearance"></div>
       </div>
 
       <div class="controls">
@@ -322,8 +307,8 @@ footer b{color:var(--fg-soft)}
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
       </div>
-      <p class="hint">It counts down on its own. Slide the dial either way — it wraps around.
-        Twelve appearances: the first four ship with the app, and the rest are examples of what you
+      <p class="hint">It counts down on its own. Pick an appearance to try it on:
+        the first four ship with the app, and the last two are examples of what you
         can mix and save under a name.</p>
     </div>
   </div>
@@ -618,31 +603,18 @@ footer b{color:var(--fg-soft)}
   }
 
   /* ---- the Dock tile -------------------------------------------------- */
-  // The app's own built-in themes, with the hex values it actually draws.
-  // A set chosen by hand rather than generated. The first four are the app's
-  // own, with its real hex values; the rest are examples of what you can mix,
-  // picked to be distinct from one another rather than points on a colour wheel.
+  // The four the app ships with, drawn with its real hex values, and two
+  // examples of what you can mix yourself. A few representative looks rather
+  // than a catalogue — the point is what the tile can look like, not how many.
   var THEMES = [
-    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
-    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
-    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
-    { name: 'Sunset',  mixed: 1, top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
-    { name: 'Forest',  mixed: 1, top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' },
-    { name: 'Grape',   mixed: 1, top: '#A177FF', bot: '#46209E', num: '#FFFFFF', lbl: '#EDE4FF' },
-    { name: 'Sand',    mixed: 1, top: '#F6E9CE', bot: '#E0C89B', num: '#6B3E0F', lbl: '#7A5A24' },
-    { name: 'Ocean',   mixed: 1, top: '#4FC3D9', bot: '#10495E', num: '#FFFFFF', lbl: '#DCF4FA' },
-    { name: 'Crimson', mixed: 1, top: '#FF6E6E', bot: '#96131C', num: '#FFFFFF', lbl: '#FFE0E0' },
-    { name: 'Slate',   mixed: 1, top: '#6B7688', bot: '#1F2733', num: '#FFFFFF', lbl: '#CFD7E2' },
-    { name: 'Mint',    mixed: 1, top: '#E8F7EE', bot: '#CDE9D8', num: '#1B6B44', lbl: '#2F7A55' }
+    { name: 'Default Blue',         short: 'Blue',          top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
+    { name: 'Days Matter Inspired', short: 'Days Matter',   top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
+    { name: 'Dark',                 short: 'Dark',          top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
+    { name: 'High Contrast',        short: 'High Contrast', top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
+    { name: 'Sunset', mixed: 1,     short: 'Sunset',        top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
+    { name: 'Forest', mixed: 1,     short: 'Forest',        top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' }
   ];
   var START = 14;
-
-  // The list wraps, so the rail can be pushed either way without running into
-  // an end — but it is twelve things, not an endless generator.
-  function themeAt(i) {
-    return THEMES[((i % THEMES.length) + THEMES.length) % THEMES.length];
-  }
 
   var tile = document.getElementById('tile');
   var wrap = document.getElementById('tilewrap');
@@ -651,13 +623,8 @@ footer b{color:var(--fg-soft)}
   var stepLabel = document.getElementById('stepLabel');
   var stage = document.getElementById('stage');
   var rail = document.getElementById('rail');
-  var rulerinner = document.getElementById('rulerinner');
   if (!tile || !rail) { return; }
 
-  var SLOTS = 15;            // faces kept in the DOM
-  var PITCH = 80;            // 66px face + 14px gap
-  var EDGE = 4;              // how close to an end before we shuffle along
-  var base = -Math.floor(SLOTS / 2);   // logical index sitting in slot 0
   var days = START, current = null, timer = null, manual = false, onScreen = false;
   var faces = [];
 
@@ -674,12 +641,8 @@ footer b{color:var(--fg-soft)}
   function select(i) {
     if (i === current) { return; }
     current = i;
-    apply(themeAt(i));
-    faces.forEach(function (f, n) {
-      var logical = base + n;
-      f.setAttribute('aria-selected', String(logical === i));
-      f.classList.toggle('near', Math.abs(logical - i) === 1);
-    });
+    apply(THEMES[i]);
+    faces.forEach(function (f, n) { f.setAttribute('aria-pressed', String(n === i)); });
     if (reduce) { return; }
     tile.classList.remove('pop'); wrap.classList.remove('burst');
     void tile.offsetWidth;
@@ -701,122 +664,32 @@ footer b{color:var(--fg-soft)}
     });
   }
 
-  function dress(f, logical) {
-    var t = themeAt(logical);
-    f.style.background = 'linear-gradient(180deg,' + t.top + ',' + t.bot + ')';
-    f.title = t.name;
-    f.setAttribute('aria-label', t.name + (t.mixed ? ' (one you could mix)' : ' (ships with the app)'));
-    f.querySelector('.fl').style.color = t.lbl;
-    var d = f.querySelector('.fn');
-    d.style.color = t.num;
-    d.textContent = days;
-  }
-
-  for (var i = 0; i < SLOTS; i++) {
+  // One button per appearance, each with its name under it — everything on
+  // offer is visible at once, so there is nothing to scroll for.
+  THEMES.forEach(function (t, i) {
     var b = document.createElement('button');
-    b.className = 'face';
+    b.className = 'facebtn';
     b.type = 'button';
-    b.setAttribute('role', 'option');
-    b.innerHTML = '<span class="fl">DAYS</span><span class="fn">' + START + '</span>';
-    (function (slot) {
-      b.addEventListener('click', function () { centre(base + slot); });
-    }(i));
+    b.setAttribute('aria-pressed', 'false');
+    b.title = t.name;
+    b.setAttribute('aria-label', t.name + (t.mixed ? ' (one you could mix)' : ' (ships with the app)'));
+    b.innerHTML =
+      '<span class="face" style="background:linear-gradient(180deg,' + t.top + ',' + t.bot + ')">' +
+        '<span class="fl" style="color:' + t.lbl + '">DAYS</span>' +
+        '<span class="fn" style="color:' + t.num + '">' + START + '</span>' +
+      '</span>' +
+      '<span class="facename">' + t.short + '</span>';
+    b.addEventListener('click', function () { select(i); });
+    b.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
+      e.preventDefault();
+      var n = (i + (e.key === 'ArrowRight' ? 1 : -1) + THEMES.length) % THEMES.length;
+      faces[n].focus();
+      select(n);
+    });
     rail.appendChild(b);
     faces.push(b);
-  }
-  // Marks for the dial. Enough to cover the mask either side of the needle.
-  for (var r = -12; r <= 12; r++) {
-    var pip = document.createElement('span');
-    pip.className = 'pip' + (r % 5 === 0 ? ' tall' : '');
-    rulerinner.appendChild(pip);
-  }
-  var RULER_PITCH = 20;   // 2px pip + 18px gap
-  rulerinner.style.left = 'calc(50% - ' + (12 * RULER_PITCH) + 'px)';
-
-  function redress() {
-    faces.forEach(function (f, n) { dress(f, base + n); });
-  }
-
-  function slotOf(logical) { return logical - base; }
-
-  function centre(logical) {
-    var slot = slotOf(logical);
-    if (slot < 0 || slot > SLOTS - 1) { return; }
-    rail.scrollTo({ left: slot * PITCH, behavior: reduce ? 'auto' : 'smooth' });
-  }
-
-  // Keep the window of faces around wherever the rail has got to, moving the
-  // scroll position by the same number of slots so nothing appears to jump.
-  function reseat() {
-    var slot = Math.round(rail.scrollLeft / PITCH);
-    var shift = 0;
-    if (slot < EDGE) { shift = -(Math.floor(SLOTS / 2) - slot); }
-    else if (slot > SLOTS - 1 - EDGE) { shift = slot - Math.floor(SLOTS / 2); }
-    if (!shift) { return false; }
-    base += shift;
-    var prev = rail.style.scrollBehavior;
-    rail.style.scrollBehavior = 'auto';
-    rail.scrollLeft -= shift * PITCH;
-    rail.style.scrollBehavior = prev;
-    redress();
-    return true;
-  }
-
-  var raf = null;
-  rail.addEventListener('scroll', function () {
-    if (raf) { return; }
-    raf = requestAnimationFrame(function () {
-      raf = null;
-      reseat();
-      select(base + Math.round(rail.scrollLeft / PITCH));
-      rulerinner.style.transform =
-        'translateX(' + (-(rail.scrollLeft % PITCH) / PITCH) * RULER_PITCH + 'px)';
-    });
-  }, { passive: true });
-
-  rail.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight') { e.preventDefault(); centre(current + 1); }
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); centre(current - 1); }
   });
-
-  // Snap has to be off while a finger or pointer is down. With it on, every
-  // move we made was pulled straight back to the nearest snap point, which is
-  // what made dragging feel stuck.
-  var down = false, startX = 0, startLeft = 0, moved = false;
-  rail.addEventListener('pointerdown', function (e) {
-    if (e.button) { return; }
-    down = true; moved = false;
-    startX = e.clientX; startLeft = rail.scrollLeft;
-    rail.style.scrollSnapType = 'none';
-    rail.style.cursor = 'grabbing';
-    if (rail.setPointerCapture) { rail.setPointerCapture(e.pointerId); }
-  });
-  rail.addEventListener('pointermove', function (e) {
-    if (!down) { return; }
-    var dx = e.clientX - startX;
-    if (Math.abs(dx) > 3) { moved = true; }
-    rail.scrollLeft = startLeft - dx;
-  });
-  function release(e) {
-    if (!down) { return; }
-    down = false;
-    rail.style.cursor = 'grab';
-    if (e && e.pointerId != null && rail.releasePointerCapture) {
-      try { rail.releasePointerCapture(e.pointerId); } catch (err) {}
-    }
-    // Settle on whatever is nearest where the drag ended, not on whatever was
-    // selected before it started.
-    var slot = Math.max(0, Math.min(SLOTS - 1, Math.round(rail.scrollLeft / PITCH)));
-    rail.scrollTo({ left: slot * PITCH, behavior: reduce ? 'auto' : 'smooth' });
-    setTimeout(function () { rail.style.scrollSnapType = ''; }, reduce ? 0 : 320);
-  }
-  ['pointerup', 'pointercancel'].forEach(function (ev) {
-    rail.addEventListener(ev, release);
-  });
-  // A click that was really a drag should not also pick a face.
-  rail.addEventListener('click', function (e) {
-    if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
-  }, true);
 
   function tickDown() {
     if (days > 0) {
@@ -845,13 +718,8 @@ footer b{color:var(--fg-soft)}
   document.getElementById('minus').addEventListener('click', function () { takeOver(-1); });
   document.getElementById('plus').addEventListener('click', function () { takeOver(1); });
 
-  redress();
   setDays(START, false);
-  // Start on Default Blue, with room already scrolled either side of it.
-  rail.style.scrollBehavior = 'auto';
-  rail.scrollLeft = slotOf(0) * PITCH;
-  rail.style.scrollBehavior = '';
-  select(0);
+  select(0);   // Default Blue, the one the app starts on
 }());
 
 // The download button follows whatever the newest release is, so publishing a
