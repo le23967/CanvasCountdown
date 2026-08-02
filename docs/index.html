@@ -626,29 +626,61 @@ footer b{color:var(--fg-soft)}
     { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
     { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' }
   ];
-  var HUES = ['Red','Ember','Amber','Gold','Lime','Green','Jade','Teal','Cyan',
-              'Azure','Blue','Indigo','Violet','Purple','Magenta','Rose'];
+  var HUES = [
+    [345,'Crimson'],[10,'Red'],[24,'Ember'],[38,'Amber'],[50,'Gold'],[68,'Olive'],
+    [88,'Lime'],[108,'Green'],[135,'Jade'],[158,'Emerald'],[172,'Teal'],[188,'Cyan'],
+    [202,'Sky'],[216,'Azure'],[232,'Blue'],[248,'Indigo'],[264,'Violet'],[280,'Purple'],
+    [296,'Orchid'],[312,'Magenta'],[328,'Rose']
+  ];
   var START = 14;
 
-  function hsl(h, sat, light) {
-    return 'hsl(' + ((h % 360) + 360) % 360 + ' ' + sat + '% ' + light + '%)';
+  // A mixed hash rather than a ramp. A ramp made position -k and +k mirror each
+  // other, which is exactly what it looked like: the same colours on both sides.
+  function hash(n) {
+    var x = Math.imul(n | 0, 2654435761) >>> 0;
+    x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0;
+    x ^= x >>> 13; x = Math.imul(x, 3266489917) >>> 0;
+    x ^= x >>> 16;
+    return x >>> 0;
   }
+  function hsl(h, sat, light) { return 'hsl(' + h + ' ' + sat + '% ' + light + '%)'; }
 
-  // Anything outside the built-in four is worked out from its index, so the
-  // rail can run for ever in both directions without a list to run out of.
-  // The app takes any colours you like, so these are all things you could mix.
+  // Everything outside the built-in four is derived from its own index, so the
+  // rail never repeats and never runs out. Saturation, lightness and whether the
+  // face is light or dark all vary, so neighbours are not the same idea twice.
   function themeAt(i) {
     if (i >= 0 && i < BUILT_IN.length) { return BUILT_IN[i]; }
-    var n = i < 0 ? i : i - BUILT_IN.length;
-    var hue = (n * 47) % 360;
-    var bucket = Math.floor((((hue % 360) + 360) % 360) / 22.5) % HUES.length;
+    var h = hash(i * 7919 + 104729);
+    // Hue walks by the golden angle so each face is as far from the one beside
+    // it as it can be. The index is shifted into positive territory first, so
+    // the run is monotonic and cannot mirror itself around the middle.
+    var hue = ((i + 1024) * 137.50776) % 360;
+    var pick = HUES[0];
+    for (var q = 0; q < HUES.length; q++) {
+      var d = Math.abs(((HUES[q][0] - hue + 540) % 360) - 180);
+      var bd = Math.abs(((pick[0] - hue + 540) % 360) - 180);
+      if (d < bd) { pick = HUES[q]; }
+    }
+    var sat = 46 + ((h >>> 9) % 40);
+    var pale = ((h >>> 19) % 5) === 0;          // an occasional light face
+    var spread = 16 + ((h >>> 13) % 16);
+    if (pale) {
+      var l = 90 + ((h >>> 23) % 6);
+      return {
+        top: hsl(hue, Math.min(sat, 30), l),
+        bot: hsl(hue, Math.min(sat, 34), l - 8),
+        num: hsl(hue, Math.max(sat, 62), 40),
+        lbl: hsl(hue, 22, 42),
+        name: pick[1], mixed: true
+      };
+    }
+    var mid = 44 + ((h >>> 17) % 18);
     return {
-      top: hsl(hue, 62, 60),
-      bot: hsl(hue + 12, 66, 33),
+      top: hsl(hue, sat, mid + 10),
+      bot: hsl((hue + spread - 8 + 360) % 360, Math.min(sat + 8, 92), mid - 16),
       num: '#FFFFFF',
-      lbl: hsl(hue, 55, 88),
-      name: HUES[bucket],
-      mixed: true
+      lbl: hsl(hue, Math.min(sat, 50), 90),
+      name: pick[1], mixed: true
     };
   }
 
@@ -787,20 +819,44 @@ footer b{color:var(--fg-soft)}
     if (e.key === 'ArrowLeft')  { e.preventDefault(); centre(current - 1); }
   });
 
-  var down = false, startX = 0, startLeft = 0;
+  // Snap has to be off while a finger or pointer is down. With it on, every
+  // move we made was pulled straight back to the nearest snap point, which is
+  // what made dragging feel stuck.
+  var down = false, startX = 0, startLeft = 0, moved = false;
   rail.addEventListener('pointerdown', function (e) {
-    down = true; startX = e.clientX; startLeft = rail.scrollLeft; rail.style.cursor = 'grabbing';
+    if (e.button) { return; }
+    down = true; moved = false;
+    startX = e.clientX; startLeft = rail.scrollLeft;
+    rail.style.scrollSnapType = 'none';
+    rail.style.cursor = 'grabbing';
+    if (rail.setPointerCapture) { rail.setPointerCapture(e.pointerId); }
   });
   rail.addEventListener('pointermove', function (e) {
     if (!down) { return; }
-    rail.scrollLeft = startLeft - (e.clientX - startX);
+    var dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) { moved = true; }
+    rail.scrollLeft = startLeft - dx;
   });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
-    rail.addEventListener(ev, function () {
-      if (!down) { return; }
-      down = false; rail.style.cursor = 'grab'; centre(current);
-    });
+  function release(e) {
+    if (!down) { return; }
+    down = false;
+    rail.style.cursor = 'grab';
+    if (e && e.pointerId != null && rail.releasePointerCapture) {
+      try { rail.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    // Settle on whatever is nearest where the drag ended, not on whatever was
+    // selected before it started.
+    var slot = Math.max(0, Math.min(SLOTS - 1, Math.round(rail.scrollLeft / PITCH)));
+    rail.scrollTo({ left: slot * PITCH, behavior: reduce ? 'auto' : 'smooth' });
+    setTimeout(function () { rail.style.scrollSnapType = ''; }, reduce ? 0 : 320);
+  }
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    rail.addEventListener(ev, release);
   });
+  // A click that was really a drag should not also pick a face.
+  rail.addEventListener('click', function (e) {
+    if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
+  }, true);
 
   function tickDown() {
     if (days > 0) {
