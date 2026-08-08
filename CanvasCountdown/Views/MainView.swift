@@ -26,6 +26,17 @@ struct MainView: View {
         } detail: {
             detailWithAssistant
                 .frame(minHeight: 420)
+                // Across the content column, not the whole window: an inset on
+                // the split view itself lays the strip over the sidebar's first
+                // row, which then reads as a rendering fault rather than a
+                // notice.
+                .safeAreaInset(edge: .top) {
+                    updateBanner
+                }
+                .animation(
+                    reduceMotion ? nil : .snappy(duration: 0.22),
+                    value: viewModel.availableUpdate
+                )
         }
         .task {
             await viewModel.start()
@@ -388,6 +399,13 @@ struct MainView: View {
                     onRefresh: {
                         Task { await viewModel.refreshLocalModels() }
                     }
+                ),
+                updates: UpdatePresentation(
+                    runningVersion: viewModel.runningVersionDescription,
+                    isChecking: viewModel.isCheckingForUpdate,
+                    available: viewModel.availableUpdate,
+                    announcement: viewModel.updateCheckAnnouncement,
+                    onCheck: { viewModel.checkForUpdateManually() }
                 )
             )
         } else {
@@ -554,6 +572,27 @@ struct MainView: View {
         .menuIndicator(.hidden)
         .help("Add an event, or import from Canvas")
         .accessibilityLabel("Add or import events")
+    }
+
+    @ViewBuilder
+    private var updateBanner: some View {
+        if let release = viewModel.availableUpdate {
+            UpdateBannerView(
+                release: release,
+                isDownloading: viewModel.isDownloadingUpdate,
+                message: viewModel.updateMessage,
+                onDownload: {
+                    Task { await viewModel.downloadUpdate() }
+                },
+                onReadMore: {
+                    viewModel.openReleasePage()
+                },
+                onDismiss: {
+                    viewModel.dismissUpdate()
+                }
+            )
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 
     private var assistantPanel: some View {

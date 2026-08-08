@@ -48,6 +48,7 @@ struct SettingsView: View {
     let assistantAPIKey: String
     let onSaveAssistantKey: @MainActor (String) -> Void
     let models: LocalModelPresentation
+    let updates: UpdatePresentation
 
     @State private var coursePendingRemoval: ManagedCourse?
     @State private var apiKeyDraft = ""
@@ -79,6 +80,7 @@ struct SettingsView: View {
             dockSection
             assistantSection
             systemSection
+            updatesSection
             dataSection
         }
         .formStyle(.grouped)
@@ -1035,6 +1037,49 @@ struct SettingsView: View {
             Text("macOS may ask you to approve this under Login Items.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Says which version is running and offers to look for a newer one.
+    ///
+    /// The app checks by itself once a day, so this button is for the moment
+    /// somebody wants an answer now — and for saying plainly that they are
+    /// already on the newest version, which the silent check never bothers to
+    /// mention.
+    private var updatesSection: some View {
+        Section {
+            LabeledContent("Version", value: updates.runningVersion)
+
+            HStack(spacing: 10) {
+                Button("Check for Updates") {
+                    updates.onCheck()
+                }
+                .disabled(updates.isChecking)
+
+                if updates.isChecking {
+                    ProgressView().controlSize(.small)
+                }
+
+                if let release = updates.available {
+                    Text("\(release.version.description) is available")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else if let announcement = updates.announcement {
+                    Text(announcement)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            // Said here rather than discovered halfway through: the app cannot
+            // install over itself, and somebody about to update should know
+            // where it will stop before they start.
+            Text("Canvas Countdown checks once a day and tells you in the window. Downloading opens the disk image — the last step is dragging the app to Applications yourself, because a sandboxed app cannot replace itself.")
         }
     }
 

@@ -28,6 +28,13 @@ no paid dependency.
   Settings suggests the major services and fills in their address for you. Keep
   several models, each with its own key in the Keychain, and switch between them
   from the Assistant itself, beside the sentence they will answer.
+- **Tells you when there is a new version** — it asks GitHub once a day and says
+  so in the window, never in a dialog you have to dismiss to read your
+  deadlines. **Download** fetches the disk image and opens it; the last step is
+  dragging the app to Applications, because a sandboxed app cannot replace
+  itself. Dismissing a version means you are not asked about it again, only
+  about the one after it. **Settings → Updates** has a Check for Updates button
+  that always answers.
 - **11:59 PM due times** — a Canvas deadline that arrives as midnight is shown
   as the end of that day, which is what it means. The day and the countdown
   never move, and it can be turned off.

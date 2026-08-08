@@ -8,5 +8,11 @@
     <true/>
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    <!-- So an update can be put where downloads go, and found again later.
+         The app cannot replace itself: it is sandboxed, so /Applications is
+         out of reach. Downloads is the one folder where leaving a disk image
+         is both allowed and unsurprising. -->
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
 </dict>
 </plist>

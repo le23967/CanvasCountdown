@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -98,6 +99,17 @@ final class MainViewModel {
     private let assistantFactory:
         @MainActor (AssistantSettings, String?, Calendar) -> any AssistantServicing
     @ObservationIgnored
+    private let releaseChecker: any ReleaseChecking
+    @ObservationIgnored
+    private let updateDownloader: any UpdateDownloading
+    /// The running version, and how a link is opened. Both injected: under
+    /// `xctest` the main bundle is the test runner, whose version has nothing
+    /// to do with the app's, and no test should open a browser.
+    @ObservationIgnored
+    private let currentVersion: @Sendable () -> AppVersion?
+    @ObservationIgnored
+    private let openURL: @MainActor (URL) -> Void
+    @ObservationIgnored
     private var hasStarted = false
 
     init(
@@ -121,9 +133,22 @@ final class MainViewModel {
                 apiKey: apiKey,
                 calendar: calendar
             )
+        },
+        releaseChecker: any ReleaseChecking = GitHubReleaseChecker(),
+        updateDownloader: any UpdateDownloading =
+            DownloadsFolderUpdateDownloader(),
+        currentVersion: @escaping @Sendable () -> AppVersion? = {
+            AppVersion.current()
+        },
+        openURL: @escaping @MainActor (URL) -> Void = { url in
+            NSWorkspace.shared.open(url)
         }
     ) {
         self.assistantFactory = assistantFactory
+        self.releaseChecker = releaseChecker
+        self.updateDownloader = updateDownloader
+        self.currentVersion = currentVersion
+        self.openURL = openURL
         self.courseBlocklist = courseBlocklist
         self.localModels = localModels
         self.assistantKeyStore = assistantKeyStore
@@ -1711,6 +1736,157 @@ final class MainViewModel {
         } else {
             await synchronizeNotifications()
         }
+
+        await checkForUpdate()
+    }
+
+    // MARK: - Keeping up with what has been published
+
+    /// How long a check lasts before another one is worth making. A day: this
+    /// app is published a few times a month at most, and asking GitHub more
+    /// often would spend someone's network on an answer that cannot have
+    /// changed.
+    static let updateCheckInterval: TimeInterval = 86_400
+
+    /// A newer release than the one running, that has not been waved away.
+    private(set) var availableUpdate: AppRelease?
+    private(set) var isCheckingForUpdate = false
+    private(set) var isDownloadingUpdate = false
+    private(set) var updateMessage: String?
+    /// Set only by the manual check, so a background check that finds nothing
+    /// stays silent while the button always answers.
+    private(set) var updateCheckAnnouncement: String?
+
+    var runningVersion: AppVersion? {
+        currentVersion()
+    }
+
+    var runningVersionDescription: String {
+        runningVersion?.description ?? "unknown"
+    }
+
+    /// Whether enough time has passed to ask again.
+    func shouldCheckForUpdate(now: Date = .now) -> Bool {
+        guard let last = settingsStore.lastUpdateCheck else {
+            return true
+        }
+        return now.timeIntervalSince(last) >= Self.updateCheckInterval
+            || last > now
+    }
+
+    /// Looks for something newer.
+    ///
+    /// Silent by design when it is the launch check: an app that opens with a
+    /// message every day is an app people stop reading. Only a newer version
+    /// than the running one, and only one that has not been dismissed, puts
+    /// anything on screen.
+    func checkForUpdate(
+        force: Bool = false,
+        now: Date = .now
+    ) async {
+        guard !isCheckingForUpdate else {
+            return
+        }
+        guard force || shouldCheckForUpdate(now: now) else {
+            return
+        }
+        guard let running = runningVersion else {
+            // No version to compare against means every answer would be a
+            // guess, and "update available" is not something to guess at.
+            return
+        }
+
+        isCheckingForUpdate = true
+        if force {
+            updateCheckAnnouncement = nil
+            updateMessage = nil
+        }
+        defer { isCheckingForUpdate = false }
+
+        do {
+            let latest = try await releaseChecker.latestRelease()
+            settingsStore.lastUpdateCheck = now
+
+            guard let latest, latest.version > running else {
+                availableUpdate = nil
+                if force {
+                    updateCheckAnnouncement =
+                        "\(runningVersionDescription) is the newest version"
+                }
+                return
+            }
+            // A manual check answers even about a version already dismissed:
+            // asking is a change of mind.
+            if force {
+                settingsStore.dismissedUpdateVersion = nil
+            }
+            guard settingsStore.dismissedUpdateVersion
+                != latest.version.description else {
+                return
+            }
+            availableUpdate = latest
+        } catch {
+            // A launch check that cannot reach GitHub says nothing. Being
+            // offline is not news, and it is not the user's problem to solve.
+            if force {
+                updateCheckAnnouncement = error.localizedDescription
+            }
+        }
+    }
+
+    func checkForUpdateManually() {
+        Task { await checkForUpdate(force: true) }
+    }
+
+    /// Puts this version away until there is a newer one.
+    func dismissUpdate() {
+        settingsStore.dismissedUpdateVersion = availableUpdate?
+            .version.description
+        availableUpdate = nil
+        updateMessage = nil
+    }
+
+    func clearUpdateMessage() {
+        updateMessage = nil
+        updateCheckAnnouncement = nil
+    }
+
+    /// Downloads the disk image and opens it, which is as far as this app can
+    /// honestly take an update.
+    ///
+    /// It is sandboxed and ad-hoc signed: it cannot write to `/Applications`,
+    /// and it has no signing identity a replacement could be checked against.
+    /// So it fetches the image, leaves it in Downloads where it can be found
+    /// again, and opens it — the last step is the same drag the first install
+    /// asked for.
+    func downloadUpdate() async {
+        guard let release = availableUpdate, !isDownloadingUpdate else {
+            return
+        }
+        guard release.downloadURL != nil else {
+            openReleasePage()
+            return
+        }
+
+        isDownloadingUpdate = true
+        updateMessage = nil
+        defer { isDownloadingUpdate = false }
+
+        do {
+            let file = try await updateDownloader.download(release)
+            updateDownloader.reveal(file)
+            updateMessage =
+                "\(release.version) is in your Downloads. Drag it to Applications to finish."
+        } catch {
+            updateMessage = error.localizedDescription
+        }
+    }
+
+    func openReleasePage() {
+        guard let url = availableUpdate?.pageURL else {
+            return
+        }
+        openURL(url)
     }
 
     func refreshManually() {

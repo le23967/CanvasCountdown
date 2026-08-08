@@ -35,6 +35,8 @@ struct AppDependencies {
         let courseBlocklist: any CourseBlocklisting
         let notificationScheduler: any NotificationScheduling
         let dockRenderer: any DockRendering
+        let releaseChecker: any ReleaseChecking
+        let updateDownloader: any UpdateDownloading
 
         switch environment {
         case .production:
@@ -44,6 +46,8 @@ struct AppDependencies {
             courseBlocklist = UserDefaultsCourseBlocklistStore()
             notificationScheduler = NotificationService()
             dockRenderer = DockTileService()
+            releaseChecker = GitHubReleaseChecker()
+            updateDownloader = DownloadsFolderUpdateDownloader()
         case .automatedTesting:
             feedURLStore = IsolatedFeedURLStore()
             feedFetcher = OfflineFeedFetcher()
@@ -51,6 +55,10 @@ struct AppDependencies {
             courseBlocklist = IsolatedCourseBlocklistStore()
             notificationScheduler = InertNotificationScheduler()
             dockRenderer = InertDockRenderer()
+            // A test run must not ask GitHub what is published today, or the
+            // suite would pass or fail on somebody else's release.
+            releaseChecker = InertReleaseChecker()
+            updateDownloader = InertUpdateDownloader()
         }
 
         // Recognition is local either way; an automated run uses a stub so no
@@ -84,7 +92,9 @@ struct AppDependencies {
             dockRenderer: dockRenderer,
             notificationScheduler: notificationScheduler,
             automaticActivityEnabled: !environment.isAutomatedTesting,
-            courseBlocklist: courseBlocklist
+            courseBlocklist: courseBlocklist,
+            releaseChecker: releaseChecker,
+            updateDownloader: updateDownloader
         )
 
         return AppDependencies(

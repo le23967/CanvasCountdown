@@ -170,6 +170,21 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    /// A version someone has said they are not interested in. Kept out of
+    /// `AppSettings` and out of `reset()`: it is an answer they gave, not a
+    /// preference, and asking again about the version they just waved away is
+    /// the whole reason an update notice becomes something people learn to
+    /// ignore.
+    var dismissedUpdateVersion: String? {
+        didSet { persist() }
+    }
+
+    /// When the last check happened, so a day's gap survives a relaunch. Kept
+    /// out of `AppSettings` for the same reason: it is bookkeeping.
+    var lastUpdateCheck: Date? {
+        didSet { persist() }
+    }
+
     @ObservationIgnored
     private let defaults: UserDefaults
 
@@ -239,6 +254,10 @@ final class SettingsStore {
         treatsMidnightAsEndOfDay = defaults
             .boolValue(forKey: Key.treatsMidnightAsEndOfDay)
             ?? fallback.treatsMidnightAsEndOfDay
+        dismissedUpdateVersion = defaults
+            .string(forKey: Key.dismissedUpdateVersion)
+        lastUpdateCheck = defaults
+            .object(forKey: Key.lastUpdateCheck) as? Date
 
         // Writing the starting labels out on the first run pins them: an event
         // labelled today keeps its colour even if a later version ships a
@@ -347,6 +366,8 @@ final class SettingsStore {
             treatsMidnightAsEndOfDay,
             forKey: Key.treatsMidnightAsEndOfDay
         )
+        defaults.set(dismissedUpdateVersion, forKey: Key.dismissedUpdateVersion)
+        defaults.set(lastUpdateCheck, forKey: Key.lastUpdateCheck)
     }
 
     private enum Key {
@@ -367,6 +388,8 @@ final class SettingsStore {
         static let calendarScale = prefix + "calendarScale"
         static let treatsMidnightAsEndOfDay =
             prefix + "treatsMidnightAsEndOfDay"
+        static let dismissedUpdateVersion = prefix + "dismissedUpdateVersion"
+        static let lastUpdateCheck = prefix + "lastUpdateCheck"
     }
 }
 
