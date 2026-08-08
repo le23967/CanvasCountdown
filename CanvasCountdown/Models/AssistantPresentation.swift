@@ -47,6 +47,165 @@ enum ActiveAssistantPresentation: String, Equatable, Sendable {
     }
 }
 
+/// What the one box in the assistant is for.
+///
+/// There used to be three fields — ask, describe a task, change these drafts —
+/// stacked one above another, each with its own button. The third read as the
+/// save field, which meant the one place a typed sentence could be thrown away
+/// by pressing the wrong thing. One box that says what it is doing replaces all
+/// three.
+///
+/// `automatic` is the default so that the box costs nothing to use: most
+/// sentences say plainly enough which of the two they are, and the panel shows
+/// what it read before anything is sent. The other two are there for when that
+/// guess is not wanted — choosing `ask` means a sentence is never read as a
+/// task, however much it sounds like one.
+enum AssistantComposerMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case automatic
+    case ask
+    case addTask
+
+    var id: String { rawValue }
+
+    /// Kept to two words: this is the label on a chip under the field, not a
+    /// sentence.
+    var title: String {
+        switch self {
+        case .automatic:
+            "Automatic"
+        case .ask:
+            "Ask"
+        case .addTask:
+            "Add task"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .automatic:
+            "wand.and.stars"
+        case .ask:
+            "bubble.left.and.text.bubble.right"
+        case .addTask:
+            "calendar.badge.plus"
+        }
+    }
+}
+
+/// What the box will actually do when Return is pressed right now.
+///
+/// Not the same as the mode: drafts on screen take the box over, because a
+/// sentence typed while a review is open is about that review, and on automatic
+/// the sentence itself decides.
+enum AssistantComposerRole: Equatable, Sendable {
+    case ask
+    case addTask
+    case reviseDrafts
+}
+
+/// Reads a sentence and says which of the two it is.
+///
+/// Deliberately local and deliberately plain. Sending the sentence to the model
+/// to be classified would cost a round trip before anything happened, and would
+/// make a box that is meant to feel free to type in the slowest part of the
+/// panel. Neither answer is expensive to be wrong about: a question produces an
+/// answer, and a task produces a review that writes nothing until it is
+/// confirmed. The panel says which way it read the sentence while it is still
+/// being typed, so a wrong guess is corrected before it is sent, not after.
+enum AssistantRequestReader {
+    /// Words that open a question about the list rather than name a thing to
+    /// put on it. "Should I start the essay today" has no question mark and is
+    /// still plainly a question.
+    private static let questionOpeners: Set<String> = [
+        "am", "are", "can", "could", "did", "do", "does", "explain", "has",
+        "have", "how", "is", "list", "must", "shall", "should", "show",
+        "summarise", "summarize", "tell", "was", "were", "what", "whats",
+        "when", "where", "which", "who", "why", "will", "would",
+    ]
+
+    /// Verbs that ask for something to be put on the list.
+    private static let addingOpeners: Set<String> = [
+        "add", "book", "create", "make", "new", "note", "plan", "put",
+        "remind", "schedule", "set",
+    ]
+
+    /// Words that only appear when a sentence is naming a time.
+    private static let timeWords: Set<String> = [
+        "today", "tonight", "tomorrow", "monday", "tuesday", "wednesday",
+        "thursday", "friday", "saturday", "sunday", "mon", "tue", "tues",
+        "wed", "thu", "thur", "thurs", "fri", "sat", "sun", "january",
+        // "may" is left out on purpose: it is a modal verb far more often than
+        // it is a month, and a date in May still carries its day number.
+        "february", "march", "april", "june", "july", "august",
+        "september", "october", "november", "december", "jan", "feb", "mar",
+        "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+        "am", "pm", "noon", "midnight", "morning", "afternoon", "evening",
+        "weekly", "fortnightly", "daily",
+    ]
+
+    static func readsAsQuestion(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            // An empty box has not said anything yet, and asking is what most
+            // people open the panel to do.
+            return true
+        }
+        if trimmed.hasSuffix("?") || trimmed.hasSuffix("？") {
+            return true
+        }
+
+        let words = trimmed.lowercased().split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+        guard let first = words.first else {
+            return true
+        }
+        if questionOpeners.contains(first) {
+            return true
+        }
+        if addingOpeners.contains(first) {
+            return false
+        }
+        // Nothing said when. Whatever this is, it cannot become a task with a
+        // due date, so it goes to the side that can answer it.
+        return !namesATime(trimmed.lowercased(), words: words)
+    }
+
+    private static func namesATime(_ text: String, words: [String]) -> Bool {
+        if words.contains(where: timeWords.contains) {
+            return true
+        }
+        // A clock time written as one word: 5pm, 11am.
+        if words.contains(where: { word in
+            (word.hasSuffix("am") || word.hasSuffix("pm"))
+                && word.dropLast(2).allSatisfy(\.isNumber)
+                && !word.dropLast(2).isEmpty
+        }) {
+            return true
+        }
+        // A bare number, but only one small enough to be a day or an hour. A
+        // course code is a run of digits too, and "anything for 41021" is a
+        // question about the list, not a task due in the year 41021.
+        if words.contains(where: { word in
+            word.allSatisfy(\.isNumber) && (1...2).contains(word.count)
+        }) {
+            return true
+        }
+        // 26/8, 17:00, 26.8 — the separator is what makes these a date or a
+        // time rather than two unrelated numbers.
+        return text.indices.contains { index in
+            guard text[index] == ":" || text[index] == "/" else {
+                return false
+            }
+            let after = text.index(after: index)
+            guard index > text.startIndex, after < text.endIndex else {
+                return false
+            }
+            return text[text.index(before: index)].isNumber
+                && text[after].isNumber
+        }
+    }
+}
+
 /// How much room the assistant panel takes beside the assignments.
 enum AssistantLayout {
     static let sidebarMinimum: CGFloat = 300

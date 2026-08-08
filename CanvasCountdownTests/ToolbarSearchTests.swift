@@ -408,6 +408,8 @@ final class ToolbarSearchTests: XCTestCase {
         )
     }
 
+    /// No longer "by course": the menu holds both filtering rules now, so the
+    /// one label has to answer for both.
     func testCourseFilterDescriptionNamesTheSelectionForVoiceOver() async throws {
         let context = try makeContext()
         await context.viewModel.start()
@@ -416,7 +418,7 @@ final class ToolbarSearchTests: XCTestCase {
 
         XCTAssertEqual(
             context.viewModel.courseFilterDescription,
-            "Filter by course, showing PHYS200"
+            "Filter, showing PHYS200"
         )
     }
 

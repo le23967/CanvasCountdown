@@ -451,19 +451,6 @@ struct MainView: View {
                 ToolbarItem(id: "action.courseFilter", placement: .primaryAction) {
                     courseFilter
                 }
-                ToolbarItem(id: "action.visibility", placement: .primaryAction) {
-                    toolbarButton(
-                        systemImage: viewModel.showCompletedAndIgnored
-                            ? "eye"
-                            : "eye.slash",
-                        title: viewModel.showCompletedAndIgnored ? "Hide" : "Show",
-                        description: viewModel.showCompletedAndIgnored
-                            ? "Hide completed and ignored"
-                            : "Show completed and ignored"
-                    ) {
-                        viewModel.showCompletedAndIgnored.toggle()
-                    }
-                }
                 ToolbarItem(id: "action.refresh", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "arrow.clockwise",
@@ -517,11 +504,6 @@ struct MainView: View {
                             .frame(minHeight: 320, maxHeight: 560)
                     }
                 }
-                if viewModel.showsAssistantModelSwitcher {
-                    ToolbarItem(id: "action.model", placement: .primaryAction) {
-                        modelSwitcher
-                    }
-                }
                 ToolbarItem(id: "action.search", placement: .primaryAction) {
                     toolbarButton(
                         systemImage: "magnifyingglass",
@@ -572,38 +554,6 @@ struct MainView: View {
         .menuIndicator(.hidden)
         .help("Add an event, or import from Canvas")
         .accessibilityLabel("Add or import events")
-    }
-
-    /// Switches which saved model the assistant uses, without a trip to
-    /// Settings. Only appears once there is more than one to switch between.
-    private var modelSwitcher: some View {
-        Menu {
-            ForEach(viewModel.assistantProfiles) { profile in
-                Button {
-                    viewModel.prepareForToolbarAction()
-                    viewModel.selectAssistantProfile(profile.id)
-                } label: {
-                    if profile.id == viewModel.assistantSettings.activeProfileID {
-                        Label(profile.name, systemImage: "checkmark")
-                    } else {
-                        Text(profile.name)
-                    }
-                }
-                .help(profile.subtitle)
-            }
-
-            Divider()
-
-            Button("Manage Models…") {
-                viewModel.prepareForToolbarAction()
-                viewModel.sidebarSelection = .settings
-            }
-        } label: {
-            Label("Model", systemImage: "cpu")
-        }
-        .menuIndicator(.hidden)
-        .help(viewModel.assistantModelDescription)
-        .accessibilityLabel(viewModel.assistantModelDescription)
     }
 
     private var assistantPanel: some View {
@@ -845,8 +795,22 @@ struct MainView: View {
 
     /// One flat native menu. A `Picker` here would render as a labelled
     /// submenu, which pushed the course list out sideways.
+    ///
+    /// Completed and ignored events sit at the top of it. They used to be an eye
+    /// in the toolbar whose title flipped between "Hide" and "Show" — two words
+    /// that named neither the state it was in nor the thing it acted on. Written
+    /// out here, beside the course rules, it reads as what it always was: a
+    /// filter.
     private var courseFilter: some View {
         Menu {
+            Toggle(
+                "Show completed and ignored",
+                isOn: $viewModel.showCompletedAndIgnored
+            )
+            .help("Keep finished and ignored events in the list")
+
+            Divider()
+
             courseFilterItem(for: nil)
 
             if !viewModel.availableCourses.isEmpty {
@@ -859,11 +823,13 @@ struct MainView: View {
         } label: {
             // A one-word title, never the selected course: a long Canvas course
             // name here would set this control's width and push the rest apart.
+            // The fill is the only thing left saying a filter is on, now that
+            // both rules live behind this one label.
             Label(
                 "Filter",
-                systemImage: viewModel.selectedCourse == nil
-                    ? "line.3.horizontal.decrease.circle"
-                    : "line.3.horizontal.decrease.circle.fill"
+                systemImage: viewModel.isFilterActive
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle"
             )
         }
         .menuIndicator(.hidden)

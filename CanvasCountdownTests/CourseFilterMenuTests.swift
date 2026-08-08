@@ -44,6 +44,44 @@ final class CourseFilterMenuTests: XCTestCase {
         }
     }
 
+    // MARK: - Completed and ignored, now that it lives in here
+
+    /// The eye left the toolbar, so the only thing left saying a filter is on is
+    /// the filled icon. It has to answer for both rules, or turning this on and
+    /// forgetting looks exactly like events going missing.
+    func testTheFilterReadsAsActiveFromEitherRule() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        XCTAssertFalse(context.viewModel.isFilterActive)
+
+        context.viewModel.showCompletedAndIgnored = true
+        XCTAssertTrue(context.viewModel.isFilterActive)
+
+        context.viewModel.showCompletedAndIgnored = false
+        context.viewModel.selectCourse("PHYS200")
+        XCTAssertTrue(context.viewModel.isFilterActive)
+    }
+
+    /// The tooltip is where a filter that is on gets to explain itself.
+    func testTheDescriptionNamesBothRules() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        XCTAssertEqual(
+            context.viewModel.courseFilterDescription,
+            "Filter, showing all courses"
+        )
+
+        context.viewModel.selectCourse("PHYS200")
+        context.viewModel.showCompletedAndIgnored = true
+
+        XCTAssertEqual(
+            context.viewModel.courseFilterDescription,
+            "Filter, showing PHYS200, including completed and ignored"
+        )
+    }
+
     func testSelectionUpdatesTheSidebarCountAndNearestCard() async throws {
         let context = try makeContext()
         await context.viewModel.start()

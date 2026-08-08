@@ -17,15 +17,17 @@ no paid dependency.
   on a schedule while it is running.
 - **Screenshot import with mandatory review** — recognition runs locally with
   Apple Vision, and nothing is saved until you have checked it.
-- **AI deadline Assistant** — ask what is most urgent, or write a task in a
-  sentence, give it a course and a label, and review the draft before it is
-  saved. One click undoes everything a batch just added. Optional, and local by
-  default.
+- **AI deadline Assistant** — one box. Ask what is most urgent, or write a task
+  in a sentence, give it a course and a label, and review the draft before it is
+  saved. It reads which of the two you meant and says so under the box before
+  you send, and you can pin it to one or the other. While a review is on screen
+  the same box changes those drafts rather than starting again. One click undoes
+  everything a batch just added. Optional, and local by default.
 - **Any AI service, saved by name** — anything speaking the common
   chat-completions API works, including a model running locally through Ollama.
   Settings suggests the major services and fills in their address for you. Keep
   several models, each with its own key in the Keychain, and switch between them
-  from the toolbar.
+  from the Assistant itself, beside the sentence they will answer.
 - **11:59 PM due times** — a Canvas deadline that arrives as midnight is shown
   as the end of that day, which is what it means. The day and the countdown
   never move, and it can be turned off.

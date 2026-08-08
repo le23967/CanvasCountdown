@@ -273,9 +273,19 @@ final class MainViewModel {
     private(set) var assistantPresentation: ActiveAssistantPresentation = .closed
     /// The assignment a question is about, if any.
     private(set) var assistantContext: AssistantContext?
+    /// The one thing typed into the assistant, whatever it is for.
+    ///
     /// Kept here rather than in the panel, so moving between a sidebar, a
     /// popover and a window never resets what was typed or said.
-    var assistantDraftInput = ""
+    var assistantComposerInput = ""
+
+    /// Which of the two things the box is for, when there are no drafts to take
+    /// it over.
+    ///
+    /// Starts on `.automatic`, and returns there after a save: choosing before
+    /// typing is friction on every single sentence, to prevent a mistake that
+    /// costs an answer nobody wanted or a review nobody saves.
+    var assistantComposerMode: AssistantComposerMode = .automatic
     private(set) var assistantSummary: String?
     private(set) var assistantDrafts: [AssistantDraftTask] = []
     private(set) var isAssistantBusy = false
@@ -578,15 +588,6 @@ final class MainViewModel {
         }
     }
 
-    /// What was typed to produce the drafts. Kept here rather than in the
-    /// panel, and deliberately not cleared once it has been sent: having to
-    /// retype the whole sentence to change one thing about the result is the
-    /// reason this used to be so tiring.
-    var assistantDraftRequest = ""
-
-    /// The follow-up field, for changing drafts that already exist.
-    var assistantRevisionInput = ""
-
     /// Everything asked in this round, oldest first, so the drafts on screen
     /// can be read as the result of a conversation instead of appearing from
     /// nowhere.
@@ -594,6 +595,65 @@ final class MainViewModel {
 
     var canReviseAssistantDrafts: Bool {
         !assistantDrafts.isEmpty && !isAssistantBusy
+    }
+
+    // MARK: - The one box
+
+    /// What the box will do when it is sent, as it stands right now.
+    ///
+    /// Drafts on screen own it, whatever mode was chosen: a sentence typed while
+    /// a review is open is about that review, never a new request. This is the
+    /// rule that used to need a third field to express.
+    ///
+    /// On `.automatic` this changes as the sentence is typed, which is the
+    /// point: the panel shows what it has read before anything is sent.
+    var assistantComposerRole: AssistantComposerRole {
+        guard assistantDrafts.isEmpty else {
+            return .reviseDrafts
+        }
+        switch assistantComposerMode {
+        case .ask:
+            return .ask
+        case .addTask:
+            return .addTask
+        case .automatic:
+            return AssistantRequestReader
+                .readsAsQuestion(assistantComposerInput) ? .ask : .addTask
+        }
+    }
+
+    var canSendComposer: Bool {
+        guard !isAssistantBusy, !trimmedComposerInput.isEmpty else {
+            return false
+        }
+        return true
+    }
+
+    private var trimmedComposerInput: String {
+        assistantComposerInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Sends what is in the box to whichever of the three it belongs to.
+    ///
+    /// Each branch decides when the field is emptied, because the three are not
+    /// alike: a question is gone the moment it is asked, while a sentence that
+    /// failed to produce anything is worth keeping so it can be edited rather
+    /// than retyped.
+    func sendComposer() async {
+        let text = trimmedComposerInput
+        guard canSendComposer else {
+            return
+        }
+
+        switch assistantComposerRole {
+        case .ask:
+            assistantComposerInput = ""
+            await ask(text)
+        case .addTask:
+            await draftTask(from: text)
+        case .reviseDrafts:
+            await reviseAssistantDrafts(with: text)
+        }
     }
 
     func draftTask(from text: String) async {
@@ -616,7 +676,10 @@ final class MainViewModel {
             }
             assistantDrafts = drafts
             assistantDraftHistory = [trimmed]
-            assistantRevisionInput = ""
+            // Only now. The sentence is on screen above the drafts from here
+            // on, so emptying the box loses nothing; a failure above leaves it
+            // exactly as typed.
+            assistantComposerInput = ""
         } catch {
             assistantErrorMessage = error.localizedDescription
         }
@@ -652,7 +715,7 @@ final class MainViewModel {
             }
             assistantDrafts = revised
             assistantDraftHistory.append(trimmed)
-            assistantRevisionInput = ""
+            assistantComposerInput = ""
         } catch {
             assistantErrorMessage = error.localizedDescription
         }
@@ -674,7 +737,7 @@ final class MainViewModel {
     func clearAssistantDrafts() {
         assistantDrafts = []
         assistantDraftHistory = []
-        assistantRevisionInput = ""
+        assistantComposerInput = ""
         assistantErrorMessage = nil
         isConfirmingAssistantSave = false
     }
@@ -721,9 +784,7 @@ final class MainViewModel {
             withoutCourseCount: saving.count - courses.count,
             earliest: dates.first,
             latest: dates.last,
-            hasUnappliedChange: !assistantRevisionInput
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty
+            hasUnappliedChange: !trimmedComposerInput.isEmpty
         )
     }
 
@@ -766,7 +827,9 @@ final class MainViewModel {
         }
 
         clearAssistantDrafts()
-        assistantDraftRequest = ""
+        // The round is over, so the box goes back to needing no choice rather
+        // than staying pointed at the job that just finished.
+        assistantComposerMode = .automatic
         guard !savedIDs.isEmpty else {
             return
         }
@@ -950,9 +1013,15 @@ final class MainViewModel {
         !settingsStore.assistantProfiles.isFull
     }
 
-    /// Whether the toolbar is worth a switcher. One model is just the model;
-    /// the control only earns its place once there is something to switch to.
-    var showsAssistantModelSwitcher: Bool {
+    /// Whether the assistant's composer is worth a model chip. One model is just
+    /// the model; the control only earns its place once there is something to
+    /// switch to.
+    ///
+    /// This used to gate an eighth toolbar button. A `cpu` icon in the window's
+    /// toolbar only ever changed something about the assistant, so it lives in
+    /// the assistant now and the toolbar no longer changes width when a second
+    /// model is saved.
+    var showsAssistantModelPicker: Bool {
         settingsStore.assistant.isEnabled && assistantProfiles.count > 1
     }
 
@@ -1361,10 +1430,13 @@ final class MainViewModel {
         true
     }
 
-    /// Seven compact actions, or eight once there is more than one saved model
-    /// to switch between. Search no longer takes the row over.
+    /// Six compact actions, always the same six.
+    ///
+    /// Search no longer takes the row over, the model chip moved into the
+    /// assistant, and the eye — whose two titles described neither its state nor
+    /// its effect — became a named line in the filter menu.
     var toolbarItemCount: Int {
-        showsAssistantModelSwitcher ? 8 : 7
+        6
     }
 
     func clearSearchQuery() {
@@ -1487,10 +1559,21 @@ final class MainViewModel {
     }
 
     var courseFilterDescription: String {
-        guard let selectedCourse else {
-            return "Filter by course, showing all courses"
+        let courses = selectedCourse.map { "showing \($0)" }
+            ?? "showing all courses"
+        guard showCompletedAndIgnored else {
+            return "Filter, \(courses)"
         }
-        return "Filter by course, showing \(selectedCourse)"
+        return "Filter, \(courses), including completed and ignored"
+    }
+
+    /// Whether anything is being filtered out, by either rule.
+    ///
+    /// Drives the filled filter icon. The completed-and-ignored switch lives
+    /// inside a menu now, so the toolbar has to be able to say that it is on —
+    /// otherwise turning it on and forgetting looks like missing events.
+    var isFilterActive: Bool {
+        selectedCourse != nil || showCompletedAndIgnored
     }
 
     /// Truncates a long course title for display. The full title stays

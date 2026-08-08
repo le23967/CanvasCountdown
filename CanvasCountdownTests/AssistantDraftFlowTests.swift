@@ -16,24 +16,208 @@ import XCTest
 final class AssistantDraftFlowTests: XCTestCase {
     // MARK: - The request stays, and reads as a conversation
 
+    /// The sentence is not lost by the box emptying: it moves onto the screen,
+    /// above the drafts it produced, where the next turn will join it.
     func testTheRequestStaysOnScreenAfterDrafting() async throws {
         let harness = try makeHarness()
 
-        harness.viewModel.assistantDraftRequest = "gym monday wednesday friday"
-        await harness.viewModel.draftTask(
-            from: harness.viewModel.assistantDraftRequest
-        )
+        harness.viewModel.assistantComposerMode = .addTask
+        harness.viewModel.assistantComposerInput = "gym monday wednesday friday"
+        await harness.viewModel.sendComposer()
 
         XCTAssertEqual(
-            harness.viewModel.assistantDraftRequest,
-            "gym monday wednesday friday",
+            harness.viewModel.assistantDraftHistory,
+            ["gym monday wednesday friday"],
             "Retyping the sentence to change one thing is what this fixed"
         )
-        XCTAssertEqual(
-            harness.viewModel.assistantDraftHistory,
-            ["gym monday wednesday friday"]
+        XCTAssertTrue(
+            harness.viewModel.assistantComposerInput.isEmpty,
+            "The box is free for the follow-up that comes next"
         )
         XCTAssertEqual(harness.viewModel.assistantDrafts.count, 2)
+    }
+
+    /// A sentence that produced nothing is worth keeping: it is nearly right,
+    /// and retyping it is exactly the tiring thing this flow exists to avoid.
+    func testARequestThatFailsIsLeftInTheBox() async throws {
+        let harness = try makeHarness()
+        harness.service.drafting = { _ in throw AssistantError.unreachable }
+
+        harness.viewModel.assistantComposerMode = .addTask
+        harness.viewModel.assistantComposerInput = "gym monday wednesday friday"
+        await harness.viewModel.sendComposer()
+
+        XCTAssertEqual(
+            harness.viewModel.assistantComposerInput,
+            "gym monday wednesday friday"
+        )
+        XCTAssertTrue(harness.viewModel.assistantDrafts.isEmpty)
+        XCTAssertNotNil(harness.viewModel.assistantErrorMessage)
+    }
+
+    // MARK: - Reading the sentence, so nobody has to choose first
+
+    /// The sentences the panel itself offers, and the one printed in its own
+    /// placeholder. If automatic cannot read these, it has no business being
+    /// the default.
+    func testTheObviousSentencesAreReadTheObviousWay() {
+        for question in MainViewModel.assistantSuggestions {
+            XCTAssertTrue(
+                AssistantRequestReader.readsAsQuestion(question),
+                "\(question) is a question"
+            )
+        }
+
+        for question in [
+            "how many are due this week",
+            "should I start the essay today",
+            "what is left in 41021",
+            "tell me what is urgent",
+        ] {
+            XCTAssertTrue(
+                AssistantRequestReader.readsAsQuestion(question),
+                "\(question) is a question even without the mark"
+            )
+        }
+
+        for task in [
+            "essay draft due next Friday at 5pm",
+            "gym monday wednesday friday",
+            "add a workout session tuesday 5pm",
+            "remind me to email the tutor tomorrow",
+            "quiz 2 on 26/8",
+        ] {
+            XCTAssertFalse(
+                AssistantRequestReader.readsAsQuestion(task),
+                "\(task) names something to put on the list"
+            )
+        }
+    }
+
+    /// Nothing said about when means nothing that could become a task with a
+    /// due date, so it goes to the side that can answer it.
+    func testASentenceWithNoTimeIsAnswered() {
+        XCTAssertTrue(AssistantRequestReader.readsAsQuestion(""))
+        XCTAssertTrue(AssistantRequestReader.readsAsQuestion("   "))
+        XCTAssertTrue(AssistantRequestReader.readsAsQuestion("the essay"))
+        XCTAssertTrue(
+            AssistantRequestReader.readsAsQuestion("anything for 41021"),
+            "No day, no time — the drafter would only ask for one"
+        )
+    }
+
+    /// Automatic is a default, not a verdict. Picking a side means the sentence
+    /// goes there however it reads.
+    func testChoosingASideOverridesTheReading() async throws {
+        let harness = try makeHarness()
+        harness.viewModel.assistantComposerInput = "gym tuesday 5pm"
+        XCTAssertEqual(
+            harness.viewModel.assistantComposerRole,
+            .addTask,
+            "Automatic reads this as a task"
+        )
+
+        harness.viewModel.assistantComposerMode = .ask
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .ask)
+
+        harness.viewModel.assistantComposerInput = "what is most urgent?"
+        harness.viewModel.assistantComposerMode = .addTask
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .addTask)
+    }
+
+    /// What the panel prints under the box while it is being typed, so a wrong
+    /// reading is caught before Return rather than after.
+    func testTheReadingFollowsTheSentenceAsItIsTyped() async throws {
+        let harness = try makeHarness()
+        XCTAssertEqual(harness.viewModel.assistantComposerMode, .automatic)
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .ask)
+
+        harness.viewModel.assistantComposerInput = "gym tuesday 5pm"
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .addTask)
+
+        harness.viewModel.assistantComposerInput = "what is due tuesday?"
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .ask)
+    }
+
+    // MARK: - One box, pointed by what is on screen
+
+    /// The rule that made the third field unnecessary: while a review is open,
+    /// a sentence is about that review, whatever mode was chosen before it.
+    func testDraftsOnScreenTakeTheBoxOver() async throws {
+        let harness = try makeHarness()
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .ask)
+
+        harness.viewModel.assistantComposerMode = .addTask
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .addTask)
+
+        await harness.viewModel.draftTask(from: "gym monday wednesday friday")
+
+        XCTAssertEqual(
+            harness.viewModel.assistantComposerRole,
+            .reviseDrafts,
+            "A sentence typed now is about the drafts, not a new request"
+        )
+
+        harness.viewModel.clearAssistantDrafts()
+        XCTAssertEqual(harness.viewModel.assistantComposerRole, .addTask)
+    }
+
+    /// A question is gone the moment it is asked — it is already on screen as
+    /// the thing being answered, so keeping it would only be in the way.
+    func testAQuestionLeavesTheBoxAsSoonAsItIsSent() async throws {
+        let harness = try makeHarness()
+
+        harness.viewModel.assistantComposerInput = "what is most urgent?"
+        await harness.viewModel.sendComposer()
+
+        XCTAssertTrue(harness.viewModel.assistantComposerInput.isEmpty)
+        XCTAssertEqual(
+            harness.viewModel.conversation.first?.text,
+            "what is most urgent?"
+        )
+        XCTAssertTrue(
+            harness.viewModel.assistantDrafts.isEmpty,
+            "Asking never produces a review to check"
+        )
+    }
+
+    func testAnEmptyBoxSendsNothing() async throws {
+        let harness = try makeHarness()
+
+        harness.viewModel.assistantComposerInput = "   \n "
+
+        XCTAssertFalse(harness.viewModel.canSendComposer)
+        await harness.viewModel.sendComposer()
+
+        XCTAssertTrue(harness.viewModel.conversation.isEmpty)
+        XCTAssertTrue(harness.viewModel.assistantDrafts.isEmpty)
+    }
+
+    /// The box only ever sends to one place, so this is what keeps a follow-up
+    /// from being drafted as a brand-new task.
+    func testTheBoxSendsAFollowUpToTheDraftsRatherThanTheDrafter() async throws {
+        let harness = try makeHarness()
+        await harness.viewModel.draftTask(from: "gym monday wednesday friday")
+        harness.service.revision = { drafts, _ in
+            drafts.map { draft in
+                var edited = draft
+                edited.courseName = "41021 Interaction Design Studio"
+                return edited
+            }
+        }
+
+        harness.viewModel.assistantComposerInput = "put them all under 41021"
+        await harness.viewModel.sendComposer()
+
+        XCTAssertEqual(
+            harness.service.lastRevisionRequest?.instruction,
+            "put them all under 41021"
+        )
+        XCTAssertEqual(
+            harness.viewModel.assistantDrafts.count,
+            2,
+            "A follow-up edits the review; it does not add to it"
+        )
     }
 
     /// The follow-up is sent with the drafts attached, so it edits the rows on
@@ -71,8 +255,8 @@ final class AssistantDraftFlowTests: XCTestCase {
             "Both turns are shown, so the drafts do not appear from nowhere"
         )
         XCTAssertTrue(
-            harness.viewModel.assistantRevisionInput.isEmpty,
-            "The follow-up field empties, ready for the next one"
+            harness.viewModel.assistantComposerInput.isEmpty,
+            "The box empties, ready for the next follow-up"
         )
     }
 
@@ -186,13 +370,13 @@ final class AssistantDraftFlowTests: XCTestCase {
     func testStartingOverClearsTheConversation() async throws {
         let harness = try makeHarness()
         await harness.viewModel.draftTask(from: "gym monday wednesday friday")
-        harness.viewModel.assistantRevisionInput = "half typed"
+        harness.viewModel.assistantComposerInput = "half typed"
 
         harness.viewModel.clearAssistantDrafts()
 
         XCTAssertTrue(harness.viewModel.assistantDrafts.isEmpty)
         XCTAssertTrue(harness.viewModel.assistantDraftHistory.isEmpty)
-        XCTAssertTrue(harness.viewModel.assistantRevisionInput.isEmpty)
+        XCTAssertTrue(harness.viewModel.assistantComposerInput.isEmpty)
         XCTAssertNil(harness.viewModel.assistantErrorMessage)
     }
 
@@ -252,6 +436,11 @@ final class DraftFlowAssistantStub: AssistantServicing, @unchecked Sendable {
             drafts
         }
 
+    /// Set by a test that needs the first attempt to fail. Left alone, the two
+    /// fixed workouts below are the answer.
+    nonisolated(unsafe) var drafting:
+        (@Sendable (String) throws -> [AssistantDraftTask])?
+
     var lastRevisionRequest: RevisionRequest? {
         lock.withLock { recordedRequest }
     }
@@ -272,6 +461,9 @@ final class DraftFlowAssistantStub: AssistantServicing, @unchecked Sendable {
         from text: String,
         now: Date
     ) async throws -> [AssistantDraftTask] {
+        if let drafting {
+            return try drafting(text)
+        }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Australia/Sydney")!
         return [

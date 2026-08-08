@@ -219,18 +219,18 @@ final class AssistantPresentationTests: XCTestCase {
 
         let item = try XCTUnwrap(context.viewModel.assignments.first)
         context.viewModel.openAssistant(about: item)
-        context.viewModel.assistantDraftInput = "half a question"
+        context.viewModel.assistantComposerInput = "half a question"
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
 
         // Out to a popover and back: nothing typed or said is lost.
         context.viewModel.showAssistantAsPopover()
         XCTAssertEqual(context.viewModel.assistantPresentation, .popover)
-        XCTAssertEqual(context.viewModel.assistantDraftInput, "half a question")
+        XCTAssertEqual(context.viewModel.assistantComposerInput, "half a question")
         XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
 
         context.viewModel.showAssistantAsSidebar()
         XCTAssertEqual(context.viewModel.assistantPresentation, .sidebar)
-        XCTAssertEqual(context.viewModel.assistantDraftInput, "half a question")
+        XCTAssertEqual(context.viewModel.assistantComposerInput, "half a question")
         XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
     }
 

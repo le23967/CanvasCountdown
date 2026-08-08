@@ -12,24 +12,41 @@ enum AssistantStyle {
     static let accent = Color(red: 0.42, green: 0.36, blue: 0.86)
     static let secondaryAccent = Color(red: 0.58, green: 0.44, blue: 0.90)
 
+    /// The identity mark, and the send control. One gradient at one size, so
+    /// the panel reads as a place rather than as another form.
+    static var mark: LinearGradient {
+        LinearGradient(
+            colors: [secondaryAccent, accent],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     /// Tinted fills stay faint so system label colours keep their contrast in
     /// both appearances.
     static func messageFill(isUser: Bool) -> Color {
         isUser ? accent.opacity(0.14) : Color.secondary.opacity(0.10)
     }
+
+    /// The hairline the suggestion cards, the draft cards and the composer all
+    /// share, so they read as one set of surfaces rather than three treatments.
+    /// Derived from the label colour, so it follows the appearance.
+    static let cardStroke = Color.primary.opacity(0.10)
+    static let cardFill = Color.primary.opacity(0.04)
+    static let cardCornerRadius: CGFloat = 12
 }
 
 struct AssistantPanelView: View {
     @Bindable var viewModel: MainViewModel
     let onSaveDrafts: @MainActor ([AssistantDraftTask]) async -> Void
 
-    @FocusState private var isRequestFocused: Bool
-    @FocusState private var isRevisionFocused: Bool
-    @FocusState private var isQuestionFocused: Bool
+    /// One field, so one focus binding. There used to be three of each.
+    @FocusState private var isComposerFocused: Bool
 
     /// Starts off, so opening the panel lands on the newest exchange rather
     /// than the oldest one kept.
     @State private var showsFullHistory = false
+    @State private var hoveredSuggestion: String?
 
     private var visibleConversation: [AssistantMessage] {
         showsFullHistory ? viewModel.conversation : viewModel.recentConversation
@@ -48,8 +65,11 @@ struct AssistantPanelView: View {
                         disabledNotice
                     } else {
                         conversationSection
-                        Divider()
-                        draftSection
+
+                        if !viewModel.assistantDrafts.isEmpty {
+                            Divider()
+                            draftSection
+                        }
                     }
 
                     if let message = viewModel.assistantErrorMessage {
@@ -61,15 +81,25 @@ struct AssistantPanelView: View {
                     }
                 }
                 .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Outside the scroll view on purpose. The one place to type is also
+            // the one thing that must never be scrolled off the panel.
+            if viewModel.isAssistantEnabled {
+                composer
             }
         }
         .frame(minWidth: 220)
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
             Image(systemName: "sparkles")
-                .foregroundStyle(AssistantStyle.accent)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(AssistantStyle.mark, in: Circle())
                 .accessibilityHidden(true)
 
             Text("Assistant")
@@ -98,24 +128,9 @@ struct AssistantPanelView: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
 
+            // Which model is in use is chosen on the composer now, beside the
+            // sentence it will answer, rather than in here as well.
             Menu {
-                if viewModel.assistantProfiles.count > 1 {
-                    Picker("Model", selection: Binding(
-                        get: { viewModel.assistantSettings.activeProfileID },
-                        set: { id in
-                            if let id {
-                                viewModel.selectAssistantProfile(id)
-                            }
-                        }
-                    )) {
-                        ForEach(viewModel.assistantProfiles) { profile in
-                            Text(profile.name).tag(Optional(profile.id))
-                        }
-                    }
-
-                    Divider()
-                }
-
                 Picker("Show as", selection: Binding(
                     get: { viewModel.assistantPreference },
                     set: { viewModel.setAssistantPreference($0) }
@@ -203,26 +218,13 @@ struct AssistantPanelView: View {
         }
     }
 
+    // MARK: - The conversation
+
+    @ViewBuilder
     private var conversationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             if viewModel.conversation.isEmpty {
-                Text("Ask about your deadlines")
-                    .font(.subheadline.weight(.semibold))
-
-                // Counts and dates are worked out by the app and handed to the
-                // model, so an answer about "how many" is not a guess.
-                Text("Counts and dates come from your own list, not from the model.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                ForEach(MainViewModel.assistantSuggestions, id: \.self) { suggestion in
-                    Button(suggestion) {
-                        Task { await viewModel.ask(suggestion) }
-                    }
-                    .buttonStyle(.link)
-                    .disabled(viewModel.isAssistantBusy)
-                }
+                emptyState
             } else {
                 // The newest exchange is the one being read, and the field to
                 // ask again sits below all of this, so only the recent ones are
@@ -264,36 +266,6 @@ struct AssistantPanelView: View {
                 }
                 .font(.callout)
             }
-
-            HStack(spacing: 6) {
-                TextField(
-                    "Ask anything about your deadlines",
-                    text: $viewModel.assistantDraftInput,
-                    axis: .vertical
-                )
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-                    .focused($isQuestionFocused)
-                    .onSubmit(sendQuestion)
-                    .accessibilityLabel("Ask the assistant")
-
-                Button {
-                    sendQuestion()
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .foregroundStyle(
-                            viewModel.assistantDraftInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? AnyShapeStyle(.secondary)
-                                : AnyShapeStyle(AssistantStyle.accent)
-                        )
-                }
-                .buttonStyle(.borderless)
-                .disabled(
-                    viewModel.isAssistantBusy
-                        || viewModel.assistantDraftInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                )
-                .accessibilityLabel("Send")
-            }
         }
         // Kept between launches now, so clearing throws away a record rather
         // than closing a window.
@@ -310,6 +282,87 @@ struct AssistantPanelView: View {
             }
         } message: {
             Text("Everything asked and answered here is deleted. Your assignments are not touched.")
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Ask about your deadlines")
+                .font(.title3.weight(.semibold))
+
+            // Counts and dates are worked out by the app and handed to the
+            // model, so an answer about "how many" is not a guess.
+            Text("Counts and dates come from your own list, not from the model.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 2)
+
+            ForEach(MainViewModel.assistantSuggestions, id: \.self) { suggestion in
+                suggestionCard(suggestion, systemImage: "text.bubble") {
+                    Task { await viewModel.ask(suggestion) }
+                }
+                .disabled(viewModel.isAssistantBusy)
+            }
+
+            // The one thing that says the box below has a second job. Without
+            // it the mode chip is a control nobody has a reason to open, and
+            // writing a task in a sentence goes back to being undiscoverable.
+            suggestionCard(
+                "Add a task in your own words",
+                systemImage: AssistantComposerMode.addTask.systemImage
+            ) {
+                viewModel.assistantComposerMode = .addTask
+                isComposerFocused = true
+            }
+        }
+    }
+
+    /// A whole row that can be pressed, rather than a line of blue underlined
+    /// text. The cards are the empty state; there is nothing else to read.
+    private func suggestionCard(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.caption)
+                    .foregroundStyle(AssistantStyle.accent)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        AssistantStyle.accent.opacity(0.12),
+                        in: Circle()
+                    )
+                    .accessibilityHidden(true)
+
+                Text(title)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(hoveredSuggestion == title
+                        ? AssistantStyle.cardFill
+                        : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(AssistantStyle.cardStroke)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .onHover { isInside in
+            hoveredSuggestion = isInside ? title : nil
         }
     }
 
@@ -342,101 +395,78 @@ struct AssistantPanelView: View {
         )
     }
 
+    /// Your own words sit on the right, the answer on the left, both short of
+    /// the full width so the two sides are told apart at a glance. The name and
+    /// the time stay: this is a record that survives a relaunch, not a
+    /// scrollback.
     private func messageBubble(_ message: AssistantMessage) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(message.role == .user ? "You" : "Assistant")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(message.date.formatted(.dateTime.hour().minute()))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Spacer(minLength: 0)
+        let isUser = message.role == .user
+        return HStack(spacing: 0) {
+            if isUser {
+                Spacer(minLength: 28)
             }
-            Text(message.text)
-                .font(.callout)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(isUser ? "You" : "Assistant")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(message.date.formatted(.dateTime.hour().minute()))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer(minLength: 0)
+                }
+                Text(message.text)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(10)
+            .background(
+                AssistantStyle.messageFill(isUser: isUser),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+
+            if !isUser {
+                Spacer(minLength: 28)
+            }
         }
-        .padding(10)
-        .background(
-            AssistantStyle.messageFill(isUser: message.role == .user),
-            in: RoundedRectangle(cornerRadius: 8)
-        )
     }
 
-    private func sendQuestion() {
-        let text = viewModel.assistantDraftInput
-        viewModel.assistantDraftInput = ""
-        Task { await viewModel.ask(text) }
-    }
+    // MARK: - Drafts waiting to be checked
 
     private var draftSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Add a task in your own words")
-                .font(.subheadline.weight(.semibold))
+            requestHistory
 
-            // Not cleared once it has been sent. Changing one thing about the
-            // result should not mean retyping the sentence that produced it.
-            TextField(
-                "Essay draft due next Friday at 5pm",
-                text: $viewModel.assistantDraftRequest,
-                axis: .vertical
-            )
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(2...4)
-            .focused($isRequestFocused)
-            .onSubmit(draft)
-            .accessibilityLabel("Describe a task")
+            Text("Check these before saving")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-            HStack {
-                Button(viewModel.assistantDrafts.isEmpty
-                    ? "Draft Task"
-                    : "Start Over") {
-                    draft()
-                }
-                .disabled(
-                    viewModel.isAssistantBusy
-                        || viewModel.assistantDraftRequest
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                            .isEmpty
-                )
-                .help(viewModel.assistantDrafts.isEmpty
-                    ? "Read tasks out of that sentence"
-                    : "Throw these away and read that sentence again")
-                Spacer()
+            ForEach(viewModel.assistantDrafts) { task in
+                draftRow(task)
             }
 
-            if !viewModel.assistantDrafts.isEmpty {
-                requestHistory
-
-                Text("Check these before saving")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ForEach(viewModel.assistantDrafts) { task in
-                    draftRow(task)
+            HStack {
+                Button("Discard") {
+                    viewModel.clearAssistantDrafts()
                 }
-
-                revisionField
-
-                HStack {
-                    Button("Discard") {
-                        viewModel.clearAssistantDrafts()
-                    }
-                    Spacer()
-                    // The ellipsis is the promise that this is not the last
-                    // step: it opens the confirmation rather than writing.
-                    Button("Save Selected…") {
-                        viewModel.requestSaveAssistantDrafts()
-                    }
-                    .keyboardShortcut(
-                        hasPendingRevision ? nil : KeyboardShortcut.defaultAction
-                    )
-                    .disabled(!viewModel.hasSaveableDrafts)
-                    .help("Check what will be added, then add it")
+                .help("Throw these away and start from a new sentence")
+                Spacer()
+                // The ellipsis is the promise that this is not the last
+                // step: it opens the confirmation rather than writing.
+                Button("Save Selected…") {
+                    viewModel.requestSaveAssistantDrafts()
                 }
+                // Return belongs to whatever is being typed. While there is a
+                // sentence in the box, it changes the drafts rather than saving
+                // them.
+                .keyboardShortcut(
+                    hasTypedText ? nil : KeyboardShortcut.defaultAction
+                )
+                .disabled(!viewModel.hasSaveableDrafts)
+                .help("Check what will be added, then add it")
             }
         }
         .confirmationDialog(
@@ -462,6 +492,9 @@ struct AssistantPanelView: View {
 
     /// What has been asked so far, so the drafts read as the result of a
     /// conversation rather than appearing from nowhere.
+    ///
+    /// This is also where the sentence that produced them goes once the box has
+    /// been emptied, so nothing typed is lost by clearing it.
     @ViewBuilder
     private var requestHistory: some View {
         if !viewModel.assistantDraftHistory.isEmpty {
@@ -497,70 +530,6 @@ struct AssistantPanelView: View {
                     viewModel.assistantDraftHistory.joined(separator: ", then ")
             )
         }
-    }
-
-    /// Says something about the drafts that exist, rather than starting again.
-    ///
-    /// The button says what it does rather than being an arrow. A bare glyph
-    /// beside a text field read as decoration, and people pressed Save Selected
-    /// instead — which meant the sentence they had just typed was thrown away
-    /// and the drafts were written unchanged.
-    private var revisionField: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextField(
-                "Change these — “put them under 41021”",
-                text: $viewModel.assistantRevisionInput,
-                axis: .vertical
-            )
-            .textFieldStyle(.roundedBorder)
-            .lineLimit(1...3)
-            .focused($isRevisionFocused)
-            .onSubmit(revise)
-            .accessibilityLabel("Change these drafts")
-
-            HStack(spacing: 8) {
-                Button("Apply Change") {
-                    revise()
-                }
-                // Return belongs to whatever is being typed. While there is a
-                // sentence in the field, it applies that rather than saving.
-                .keyboardShortcut(
-                    hasPendingRevision ? KeyboardShortcut.defaultAction : nil
-                )
-                .disabled(!canRevise)
-                .help("Rewrite the drafts above using this sentence")
-
-                if viewModel.isAssistantBusy {
-                    ProgressView().controlSize(.small)
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            Text("The drafts above go with it, so it edits them instead of starting again. Your ticks and labels are kept.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    /// Something is typed in the follow-up field and has not been applied.
-    private var hasPendingRevision: Bool {
-        !viewModel.assistantRevisionInput
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .isEmpty
-    }
-
-    private var canRevise: Bool {
-        viewModel.canReviseAssistantDrafts && hasPendingRevision
-    }
-
-    private func revise() {
-        guard canRevise else {
-            return
-        }
-        let text = viewModel.assistantRevisionInput
-        Task { await viewModel.reviseAssistantDrafts(with: text) }
     }
 
     private func draftRow(_ task: AssistantDraftTask) -> some View {
@@ -649,7 +618,14 @@ struct AssistantPanelView: View {
             }
         }
         .padding(10)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            RoundedRectangle(cornerRadius: AssistantStyle.cardCornerRadius)
+                .fill(AssistantStyle.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AssistantStyle.cardCornerRadius)
+                .strokeBorder(AssistantStyle.cardStroke)
+        )
     }
 
     /// One list with None at the top, the same shape the row menu in the list
@@ -708,8 +684,255 @@ struct AssistantPanelView: View {
         .accessibilityLabel("Label for \(task.title)")
     }
 
-    private func draft() {
-        let text = viewModel.assistantDraftRequest
-        Task { await viewModel.draftTask(from: text) }
+    // MARK: - The one box
+
+    /// Everything typed into the assistant goes here.
+    ///
+    /// There used to be three fields stacked one above another — ask, describe
+    /// a task, change these drafts — each with its own button. The third looked
+    /// like the save field, which made it the one place where pressing the
+    /// obvious thing threw away a sentence and wrote the drafts unchanged. One
+    /// box, saying underneath it what it is about to do, cannot do that.
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField(
+                composerPlaceholder,
+                text: $viewModel.assistantComposerInput,
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .font(.callout)
+            .lineLimit(1...5)
+            .focused($isComposerFocused)
+            .onSubmit(send)
+            .accessibilityLabel(composerDescription)
+
+            HStack(spacing: 6) {
+                if viewModel.assistantComposerRole == .reviseDrafts {
+                    revisingNotice
+                } else {
+                    modeChip
+                    automaticReading
+                    if viewModel.showsAssistantModelPicker {
+                        modelChip
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                sendControl
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: AssistantStyle.cardCornerRadius)
+                .fill(Color(nsColor: .textBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AssistantStyle.cardCornerRadius)
+                .strokeBorder(isComposerFocused
+                    ? AssistantStyle.accent.opacity(0.55)
+                    : AssistantStyle.cardStroke)
+        )
+        .padding(12)
+        .background(.bar)
+        .overlay(alignment: .top) {
+            Divider()
+        }
+        // A click anywhere on the surround puts the caret in the field, so the
+        // whole composer behaves as the one target it looks like.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isComposerFocused = true
+        }
+    }
+
+    /// Says what the box is for, in the box.
+    ///
+    /// Read off the mode rather than the role, so that on automatic it names
+    /// both jobs instead of naming whichever one an empty box happens to
+    /// resolve to.
+    private var composerPlaceholder: String {
+        guard viewModel.assistantComposerRole != .reviseDrafts else {
+            return "Change these — “put them under 41021”"
+        }
+        switch viewModel.assistantComposerMode {
+        case .automatic:
+            return "Ask about your deadlines, or describe a task"
+        case .ask:
+            return "Ask about your deadlines"
+        case .addTask:
+            return "Describe a task — essay draft due next Friday at 5pm"
+        }
+    }
+
+    /// What automatic has made of the sentence so far.
+    ///
+    /// The whole safety of guessing rests on this line: it appears as soon as
+    /// there is something to read, so a wrong reading is caught and the chip
+    /// changed before Return is ever pressed.
+    @ViewBuilder
+    private var automaticReading: some View {
+        if viewModel.assistantComposerMode == .automatic, hasTypedText {
+            Text(viewModel.assistantComposerRole == .addTask
+                ? "will add a task"
+                : "will answer")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .accessibilityLabel(viewModel.assistantComposerRole == .addTask
+                    ? "Read as a task to add"
+                    : "Read as a question to answer")
+        }
+    }
+
+    private var composerDescription: String {
+        switch viewModel.assistantComposerRole {
+        case .ask:
+            "Ask the assistant"
+        case .addTask:
+            "Describe a task"
+        case .reviseDrafts:
+            "Change the drafts above"
+        }
+    }
+
+    /// Which of the two jobs the box has, named rather than drawn. A glyph here
+    /// would be the eye button all over again.
+    private var modeChip: some View {
+        Menu {
+            ForEach(AssistantComposerMode.allCases) { mode in
+                Button {
+                    viewModel.assistantComposerMode = mode
+                    isComposerFocused = true
+                } label: {
+                    if mode == viewModel.assistantComposerMode {
+                        Label(mode.title, systemImage: "checkmark")
+                    } else {
+                        Text(mode.title)
+                    }
+                }
+            }
+        } label: {
+            Label(
+                viewModel.assistantComposerMode.title,
+                systemImage: viewModel.assistantComposerMode.systemImage
+            )
+            .font(.caption)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .fixedSize()
+        .help("Whether this box asks a question or writes a task")
+        .accessibilityLabel(
+            "Composer mode, \(viewModel.assistantComposerMode.title)"
+        )
+    }
+
+    /// The toolbar's old Model button, rehoused beside the sentence it will
+    /// answer. Only appears once there is more than one saved model.
+    private var modelChip: some View {
+        Menu {
+            ForEach(viewModel.assistantProfiles) { profile in
+                Button {
+                    viewModel.selectAssistantProfile(profile.id)
+                } label: {
+                    if profile.id == viewModel.assistantSettings.activeProfileID {
+                        Label(profile.name, systemImage: "checkmark")
+                    } else {
+                        Text(profile.name)
+                    }
+                }
+                .help(profile.subtitle)
+            }
+
+            Divider()
+
+            Button("Manage Models…") {
+                viewModel.sidebarSelection = .settings
+            }
+        } label: {
+            Text(viewModel.activeAssistantProfile?.name ?? "Model")
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .fixedSize()
+        .help(viewModel.assistantModelDescription)
+        .accessibilityLabel(viewModel.assistantModelDescription)
+    }
+
+    /// Replaces the mode chip while drafts are on screen, because the box is no
+    /// longer the user's to point somewhere: a sentence typed now is about the
+    /// review above it. This line is also where the reassurance about ticks and
+    /// labels lives, next to the thing it reassures about.
+    private var revisingNotice: some View {
+        Label(
+            viewModel.assistantDrafts.count == 1
+                ? "Changing the draft above · ticks and labels kept"
+                : "Changing the \(viewModel.assistantDrafts.count) drafts above · ticks and labels kept",
+            systemImage: "arrow.turn.down.right"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var sendControl: some View {
+        Button(action: send) {
+            if viewModel.isAssistantBusy {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 26, height: 26)
+            } else {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background {
+                        if viewModel.canSendComposer {
+                            Circle().fill(AssistantStyle.mark)
+                        } else {
+                            Circle().fill(Color.secondary.opacity(0.35))
+                        }
+                    }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.canSendComposer)
+        .help(sendDescription)
+        .accessibilityLabel(sendDescription)
+    }
+
+    private var sendDescription: String {
+        switch viewModel.assistantComposerRole {
+        case .ask:
+            "Send this question"
+        case .addTask:
+            "Read tasks out of this sentence"
+        case .reviseDrafts:
+            "Rewrite the drafts above using this sentence"
+        }
+    }
+
+    /// Something is typed and has not been sent. While this is true, Return
+    /// belongs to the box rather than to Save Selected.
+    private var hasTypedText: Bool {
+        !viewModel.assistantComposerInput
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
+    private func send() {
+        guard viewModel.canSendComposer else {
+            return
+        }
+        Task { await viewModel.sendComposer() }
     }
 }

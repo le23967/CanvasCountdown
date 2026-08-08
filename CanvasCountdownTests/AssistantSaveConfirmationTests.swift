@@ -47,14 +47,14 @@ final class AssistantSaveConfirmationTests: XCTestCase {
         let harness = try makeHarness()
         await harness.viewModel.draftTask(from: "gym monday wednesday")
         let before = harness.viewModel.assistantDrafts
-        harness.viewModel.assistantRevisionInput = "half typed"
+        harness.viewModel.assistantComposerInput = "half typed"
 
         harness.viewModel.requestSaveAssistantDrafts()
         harness.viewModel.cancelSaveAssistantDrafts()
 
         XCTAssertFalse(harness.viewModel.isConfirmingAssistantSave)
         XCTAssertEqual(harness.viewModel.assistantDrafts, before)
-        XCTAssertEqual(harness.viewModel.assistantRevisionInput, "half typed")
+        XCTAssertEqual(harness.viewModel.assistantComposerInput, "half typed")
         let stored = try await harness.repository.fetchAll()
         XCTAssertTrue(stored.isEmpty)
     }
@@ -86,6 +86,22 @@ final class AssistantSaveConfirmationTests: XCTestCase {
         XCTAssertEqual(stored.count, 2)
         XCTAssertFalse(harness.viewModel.isConfirmingAssistantSave)
         XCTAssertTrue(harness.viewModel.assistantDrafts.isEmpty)
+    }
+
+    /// The round is over, so the box goes back to needing no choice. Leaving it
+    /// pinned to Add task would mean the next question was read as another
+    /// task, by a setting nobody remembers making.
+    func testSavingLeavesTheBoxReadyForAnything() async throws {
+        let harness = try makeHarness()
+        harness.viewModel.assistantComposerMode = .addTask
+        await harness.viewModel.draftTask(from: "gym monday wednesday")
+
+        await harness.viewModel.saveAssistantDrafts(
+            harness.viewModel.assistantDrafts
+        )
+
+        XCTAssertEqual(harness.viewModel.assistantComposerMode, .automatic)
+        XCTAssertTrue(harness.viewModel.assistantComposerInput.isEmpty)
     }
 
     /// Undo is still offered afterwards. The confirmation is the chance to stop
@@ -139,7 +155,7 @@ final class AssistantSaveConfirmationTests: XCTestCase {
 
         XCTAssertFalse(harness.viewModel.assistantSaveSummary.hasUnappliedChange)
 
-        harness.viewModel.assistantRevisionInput = "put them under 41021"
+        harness.viewModel.assistantComposerInput = "put them under 41021"
 
         let summary = harness.viewModel.assistantSaveSummary
         XCTAssertTrue(summary.hasUnappliedChange)
@@ -153,7 +169,7 @@ final class AssistantSaveConfirmationTests: XCTestCase {
     func testWhitespaceInTheFollowUpFieldIsNotAChange() async throws {
         let harness = try makeHarness()
         await harness.viewModel.draftTask(from: "gym monday wednesday")
-        harness.viewModel.assistantRevisionInput = "   \n "
+        harness.viewModel.assistantComposerInput = "   \n "
 
         XCTAssertFalse(harness.viewModel.assistantSaveSummary.hasUnappliedChange)
     }

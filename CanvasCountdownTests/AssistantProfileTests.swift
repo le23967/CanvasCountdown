@@ -266,50 +266,49 @@ final class AssistantProfileTests: XCTestCase {
     }
 
     @MainActor
-    func testTheToolbarOffersASwitcherOnlyOnceThereIsSomethingToSwitchTo() async throws {
+    func testTheAssistantOffersAPickerOnlyOnceThereIsSomethingToSwitchTo() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
 
         XCTAssertFalse(
-            harness.viewModel.showsAssistantModelSwitcher,
-            "One model is just the model; a switcher would be noise"
+            harness.viewModel.showsAssistantModelPicker,
+            "One model is just the model; a picker would be noise"
         )
-        XCTAssertEqual(harness.viewModel.toolbarItemCount, 7)
 
         harness.viewModel.addAssistantProfile(AssistantProfile(service: .groq))
 
-        XCTAssertTrue(harness.viewModel.showsAssistantModelSwitcher)
-        XCTAssertEqual(harness.viewModel.toolbarItemCount, 8)
+        XCTAssertTrue(harness.viewModel.showsAssistantModelPicker)
     }
 
     @MainActor
-    func testTurningTheAssistantOffTakesTheSwitcherWithIt() async throws {
+    func testTurningTheAssistantOffTakesThePickerWithIt() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
         harness.viewModel.addAssistantProfile(AssistantProfile(service: .groq))
-        XCTAssertTrue(harness.viewModel.showsAssistantModelSwitcher)
+        XCTAssertTrue(harness.viewModel.showsAssistantModelPicker)
 
         var form = harness.viewModel.settingsForm
         form.assistant.isEnabled = false
         harness.viewModel.applySettings(form)
 
-        XCTAssertFalse(harness.viewModel.showsAssistantModelSwitcher)
-        XCTAssertEqual(harness.viewModel.toolbarItemCount, 7)
+        XCTAssertFalse(harness.viewModel.showsAssistantModelPicker)
     }
 
-    /// Search is a panel now, so it no longer evicts the switcher — or
-    /// anything else — from the toolbar.
+    /// The picker moved into the assistant, beside the sentence it will answer,
+    /// so saving a second model no longer changes the shape of the toolbar.
     @MainActor
-    func testOpeningSearchLeavesTheSwitcherInTheToolbar() async throws {
+    func testTheToolbarIsTheSameSixWhateverTheAssistantIsSetTo() async throws {
         let harness = try makeHarness()
         await harness.viewModel.start()
+        XCTAssertEqual(harness.viewModel.toolbarItemCount, 6)
+
         harness.viewModel.addAssistantProfile(AssistantProfile(service: .groq))
-        XCTAssertEqual(harness.viewModel.toolbarItemCount, 8)
+        XCTAssertEqual(harness.viewModel.toolbarItemCount, 6)
 
         harness.viewModel.presentSearch()
 
-        XCTAssertEqual(harness.viewModel.toolbarItemCount, 8)
-        XCTAssertTrue(harness.viewModel.showsAssistantModelSwitcher)
+        XCTAssertEqual(harness.viewModel.toolbarItemCount, 6)
+        XCTAssertTrue(harness.viewModel.showsAssistantModelPicker)
         XCTAssertTrue(harness.viewModel.showsOrdinaryToolbarActions)
     }
 
