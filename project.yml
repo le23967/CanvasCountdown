@@ -30,7 +30,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Canvas Countdown
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 le23967. MIT Licence."
-        MARKETING_VERSION: 1.1.0
+        MARKETING_VERSION: 1.2.0
         PRODUCT_BUNDLE_IDENTIFIER: io.github.le23967.CanvasCountdown
         PRODUCT_MODULE_NAME: CanvasCountdown
         PRODUCT_NAME: CanvasCountdown

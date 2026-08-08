@@ -54,6 +54,24 @@ for key in CFBundleDisplayName CFBundleIdentifier CFBundleShortVersionString \
         "$(/usr/libexec/PlistBuddy -c "Print :$key" "$PLIST")"
 done
 
+echo "==> Architectures"
+# One download has to run on both kinds of Mac. Xcode builds both by default,
+# which is exactly why this is worth checking: a setting changed by accident
+# would produce a build that silently refuses to open on half the machines it
+# was published for, and nothing else here would notice.
+ARCHS_BUILT="$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")"
+echo "    $ARCHS_BUILT"
+for arch in arm64 x86_64; do
+    case " $ARCHS_BUILT " in
+        *" $arch "*) ;;
+        *)
+            echo "!! $arch missing: this build would not run on every supported Mac" >&2
+            exit 1
+            ;;
+    esac
+done
+echo "    Apple silicon and Intel are both covered"
+
 echo "==> Signature"
 codesign --verify --strict --verbose=2 "$APP" 2>&1 | sed 's/^/    /'
 codesign -dv "$APP" 2>&1 | grep -E 'Identifier|Signature|TeamIdentifier|flags' | sed 's/^/    /'

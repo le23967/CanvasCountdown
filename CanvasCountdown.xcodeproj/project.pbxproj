@@ -775,7 +775,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdown;
 				PRODUCT_MODULE_NAME = CanvasCountdown;
@@ -884,7 +884,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.le23967.CanvasCountdown;
 				PRODUCT_MODULE_NAME = CanvasCountdown;
