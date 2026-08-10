@@ -2261,8 +2261,10 @@ final class MainViewModel {
         // with the fields above it would be worse than no saving at all.
         syncActiveAssistantProfile(with: form.assistant)
 
-        // Colours the user cannot read are corrected rather than stored.
-        let appearance = form.dockAppearance.correctedForContrast()
+        // Stored exactly as chosen. Low-contrast colours used to be rewritten
+        // here, which meant picking white and being handed black — the one
+        // place in the app where a control did not do what it said.
+        let appearance = form.dockAppearance
         if settingsStore.dockAppearance != appearance {
             settingsStore.dockAppearance = appearance
             settingsForm.dockAppearance = appearance
@@ -2368,16 +2370,16 @@ final class MainViewModel {
 
     /// Saves the colours currently in force under a new name and selects it.
     ///
-    /// The contrast correction runs first, so a preset can never be saved in a
-    /// state the app would refuse to draw.
+    /// What is on screen is what is saved. A preset that came back different
+    /// from the thing that was named would make the whole library untrustworthy.
     @discardableResult
     func saveDockThemePreset(named name: String) -> DockPresetNameError? {
         if let error = validateDockPresetName(name) {
             return error
         }
-        let corrected = settingsForm.dockAppearance.correctedForContrast()
+        let chosen = settingsForm.dockAppearance
         var library = settingsStore.dockThemePresets
-        guard let id = library.add(name: name, colours: corrected.colours) else {
+        guard let id = library.add(name: name, colours: chosen.colours) else {
             return .duplicate
         }
         settingsStore.dockThemePresets = library
@@ -2386,7 +2388,7 @@ final class MainViewModel {
         }
         settingsForm.dockAppearance = DockAppearance.applying(
             saved,
-            to: corrected
+            to: chosen
         )
         applySettings(settingsForm)
         showTransientStatus("Saved “\(saved.name)”")
@@ -2398,13 +2400,13 @@ final class MainViewModel {
         guard let preset = dockThemeStatus.editedPreset else {
             return
         }
-        let corrected = settingsForm.dockAppearance.correctedForContrast()
+        let chosen = settingsForm.dockAppearance
         var library = settingsStore.dockThemePresets
-        guard library.update(preset.id, colours: corrected.colours) else {
+        guard library.update(preset.id, colours: chosen.colours) else {
             return
         }
         settingsStore.dockThemePresets = library
-        settingsForm.dockAppearance = corrected
+        settingsForm.dockAppearance = chosen
         settingsForm.dockAppearance.userPresetID = preset.id
         applySettings(settingsForm)
         showTransientStatus("Updated “\(preset.name)”")
@@ -2457,8 +2459,11 @@ final class MainViewModel {
         }
     }
 
-    /// True when the chosen colours would be hard to read and were corrected.
-    var dockAppearanceHadContrastCorrection: Bool {
+    /// True when the chosen colours fall below the readability floors.
+    ///
+    /// Nothing acts on this. It exists so Settings can mention it once, next to
+    /// the colours it is about.
+    var dockAppearanceIsLowContrast: Bool {
         !settingsForm.dockAppearance.hasSufficientContrast
     }
 

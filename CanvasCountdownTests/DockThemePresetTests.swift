@@ -369,26 +369,63 @@ final class DockThemePresetTests: XCTestCase {
         XCTAssertEqual(context.viewModel.dockThemeStatus.title, "Custom — Unsaved")
     }
 
-    func testAPresetIsSavedInAReadableState() async throws {
+    /// The reported bug, at the level it was seen: pick white, press nothing
+    /// else, and the tile is drawn white. It used to come back black.
+    func testTheChosenColoursReachTheDockUnchanged() async throws {
         let context = try makeContext()
         await context.viewModel.start()
-        // White on white: unreadable, and corrected before it is stored.
-        context.viewModel.settingsForm.dockAppearance.colours = colours(
+
+        var form = context.viewModel.settingsForm
+        form.dockAppearance.colours = colours(
+            top: "#FFFFFF",
+            bottom: "#FFFFFF",
+            number: "#FFFFFF",
+            label: "#FFFFFF"
+        )
+        form.dockAppearance.preset = .custom
+        context.viewModel.applySettings(form)
+
+        XCTAssertEqual(
+            context.viewModel.settingsForm.dockAppearance.colours.number,
+            "#FFFFFF",
+            "The colour well must keep saying what was chosen"
+        )
+        XCTAssertEqual(
+            context.dock.appliedAppearances.last?.colours.number,
+            "#FFFFFF",
+            "And the renderer must be handed the same thing"
+        )
+        XCTAssertTrue(
+            context.viewModel.dockAppearanceIsLowContrast,
+            "Settings still says so — it just does not act on it"
+        )
+    }
+
+    /// A preset comes back as the thing that was named. Saving something other
+    /// than what was on screen would make the whole library untrustworthy —
+    /// every preset would have to be opened to find out what it really was.
+    func testAPresetIsSavedExactlyAsChosen() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        // White on white: low contrast, and saved that way because that is
+        // what was asked for.
+        let chosen = colours(
             top: "#FFFFFF",
             bottom: "#FFFFFF",
             number: "#FEFEFE",
             label: "#FDFDFD"
         )
+        context.viewModel.settingsForm.dockAppearance.colours = chosen
         context.viewModel.settingsForm.dockAppearance.preset = .custom
 
         context.viewModel.saveDockThemePreset(named: "Whiteout")
 
         let saved = try XCTUnwrap(context.viewModel.dockThemePresets.first)
-        var check = DockAppearance.defaults
-        check.colours = saved.colours
-        XCTAssertTrue(
-            check.hasSufficientContrast,
-            "A preset that cannot be read would be saved unusable"
+        XCTAssertEqual(saved.colours, chosen)
+        XCTAssertEqual(
+            context.viewModel.settingsForm.dockAppearance.colours,
+            chosen,
+            "Saving does not repaint the tile that was just named"
         )
     }
 
@@ -424,6 +461,7 @@ final class DockThemePresetTests: XCTestCase {
     private struct Context {
         let viewModel: MainViewModel
         let defaults: UserDefaults
+        let dock: AppearanceRecordingDockSpy
     }
 
     private func makeContext() throws -> Context {
@@ -431,17 +469,18 @@ final class DockThemePresetTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
 
+        let dock = AppearanceRecordingDockSpy()
         let viewModel = MainViewModel(
             repository: ScopeRepositoryStub(snapshots: []),
             refreshCoordinator: PresetCoordinatorStub(),
             feedURLStore: IsolatedFeedURLStore(),
             settingsStore: SettingsStore(defaults: defaults),
-            dockRenderer: AppearanceRecordingDockSpy(),
+            dockRenderer: dock,
             notificationScheduler: InertNotificationScheduler(),
             calendar: Calendar(identifier: .gregorian),
             automaticActivityEnabled: false
         )
-        return Context(viewModel: viewModel, defaults: defaults)
+        return Context(viewModel: viewModel, defaults: defaults, dock: dock)
     }
 }
 

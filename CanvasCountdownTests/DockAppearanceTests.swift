@@ -92,6 +92,8 @@ final class DockAppearanceTests: XCTestCase {
 
     // MARK: - Colour and contrast
 
+    /// The themes the app ships are readable. Nothing enforces that at runtime
+    /// any more, so it is worth checking the ones with no user behind them.
     func testEveryPresetIsReadable() {
         for preset in DockThemePreset.selectable {
             let appearance = DockAppearance.applying(preset, to: .defaults)
@@ -100,28 +102,27 @@ final class DockAppearanceTests: XCTestCase {
                 appearance.hasSufficientContrast,
                 "\(preset.title) does not meet the contrast floor"
             )
-            XCTAssertEqual(appearance.correctedForContrast(), appearance)
         }
     }
 
-    func testUnreadableColoursAreCorrectedAutomatically() {
+    /// The colour wells do what they say. Picking white means white, even on
+    /// white: the Dock icon belongs to whoever is looking at it, and a
+    /// guideline is a reason to mention something rather than to overrule it.
+    func testLowContrastColoursAreKeptExactlyAsChosen() {
         var appearance = DockAppearance.defaults
         appearance.colours.backgroundTop = "#FFFFFF"
         appearance.colours.backgroundBottom = "#FFFFFF"
         appearance.colours.number = "#FFFFF0"
         appearance.colours.label = "#FEFEFE"
 
-        XCTAssertFalse(appearance.hasSufficientContrast)
-
-        let corrected = appearance.correctedForContrast()
-        XCTAssertTrue(corrected.hasSufficientContrast)
-        XCTAssertEqual(corrected.colours.number, "#000000")
-        XCTAssertEqual(corrected.preset, .custom)
-        XCTAssertEqual(
-            corrected.colours.backgroundTop,
-            "#FFFFFF",
-            "Only the unreadable text colour is changed"
+        XCTAssertFalse(
+            appearance.hasSufficientContrast,
+            "Settings still has something true to say about these"
         )
+        XCTAssertEqual(appearance.colours.number, "#FFFFF0")
+        XCTAssertEqual(appearance.colours.label, "#FEFEFE")
+        XCTAssertEqual(appearance.numberColor.hexString, "#FFFFF0")
+        XCTAssertEqual(appearance.labelColor.hexString, "#FEFEFE")
     }
 
     func testContrastRatioMatchesKnownValues() {

@@ -144,9 +144,14 @@ struct DockAppearance: Equatable, Codable, Sendable {
         var label: String
     }
 
-    /// WCAG contrast floors. The countdown is very large text, which the
-    /// guidelines allow at 3:1; the small header is held to the 4.5:1 body-text
-    /// figure.
+    /// WCAG contrast floors, used to *advise* and never to overrule. The
+    /// countdown is very large text, which the guidelines allow at 3:1; the
+    /// small header is held to the 4.5:1 body-text figure.
+    ///
+    /// Falling below either of these used to rewrite the colour to black or
+    /// white. It no longer does. These are the user's colours on the user's own
+    /// Dock icon: a guideline is a reason to tell somebody, not a reason to
+    /// overrule them and hand back a tile they did not ask for.
     static let minimumNumberContrastRatio: Double = 3.0
     static let minimumLabelContrastRatio: Double = 4.5
 
@@ -227,6 +232,10 @@ struct DockAppearance: Equatable, Codable, Sendable {
         )
     }
 
+    /// Whether both colours clear the floors above.
+    ///
+    /// Read only to decide whether to mention it in Settings. Nothing acts on
+    /// it: colours below the floor are stored and drawn exactly as chosen.
     var hasSufficientContrast: Bool {
         numberContrastRatio >= Self.minimumNumberContrastRatio
             && labelContrastRatio >= Self.minimumLabelContrastRatio
@@ -234,31 +243,6 @@ struct DockAppearance: Equatable, Codable, Sendable {
 
     var averageBackgroundColor: NSColor {
         NSColor.blend(backgroundTopColor, backgroundBottomColor)
-    }
-
-    /// Replaces any colour that cannot be read on the chosen background with
-    /// black or white, whichever contrasts more.
-    func correctedForContrast() -> DockAppearance {
-        var corrected = self
-        let background = averageBackgroundColor
-
-        if numberContrastRatio < Self.minimumNumberContrastRatio {
-            corrected.colours.number = NSColor
-                .mostReadable(on: background)
-                .hexString
-        }
-        if labelContrastRatio < Self.minimumLabelContrastRatio {
-            corrected.colours.label = NSColor
-                .mostReadable(on: background)
-                .hexString
-        }
-        if corrected != self {
-            corrected.preset = .custom
-            // The colours are no longer the saved ones, so the row must stop
-            // claiming they are.
-            corrected.userPresetID = nil
-        }
-        return corrected
     }
 }
 
@@ -308,15 +292,6 @@ extension NSColor {
         let lighter = max(first.relativeLuminance, second.relativeLuminance)
         let darker = min(first.relativeLuminance, second.relativeLuminance)
         return (lighter + 0.05) / (darker + 0.05)
-    }
-
-    static func mostReadable(on background: NSColor) -> NSColor {
-        let white = NSColor.white
-        let black = NSColor.black
-        return contrastRatio(between: white, and: background)
-            >= contrastRatio(between: black, and: background)
-            ? white
-            : black
     }
 
     static func blend(_ first: NSColor, _ second: NSColor) -> NSColor {

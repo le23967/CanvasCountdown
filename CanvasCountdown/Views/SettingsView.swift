@@ -402,13 +402,16 @@ struct SettingsView: View {
                 supportsOpacity: false
             )
 
+            // Says the thing and stops. The app used to overrule the choice
+            // here and hand back black or white, which made two colour wells
+            // that did not do what they said.
             if !settings.dockAppearance.hasSufficientContrast {
                 Label(
-                    "Those colours are hard to read on this background, so the text colour is corrected automatically.",
-                    systemImage: "exclamationmark.triangle.fill"
+                    "These colours are low contrast on this background. They are drawn exactly as chosen.",
+                    systemImage: "info.circle"
                 )
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
             }
 
             Button("Reset to Defaults") {
