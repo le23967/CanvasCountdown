@@ -12,13 +12,18 @@ namespace CanvasCountdown.App;
 /// </remarks>
 public static class CrashLog
 {
-    public static void Write(Exception exception)
+    public static void Write(Exception exception) => Append("crash.log", exception.ToString());
+
+    /// <summary>Something worth knowing that did not stop the app.</summary>
+    public static void Note(string message) => Append("diagnostics.log", message);
+
+    private static void Append(string fileName, string text)
     {
         try
         {
             Directory.CreateDirectory(AppEnvironment.LogDirectory);
-            var path = Path.Combine(AppEnvironment.LogDirectory, "crash.log");
-            var entry = $"[{DateTimeOffset.Now:O}] {AppEnvironment.Version}{Environment.NewLine}{Redact(exception.ToString())}{Environment.NewLine}{Environment.NewLine}";
+            var path = Path.Combine(AppEnvironment.LogDirectory, fileName);
+            var entry = $"[{DateTimeOffset.Now:O}] {AppEnvironment.Version}{Environment.NewLine}{Redact(text)}{Environment.NewLine}{Environment.NewLine}";
             File.AppendAllText(path, entry);
         }
         catch (IOException)
