@@ -1,0 +1,79 @@
+# Builds and checks the Windows version. It reads only windows/ and never
+# touches the macOS project, whose builds stay on the Mac.
+name: Windows
+
+on:
+  push:
+    branches: [windows-port]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  core:
+    name: Core tests
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test
+        run: >
+          dotnet test windows/tests/CanvasCountdown.Core.Tests -c Release
+          --logger "trx;LogFileName=core.trx"
+          --results-directory windows/TestResults
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: core-test-results
+          path: windows/TestResults
+
+  app:
+    name: App (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: x64
+            runner: windows-2025
+          - arch: arm64
+            platform: ARM64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish
+        run: >
+          dotnet publish windows/src/CanvasCountdown.App/CanvasCountdown.App.csproj
+          -c Release -r win-${{ matrix.arch }} -p:Platform=${{ matrix.platform }}
+          -o windows/artifacts/app-${{ matrix.arch }}
+      - name: Smoke test
+        shell: pwsh
+        run: >
+          windows/scripts/smoke-test.ps1
+          -AppExe windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe
+          -OutputDirectory windows/artifacts/smoke-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-${{ matrix.arch }}
+          path: windows/artifacts/smoke-${{ matrix.arch }}

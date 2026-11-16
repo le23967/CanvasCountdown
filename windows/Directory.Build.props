@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    Shared by every project under windows/. Nothing outside this folder reads
+    it, so the macOS build is unaffected.
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The one place the Windows version number is written. The app reads it
+         back from its own assembly, and the release script refuses to package
+         a build whose number disagrees with the tag. -->
+    <Version>1.0.0</Version>
+    <Company>le23967</Company>
+    <Product>Canvas Countdown</Product>
+    <Copyright>Copyright © 2026 le23967</Copyright>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

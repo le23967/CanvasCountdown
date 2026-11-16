@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="CanvasCountdown.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Canvas Countdown">
+
+    <NavigationView
+        x:Name="Navigation"
+        IsBackButtonVisible="Collapsed"
+        PaneDisplayMode="Left"
+        IsSettingsVisible="True">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="Upcoming" Tag="upcoming" />
+            <NavigationViewItem Content="All Events" Tag="allEvents" />
+            <NavigationViewItem Content="Calendar" Tag="calendar" />
+            <NavigationViewItem Content="Completed" Tag="completed" />
+        </NavigationView.MenuItems>
+
+        <StackPanel Padding="32" Spacing="8">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Canvas Countdown" />
+            <TextBlock x:Name="VersionText" Style="{StaticResource BodyTextBlockStyle}" />
+        </StackPanel>
+    </NavigationView>
+</Window>

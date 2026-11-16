@@ -1,0 +1,11 @@
+# Build output
+bin/
+obj/
+artifacts/
+dist/
+TestResults/
+*.user
+.vs/
+
+# Packaging scratch
+installer/Output/
