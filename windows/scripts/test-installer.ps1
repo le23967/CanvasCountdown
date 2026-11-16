@@ -56,7 +56,11 @@ function Check([bool] $condition, [string] $description) {
 function Run-Installer([string] $installer, [string] $name, [string[]] $extra = @()) {
     $log = Join-Path $LogDirectory "$name.log"
     $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$log`"") + $extra
-    $process = Start-Process -FilePath (Resolve-Path $installer) -ArgumentList $arguments -Wait -PassThru
+    # -PassThru and WaitForExit, not -Wait: -Wait also waits for every child,
+    # and an update relaunches the app as the installer's child, which never
+    # exits by itself.
+    $process = Start-Process -FilePath (Resolve-Path $installer) -ArgumentList $arguments -PassThru
+    $process.WaitForExit()
     return $process.ExitCode
 }
 
@@ -141,7 +145,8 @@ New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 Set-Content -Path (Join-Path $dataDir 'keep-me.txt') -Value 'user data'
 $uninstaller = Join-Path $appDir 'unins000.exe'
 Check (Test-Path $uninstaller) 'uninstaller present'
-Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$(Join-Path $LogDirectory 'uninstall.log')`"") -Wait
+$uninstall = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$(Join-Path $LogDirectory 'uninstall.log')`"") -PassThru
+$uninstall.WaitForExit()
 $deadline = (Get-Date).AddSeconds(60)
 while ((Test-Path $appDir) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 500
