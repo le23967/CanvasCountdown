@@ -72,6 +72,18 @@ jobs:
           windows/scripts/smoke-test.ps1
           -AppExe windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe
           -OutputDirectory windows/artifacts/smoke-${{ matrix.arch }}
+      # The Windows services an isolated launch stands in for: scheduled
+      # notifications, text recognition, Credential Manager, the startup
+      # entry and the tray icon, each used for real and then cleaned up.
+      - name: Windows services
+        shell: pwsh
+        run: |
+          $env:CANVAS_COUNTDOWN_ISOLATED_LAUNCH = '1'
+          $report = Join-Path '${{ github.workspace }}' 'windows/artifacts/smoke-${{ matrix.arch }}/platform-check.txt'
+          $process = Start-Process -FilePath 'windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe' -ArgumentList '--platform-check', "`"$report`"" -PassThru
+          if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'The platform check did not finish within two minutes.' }
+          if (Test-Path $report) { Get-Content $report } else { Write-Host 'No report was written.' }
+          if ($process.ExitCode -ne 0) { throw "The platform check failed (exit code $($process.ExitCode))." }
       - uses: actions/upload-artifact@v7
         if: always()
         with:

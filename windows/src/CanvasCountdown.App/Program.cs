@@ -35,6 +35,14 @@ public static class Program
             return 0;
         }
 
+        // Run by CI against the real Windows services; refuses to run outside
+        // an isolated launch.
+        var check = Array.FindIndex(args, argument => string.Equals(argument, "--platform-check", StringComparison.OrdinalIgnoreCase));
+        if (check >= 0)
+        {
+            return PlatformCheck.Run(check + 1 < args.Length ? args[check + 1] : null);
+        }
+
         if (!AppEnvironment.IsIsolatedLaunch)
         {
             AppIdentity.ApplyToProcess();
