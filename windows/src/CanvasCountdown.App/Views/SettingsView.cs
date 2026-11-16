@@ -425,7 +425,17 @@ public sealed partial class SettingsView : UserControl
 
     private StackPanel ColourRow(string title, string hex, Func<string, Func<SettingsFormState, SettingsFormState>> change)
     {
-        var swatch = new Microsoft.UI.Xaml.Shapes.Rectangle { Width = 32, Height = 20, RadiusX = 4, RadiusY = 4, Fill = Palette.FromHex(hex) };
+        // Outlined, so a white or near-white colour is still visibly there.
+        var swatch = new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Width = 32,
+            Height = 20,
+            RadiusX = 4,
+            RadiusY = 4,
+            Fill = Palette.FromHex(hex),
+            Stroke = Resource<Brush>("ControlStrongStrokeColorDefaultBrush"),
+            StrokeThickness = 1,
+        };
         var picker = new ColorPicker
         {
             Color = Palette.ColorFromHex(hex),
