@@ -27,6 +27,7 @@ internal static class Program
 {
     private static readonly List<(string Name, bool Passed, string Detail)> Results = [];
     private static string outputDirectory = ".";
+    private static int appProcessId;
 
     private static int Main(string[] args)
     {
@@ -40,6 +41,8 @@ internal static class Program
 
         using var automation = new UIA3Automation();
         var app = Application.Launch(start);
+        var processId = app.ProcessId;
+        appProcessId = processId;
         try
         {
             var window = Retry.WhileNull(() => app.GetMainWindow(automation, TimeSpan.FromSeconds(5)), TimeSpan.FromSeconds(60)).Result
@@ -133,17 +136,27 @@ internal static class Program
         }
         finally
         {
+            // Closing the window only puts the app in the notification area,
+            // so it is ended by its process id. FlaUI may already have let go
+            // of its own handle to the process by then.
             try
             {
-                app.Close();
-                app.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(2));
+                app.Close(killIfCloseFails: false);
             }
             catch (Exception)
             {
             }
-            if (!app.HasExited)
+            try
             {
-                app.Kill();
+                using var process = Process.GetProcessById(processId);
+                if (!process.HasExited)
+                {
+                    process.Kill();
+                }
+            }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                // Already gone.
             }
         }
 
@@ -172,7 +185,7 @@ internal static class Program
             {
                 if (captureScreen)
                 {
-                    CaptureScreen(Path.Combine(outputDirectory, name + ".png"));
+                    CaptureAppWindows(Path.Combine(outputDirectory, name + ".png"));
                 }
                 else
                 {
@@ -183,6 +196,8 @@ internal static class Program
             {
                 Results.Add((name + " (picture)", false, exception.Message));
             }
+            // Written as it goes, so a tour that dies part-way still says how far it got.
+            WriteReport();
         }
     }
 
@@ -283,17 +298,38 @@ internal static class Program
         }
     }
 
-    /// <summary>For menus, which open as windows of their own and are not in the window's own picture.</summary>
-    private static void CaptureScreen(string path)
+    /// <summary>
+    /// For menus, which open as windows of their own and are not in the main
+    /// window's own picture: the area covered by the app's visible windows,
+    /// and nothing else on the screen.
+    /// </summary>
+    private static void CaptureAppWindows(string path)
     {
-        var width = GetSystemMetrics(78);
-        var height = GetSystemMetrics(79);
-        var left = GetSystemMetrics(76);
-        var top = GetSystemMetrics(77);
-        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        var bounds = Rectangle.Empty;
+        EnumWindows((handle, _) =>
+        {
+            if (IsWindowVisible(handle) && GetWindowThreadProcessId(handle, out var owner) != 0 && owner == appProcessId)
+            {
+                if (DwmGetWindowAttribute(handle, 9, out var frame, Marshal.SizeOf<Rect>()) != 0)
+                {
+                    GetWindowRect(handle, out frame);
+                }
+                var rectangle = Rectangle.FromLTRB(frame.Left, frame.Top, frame.Right, frame.Bottom);
+                if (rectangle.Width > 1 && rectangle.Height > 1)
+                {
+                    bounds = bounds.IsEmpty ? rectangle : Rectangle.Union(bounds, rectangle);
+                }
+            }
+            return true;
+        }, IntPtr.Zero);
+        if (bounds.IsEmpty)
+        {
+            throw new InvalidOperationException("The app has no visible window to photograph.");
+        }
+        using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(bitmap))
         {
-            graphics.CopyFromScreen(left, top, 0, 0, bitmap.Size);
+            graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size);
         }
         bitmap.Save(path, ImageFormat.Png);
     }
@@ -335,6 +371,14 @@ internal static class Program
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out Rect value, int size);
 
+    private delegate bool EnumWindowsProc(IntPtr handle, IntPtr parameter);
+
     [DllImport("user32.dll")]
-    private static extern int GetSystemMetrics(int index);
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr parameter);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr handle, out int processId);
 }

@@ -21,7 +21,7 @@ public sealed class AssistantComposerTests
         Assert.Equal("Ask about your deadlines, or describe a task", AssistantComposer.Placeholder(AssistantComposerMode.Automatic, AssistantComposerRole.AddTask));
         Assert.Equal("Ask about your deadlines", AssistantComposer.Placeholder(AssistantComposerMode.Ask, AssistantComposerRole.Ask));
         Assert.Equal("Describe a task — essay draft due next Friday at 5pm", AssistantComposer.Placeholder(AssistantComposerMode.AddTask, AssistantComposerRole.AddTask));
-        Assert.Equal("Change these — “put them under 41021”", AssistantComposer.Placeholder(AssistantComposerMode.Ask, AssistantComposerRole.ReviseDrafts));
+        Assert.Equal("Change these — “put them under COMP2050”", AssistantComposer.Placeholder(AssistantComposerMode.Ask, AssistantComposerRole.ReviseDrafts));
     }
 
     [Fact]

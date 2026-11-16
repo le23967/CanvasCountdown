@@ -506,7 +506,7 @@ public sealed partial class MainViewModel
     /// Changes the drafts already on screen.
     /// </summary>
     /// <remarks>
-    /// "Put them all under 41021" is a sentence about the list that exists, not
+    /// "Put them all under COMP2050" is a sentence about the list that exists, not
     /// a new request, so it is sent with that list attached. A reply that
     /// cannot be read leaves the drafts exactly as they were: a follow-up that
     /// wipes the review would be worse than one that does nothing.

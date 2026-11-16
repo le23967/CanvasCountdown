@@ -51,14 +51,38 @@ $env:CANVAS_COUNTDOWN_ISOLATED_LAUNCH = '1'
 $process = Start-Process -FilePath $AppExe -PassThru
 Start-Sleep -Seconds $SettleSeconds
 
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-$bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
-$bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
-$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-$graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bitmap.Size)
-$bitmap.Save((Join-Path $OutputDirectory 'launch.png'), [System.Drawing.Imaging.ImageFormat]::Png)
-$graphics.Dispose()
-$bitmap.Dispose()
+# The app's window only, never the whole screen.
+Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class SmokeWindow {
+    [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+    [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out Rect value, int size);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+}
+"@
+$process.Refresh()
+$handle = if ($process.HasExited) { [IntPtr]::Zero } else { $process.MainWindowHandle }
+if ($handle -ne [IntPtr]::Zero) {
+    $frame = New-Object SmokeWindow+Rect
+    if ([SmokeWindow]::DwmGetWindowAttribute($handle, 9, [ref]$frame, 16) -ne 0) {
+        [void][SmokeWindow]::GetWindowRect($handle, [ref]$frame)
+    }
+    $width = $frame.Right - $frame.Left
+    $height = $frame.Bottom - $frame.Top
+    if ($width -gt 1 -and $height -gt 1) {
+        $bitmap = New-Object System.Drawing.Bitmap $width, $height
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($frame.Left, $frame.Top, 0, 0, $bitmap.Size)
+        $bitmap.Save((Join-Path $OutputDirectory 'launch.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+else {
+    Write-Host 'The app has no main window to photograph.'
+}
 
 $alive = -not $process.HasExited
 if ($alive) {

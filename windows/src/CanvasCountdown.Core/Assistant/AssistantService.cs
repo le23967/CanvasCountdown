@@ -217,7 +217,7 @@ public interface IAssistantServicing
     /// Changes drafts that already exist, rather than starting again.
     /// </summary>
     /// <remarks>
-    /// Without this, "put those under 41021" means retyping the sentence that
+    /// Without this, "put those under COMP2050" means retyping the sentence that
     /// produced them, and the reply is a fresh guess that loses whatever was
     /// already corrected by hand. The current drafts go with the request, so
     /// the model is editing a list rather than inventing one.

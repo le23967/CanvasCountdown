@@ -78,7 +78,7 @@ public sealed class AssistantSaveConfirmationTests
 
         Assert.False(review.Summary("").HasUnappliedChange);
 
-        var summary = review.Summary("put them under 41021");
+        var summary = review.Summary("put them under COMP2050");
 
         Assert.True(summary.HasUnappliedChange);
         // It is said first, because it is the surprise.
@@ -99,12 +99,12 @@ public sealed class AssistantSaveConfirmationTests
         var review = Drafted();
         foreach (var draft in review.Drafts)
         {
-            review = review.Updating(draft with { CourseName = "41021 Interaction Design Studio" });
+            review = review.Updating(draft with { CourseName = "DESN1500 Studio Practice" });
         }
 
         var lines = review.Summary("").DetailLines(Calendar, AssistantFixtures.EnglishUS);
 
-        Assert.Contains("Under 41021 Interaction Design Studio.", lines);
+        Assert.Contains("Under DESN1500 Studio Practice.", lines);
     }
 
     // The wording itself
@@ -145,9 +145,9 @@ public sealed class AssistantSaveConfirmationTests
     [Fact]
     public void TasksWithoutACourseAreCounted()
     {
-        var lines = Summary(saving: 3, courses: ["41021"], withoutCourse: 2).DetailLines(Calendar, AssistantFixtures.EnglishUS);
+        var lines = Summary(saving: 3, courses: ["COMP2050"], withoutCourse: 2).DetailLines(Calendar, AssistantFixtures.EnglishUS);
 
-        Assert.Contains("Under 41021, and 2 without a course.", lines);
+        Assert.Contains("Under COMP2050, and 2 without a course.", lines);
     }
 
     [Fact]

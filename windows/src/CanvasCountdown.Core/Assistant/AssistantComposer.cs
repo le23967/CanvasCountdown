@@ -84,7 +84,7 @@ public static class AssistantComposer
     {
         if (role == AssistantComposerRole.ReviseDrafts)
         {
-            return "Change these — “put them under 41021”";
+            return "Change these — “put them under COMP2050”";
         }
         return mode switch
         {

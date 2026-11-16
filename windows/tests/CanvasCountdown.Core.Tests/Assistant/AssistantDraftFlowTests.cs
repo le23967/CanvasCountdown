@@ -57,7 +57,7 @@ public sealed class AssistantDraftFlowTests
                  {
                      "how many are due this week",
                      "should I start the essay today",
-                     "what is left in 41021",
+                     "what is left in 12345",
                      "tell me what is urgent",
                  })
         {
@@ -88,7 +88,7 @@ public sealed class AssistantDraftFlowTests
         Assert.True(AssistantRequestReader.ReadsAsQuestion("   "));
         Assert.True(AssistantRequestReader.ReadsAsQuestion("the essay"));
         Assert.True(
-            AssistantRequestReader.ReadsAsQuestion("anything for 41021"),
+            AssistantRequestReader.ReadsAsQuestion("anything for 12345"),
             "No day, no time — the drafter would only ask for one");
     }
 
@@ -211,7 +211,7 @@ public sealed class AssistantDraftFlowTests
 
         var refusing = new RefusingHandler();
         var service = new ChatCompletionsAssistantService(AssistantFixtures.EnabledLocal, null, AssistantFixtures.Sydney, refusing);
-        var revised = await service.ReviseDraftsAsync([], "put them under 41021", AssistantFixtures.Date(2026, 7, 28));
+        var revised = await service.ReviseDraftsAsync([], "put them under COMP2050", AssistantFixtures.Date(2026, 7, 28));
 
         Assert.Empty(revised);
         Assert.Equal(0, refusing.Calls);

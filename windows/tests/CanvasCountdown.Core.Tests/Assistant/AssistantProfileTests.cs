@@ -317,7 +317,7 @@ public sealed class AssistantProfileTests
                 new AssistantDraftTask
                 {
                     Title = "  Essay draft  ",
-                    CourseName = "  41021 Interaction Design Studio  ",
+                    CourseName = "  DESN1500 Studio Practice  ",
                     LabelId = label,
                     DueDate = Date(2026, 8, 20),
                     SourceText = "essay draft due next friday",
@@ -328,7 +328,7 @@ public sealed class AssistantProfileTests
         var saved = Assert.Single(repository.Events);
         Assert.Equal("Essay draft", saved.Title);
         Assert.Equal(
-            "41021 Interaction Design Studio",
+            "DESN1500 Studio Practice",
             AssignmentListItem.FromSnapshot(saved, treatsMidnightAsEndOfDay: false, AssistantFixtures.Sydney).NormalizedCourseName);
         Assert.Equal(label, saved.LabelId);
     }

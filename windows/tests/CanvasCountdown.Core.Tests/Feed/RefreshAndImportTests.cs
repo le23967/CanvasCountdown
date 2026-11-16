@@ -238,10 +238,10 @@ public sealed class CourseBlocklistTests
     public async Task CourseNamesMatchWhateverTheirCaseAndSpacing()
     {
         var store = Store();
-        await store.BlockAsync("  68101 Physics Lab ");
+        await store.BlockAsync("  PHYS2001 Physics Lab ");
 
-        Assert.True(await store.IsBlockedAsync("68101 physics lab"));
-        Assert.True(await store.IsBlockedAsync("68101 PHYSICS LAB  "));
+        Assert.True(await store.IsBlockedAsync("PHYS2001 physics lab"));
+        Assert.True(await store.IsBlockedAsync("PHYS2001 PHYSICS LAB  "));
     }
 
     [Fact]
@@ -271,9 +271,9 @@ public sealed class CourseBlocklistTests
     public async Task ACourseIsShownBackTheWayItWasWritten()
     {
         var store = Store();
-        await store.BlockAsync(" 68101 Physics Lab ");
+        await store.BlockAsync(" PHYS2001 Physics Lab ");
 
-        Assert.Equal(["68101 Physics Lab"], await store.LoadBlockedCoursesAsync());
+        Assert.Equal(["PHYS2001 Physics Lab"], await store.LoadBlockedCoursesAsync());
     }
 
     [Fact]

@@ -194,7 +194,7 @@ public sealed class AssistantRequestTests
             new() { Id = SecondId, Title = "Workout \"2\"", DueDate = null, SourceText = "gym" },
         ];
 
-        await Service(handler).ReviseDraftsAsync(drafts, "  put them under 41021 ", Now);
+        await Service(handler).ReviseDraftsAsync(drafts, "  put them under COMP2050 ", Now);
 
         var messages = Messages(handler.Single);
         Assert.Equal(
@@ -206,7 +206,7 @@ public sealed class AssistantRequestTests
             + "use a new id only for a task you are adding, and leave a task out only if the user asked for it to go. "
             + "Today is 2026-07-28. Use 23:59 when no time is given.",
             messages[0].Content);
-        Assert.Equal("put them under 41021", messages[1].Content);
+        Assert.Equal("put them under COMP2050", messages[1].Content);
     }
 
     [Theory]

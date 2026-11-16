@@ -39,7 +39,7 @@ public sealed class AssistantTests
 
     /// <summary>
     /// The whole point of a revision: the model is handed the list that exists,
-    /// so "put them under 41021" edits those rows rather than guessing again.
+    /// so "put them under COMP2050" edits those rows rather than guessing again.
     /// </summary>
     [Fact]
     public void ARevisionEditsTheDraftsItWasGiven()
@@ -47,15 +47,15 @@ public sealed class AssistantTests
         AssistantDraftTask[] existing = [Draft("Workout 1", day: 3), Draft("Workout 2", day: 5)];
         var reply = $$"""
             {"tasks":[
-              {"id":"{{Upper(existing[0].Id)}}","title":"Workout 1","course":"41021","due":"2026-08-03T23:59"},
-              {"id":"{{Upper(existing[1].Id)}}","title":"Workout 2","course":"41021","due":"2026-08-05T23:59"}
+              {"id":"{{Upper(existing[0].Id)}}","title":"Workout 1","course":"COMP2050","due":"2026-08-03T23:59"},
+              {"id":"{{Upper(existing[1].Id)}}","title":"Workout 2","course":"COMP2050","due":"2026-08-05T23:59"}
             ]}
             """;
 
         var revised = ChatCompletionsAssistantService.ParseRevisedDrafts(reply, existing, Calendar);
 
         Assert.Equal(existing.Select(draft => draft.Id), revised.Select(draft => draft.Id));
-        Assert.Equal(new string?[] { "41021", "41021" }, revised.Select(draft => draft.CourseName));
+        Assert.Equal(new string?[] { "COMP2050", "COMP2050" }, revised.Select(draft => draft.CourseName));
     }
 
     /// <summary>

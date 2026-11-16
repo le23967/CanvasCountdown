@@ -133,7 +133,7 @@ public sealed class AssistantPortingTests
     [Fact]
     public void ACourseGivenAsANumberIsNotACourse()
     {
-        const string reply = """{"tasks":[{"title":"Essay","course":41021,"due":"2026-08-07T17:00"},{"title":"Quiz","course":"   ","due":null}]}""";
+        const string reply = """{"tasks":[{"title":"Essay","course":12345,"due":"2026-08-07T17:00"},{"title":"Quiz","course":"   ","due":null}]}""";
 
         var drafts = ChatCompletionsAssistantService.ParseDrafts(reply, "x", Calendar);
 
@@ -364,7 +364,7 @@ public sealed class AssistantPortingTests
     [InlineData("quiz 26/8", false)]
     [InlineData("quiz 26 / 8", false)]
     [InlineData("lab 17:00", false)]
-    [InlineData("anything for 41021", true)]
+    [InlineData("anything for 12345", true)]
     [InlineData("whats due", true)]
     [InlineData("what's due friday", true)]
     [InlineData("am I behind", true)]

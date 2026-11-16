@@ -252,8 +252,8 @@ public static class AssistantRequestReader
             return true;
         }
         // A bare number, but only one small enough to be a day or an hour. A
-        // course code is a run of digits too, and "anything for 41021" is a
-        // question about the list, not a task due in the year 41021.
+        // course code is a run of digits too, and "anything for 12345" is a
+        // question about the list, not a task due in the year 12345.
         if (words.Any(word =>
         {
             var characters = AssistantText.Characters(word);

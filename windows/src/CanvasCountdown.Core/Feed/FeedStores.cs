@@ -143,8 +143,8 @@ public sealed class PreferencesFeedExclusionStore(IPreferencesStore preferences,
 /// </summary>
 /// <remarks>
 /// Only ever used for comparison. What gets stored and shown is the name as it
-/// was written, because "68101 physics lab" appearing in Settings under a
-/// course the user knows as "68101 Physics Lab" reads like the app mangled it.
+/// was written, because "PHYS2001 physics lab" appearing in Settings under a
+/// course the user knows as "PHYS2001 Physics Lab" reads like the app mangled it.
 /// </remarks>
 public static class CourseName
 {
