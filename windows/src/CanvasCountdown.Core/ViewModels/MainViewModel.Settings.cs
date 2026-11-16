@@ -12,6 +12,14 @@ public sealed partial class MainViewModel
     /// </remarks>
     public void ApplySettings(SettingsFormState form)
     {
+        // Controls report their own value back when they are first drawn —
+        // a radio group does, on loading. That is not a change, and saying
+        // "Settings updated" for it would be saying something untrue.
+        if (form == SettingsForm)
+        {
+            return;
+        }
+
         // The feed URL is kept in Credential Manager and only ever changes
         // through the preview and import flow, so the form's copy is never
         // written back.

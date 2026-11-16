@@ -312,6 +312,26 @@ public sealed class CourseBlocklistTests
         Assert.Equal(["Keep", "No course"], left.Select(item => item.Title));
         Assert.Equal(0, await repository.DeleteEventsInCourseAsync("NOPE1000"));
     }
+
+    /// <summary>
+    /// Allowing a course again brings back only what the feed still publishes,
+    /// so an event typed in by hand would be gone for good. It is left alone,
+    /// as Settings promises.
+    /// </summary>
+    [Fact]
+    public async Task DeletingACourseLeavesEventsTypedInByHand()
+    {
+        using var repository = SqliteAssignmentRepository.InMemory();
+        await repository.UpsertAsync(
+            [new AssignmentImportRecord { ExternalId = "a", Title = "Imported", CourseName = "HIST1000", DueDate = FeedHarness.Day(1) }],
+            FeedHarness.Day(0));
+        await repository.SaveManualAsync(new ManualAssignmentDraft { Title = "My own reading", CourseName = "HIST1000", DueDate = FeedHarness.Day(2) }, FeedHarness.Day(0));
+
+        var removed = await repository.DeleteEventsInCourseAsync("HIST1000");
+
+        Assert.Equal(1, removed);
+        Assert.Equal(["My own reading"], (await repository.FetchAllAsync()).Select(item => item.Title));
+    }
 }
 
 /// <summary>The store itself: merging, local state, and keeping instants exact.</summary>

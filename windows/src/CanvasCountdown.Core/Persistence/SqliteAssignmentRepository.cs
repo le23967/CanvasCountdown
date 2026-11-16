@@ -483,6 +483,13 @@ public sealed class SqliteAssignmentRepository : IAssignmentRepository, IDisposa
     /// Removing a course is a deletion, which is why it is confirmed first and
     /// why the course is blocked at the same time.
     /// </summary>
+    /// <remarks>
+    /// Only what Canvas imported. An event typed in by hand under the same
+    /// course is the user's own, and allowing the course again — the way back
+    /// from a removal — brings back only what the feed still publishes, so a
+    /// manual event deleted here could never return. Settings says as much:
+    /// "Manual events are never touched".
+    /// </remarks>
     public async Task<int> DeleteEventsInCourseAsync(string courseName)
     {
         if (CourseName.Normalized(courseName) is not { } key)
@@ -492,7 +499,9 @@ public sealed class SqliteAssignmentRepository : IAssignmentRepository, IDisposa
         await oneAtATime.WaitAsync();
         try
         {
-            var doomed = LoadRows().Where(row => CourseName.Normalized(row.CourseName) == key).ToArray();
+            var doomed = LoadRows()
+                .Where(row => row.Source != AssignmentSource.Manual && CourseName.Normalized(row.CourseName) == key)
+                .ToArray();
             Delete(doomed.Select(row => row.Id));
             return doomed.Length;
         }

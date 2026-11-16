@@ -61,18 +61,24 @@ internal static class Program
                 Click(window, "ScaleMonth");
                 Click(window, "GoToDate");
                 var entry = Wait(() => Find(window, "DateEntry") ?? FindOnDesktop(automation, "DateEntry"), "the Go to Date box");
-                entry.AsTextBox().Enter("15 December");
+                // Through UI Automation rather than typed keys, which go to
+                // whatever has focus — on a fresh runner, sometimes the Start menu.
+                SetText(entry, "15 December");
                 Thread.Sleep(600);
             }, captureScreen: true);
             Step("08-go-to-date-result", window, () =>
             {
-                Keyboard.Press(VirtualKeyShort.ENTER);
+                Invoke(Wait(() => Find(window, "GoToDateGo") ?? FindOnDesktop(automation, "GoToDateGo"), "the Go button"));
                 Thread.Sleep(800);
                 var title = Find(window, "CalendarTitle")?.Name ?? string.Empty;
                 Expect(title.Contains("December", StringComparison.OrdinalIgnoreCase), $"the calendar moved to December (title: {title})");
             });
             Step("09-completed", window, () => Navigate(window, "NavCompleted", "Completed"));
             Step("10-settings", window, () => NavigateToSettings(window));
+            // Further down Settings: the tray previews, labels, the assistant, system and updates.
+            Step("10b-settings-appearance", window, () => ScrollSettings(window, 30));
+            Step("10c-settings-middle", window, () => ScrollSettings(window, 60));
+            Step("10d-settings-end", window, () => ScrollSettings(window, 100));
             Step("11-upcoming-again", window, () => Navigate(window, "NavUpcoming", "Upcoming"));
 
             Step("12-add-manual-event", window, () =>
@@ -81,7 +87,7 @@ internal static class Program
                 var menuItem = Wait(() => FindOnDesktop(automation, "AddManualEvent"), "the Add menu");
                 menuItem.Click();
                 var title = Wait(() => Find(window, "ManualTitle"), "the event name box");
-                title.AsTextBox().Enter("Practice exam (tour)");
+                SetText(title, "Practice exam (tour)");
                 Thread.Sleep(400);
             });
             Step("13-event-added-with-undo", window, () =>
@@ -102,7 +108,7 @@ internal static class Program
             {
                 Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_F);
                 var field = Wait(() => Find(window, "SearchField"), "the search box");
-                field.AsTextBox().Enter("STAT");
+                SetText(field, "STAT");
                 Thread.Sleep(800);
                 var results = Find(window, "SearchResults");
                 Expect(results is not null && results.FindAllChildren().Length > 0, "search found STAT1010 work");
@@ -124,10 +130,15 @@ internal static class Program
             Step("19-assistant-answer", window, () =>
             {
                 var composer = Find(window, "AssistantComposer")!;
-                composer.AsTextBox().Enter("What is most urgent?");
+                SetText(composer, "What is most urgent?");
                 Click(window, "AssistantSend");
-                Thread.Sleep(2500);
-                Expect(Find(window, "AssistantConversation") is not null, "the conversation shows an answer");
+                var conversation = Wait(() => Find(window, "AssistantConversation"), "the conversation");
+                // The demo assistant answers from the invented coursework.
+                var answer = Retry.WhileNull(
+                    () => conversation.FindAllDescendants().FirstOrDefault(element => element.Name?.StartsWith("Most urgent", StringComparison.Ordinal) == true),
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromMilliseconds(200)).Result;
+                Expect(answer is not null, "the conversation shows the assistant's answer");
             });
         }
         catch (Exception exception)
@@ -213,14 +224,25 @@ internal static class Program
     {
         var settings = Find(window, "SettingsItem") ?? FindByName(window, "Settings", ControlType.ListItem)
             ?? throw new InvalidOperationException("No Settings item in the navigation pane.");
-        settings.Click();
+        Invoke(settings);
         Thread.Sleep(800);
         Expect(Find(window, "SectionTitle")?.Name == "Settings", "Settings opened");
     }
 
-    private static void Click(Window window, string automationId)
+    private static void ScrollSettings(Window window, double percent)
     {
-        var element = Wait(() => Find(window, automationId), automationId);
+        var page = Wait(() => Find(window, "SettingsPage"), "the Settings page");
+        Expect(page.Patterns.Scroll.IsSupported, "the Settings page scrolls");
+        page.Patterns.Scroll.Pattern.SetScrollPercent(-1, percent);
+        Thread.Sleep(600);
+    }
+
+    private static void Click(Window window, string automationId)
+        => Invoke(Wait(() => Find(window, automationId), automationId));
+
+    /// <summary>Presses a control the way assistive technology would, so nothing on top of the window can intercept it.</summary>
+    private static void Invoke(AutomationElement element)
+    {
         if (element.Patterns.Invoke.IsSupported)
         {
             element.Patterns.Invoke.Pattern.Invoke();
@@ -234,6 +256,18 @@ internal static class Program
             element.Click();
         }
         Thread.Sleep(500);
+    }
+
+    private static void SetText(AutomationElement element, string text)
+    {
+        if (element.Patterns.Value.IsSupported)
+        {
+            element.Patterns.Value.Pattern.SetValue(text);
+        }
+        else
+        {
+            element.AsTextBox().Enter(text);
+        }
     }
 
     private static bool ListContains(Window window, string title)

@@ -212,13 +212,11 @@ public sealed partial class MainWindow : Window
 
     private void OnSearch(object sender, RoutedEventArgs e) => ViewModel.PresentSearch();
 
-    private void OnDismissUpdate(InfoBar sender, object args) => ViewModel.DismissUpdate();
+    private void OnDismissUpdate(object sender, RoutedEventArgs e) => ViewModel.DismissUpdate();
 
     private void OnInstallUpdate(object sender, RoutedEventArgs e) => _ = ViewModel.DownloadUpdateAsync();
 
     private void OnOpenReleasePage(object sender, RoutedEventArgs e) => ViewModel.OpenReleasePage();
-
-    private void OnCloseStatus(InfoBar sender, object args) => ViewModel.ClearStatus();
 
     /// <summary>
     /// One flat menu, rebuilt each time it opens so it lists the courses there

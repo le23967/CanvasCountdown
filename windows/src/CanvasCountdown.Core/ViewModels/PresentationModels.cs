@@ -71,7 +71,31 @@ public sealed record ManualEventDraft
 /// <summary>A course as Settings manages it: what it is called, and how much removing it would take with it.</summary>
 public sealed record ManagedCourse(string Name, int EventCount)
 {
-    public string EventCountDescription => EventCount == 1 ? "1 event" : $"{EventCount} events";
+    /// <summary>How many of the events came from Canvas; only those are removed with the course.</summary>
+    public int ImportedEventCount { get; init; } = EventCount;
+
+    public string EventCountDescription => Events(EventCount);
+
+    /// <summary>What the confirmation says will happen, counting only what will really go.</summary>
+    public string RemovalMessage
+    {
+        get
+        {
+            var kept = EventCount - ImportedEventCount;
+            var removed = kept == 0
+                ? $"“{Name}” and its {Events(ImportedEventCount)} will be deleted from this PC"
+                : $"The {Events(ImportedEventCount)} Canvas imported for “{Name}” will be deleted from this PC";
+            var stays = kept switch
+            {
+                0 => string.Empty,
+                1 => " The 1 event you added yourself stays.",
+                _ => $" The {kept} events you added yourself stay.",
+            };
+            return $"{removed}, and the Canvas feed will stop importing it.{stays} You can allow it again later.";
+        }
+    }
+
+    private static string Events(int count) => count == 1 ? "1 event" : $"{count} events";
 }
 
 public sealed record ImportPreviewItem

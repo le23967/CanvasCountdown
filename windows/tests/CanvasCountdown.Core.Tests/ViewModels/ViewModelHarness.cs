@@ -30,11 +30,13 @@ internal sealed class ViewModelHarness : IDisposable
 
     public static readonly Uri FeedUrl = new("https://canvas.example.edu/feeds/calendar.ics?feed=private");
 
-    public ViewModelHarness(Func<MainViewModelDependencies, MainViewModelDependencies>? customise = null)
+    /// <param name="customise">Changes to the parts, made before the view model is built.</param>
+    /// <param name="preferences">Settings carried over from an earlier launch, for tests of what survives a restart.</param>
+    public ViewModelHarness(Func<MainViewModelDependencies, MainViewModelDependencies>? customise = null, JsonPreferencesStore? preferences = null)
     {
         Clock = new FakeTimeProvider(Start);
         Clock.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Australia/Sydney"));
-        Preferences = JsonPreferencesStore.InMemory();
+        Preferences = preferences ?? JsonPreferencesStore.InMemory();
         Secrets = new InMemorySecretStore();
         Repository = SqliteAssignmentRepository.InMemory();
         FeedUrlStore = new SecretFeedUrlStore(Secrets);

@@ -1,3 +1,4 @@
+using CanvasCountdown.Tests.ViewModels;
 using Microsoft.Extensions.Time.Testing;
 
 namespace CanvasCountdown.Tests.Updates;
@@ -9,9 +10,10 @@ namespace CanvasCountdown.Tests.Updates;
 /// <remarks>
 /// No test makes a real network request, and none of them ask GitHub what is
 /// published today: the suite must not pass or fail on somebody else's release.
-/// All fixtures are invented. The Mac drove the last fifteen of these through
-/// its main view model; here they drive <see cref="UpdateCoordinator"/>, which
-/// carries that part of the view model.
+/// All fixtures are invented. Like the Mac's, the checks go through the main
+/// view model, which is what the app runs — with the download revealed rather
+/// than installed, as on the Mac; the Windows install path has its own tests
+/// in UndoAndUpdateTests.
 /// </remarks>
 public sealed class UpdateCheckTests
 {
@@ -168,13 +170,13 @@ public sealed class UpdateCheckTests
     public async Task ADismissedVersionIsNotOfferedAgain()
     {
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0");
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: Today);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today);
         Assert.NotNull(harness.Coordinator.AvailableUpdate);
 
         harness.Coordinator.DismissUpdate();
         Assert.Null(harness.Coordinator.AvailableUpdate);
 
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: AWeekAfter(Today));
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: AWeekAfter(Today));
 
         Assert.True(
             harness.Coordinator.AvailableUpdate is null,
@@ -186,11 +188,11 @@ public sealed class UpdateCheckTests
     public async Task TheNextVersionIsStillOffered()
     {
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0");
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: Today);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today);
         harness.Coordinator.DismissUpdate();
 
         harness.Checker.Release = UpdateFixtures.Release("1.4.0");
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: AWeekAfter(Today));
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: AWeekAfter(Today));
 
         Assert.Equal(AppVersion.Parse("1.4.0"), harness.Coordinator.AvailableUpdate?.Version);
     }
@@ -228,10 +230,10 @@ public sealed class UpdateCheckTests
     public async Task ADayLaterItAsksAgain()
     {
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0");
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: Today);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today);
         Assert.Equal(1, harness.Checker.CallCount);
 
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: Today + UpdateCoordinator.UpdateCheckInterval + TimeSpan.FromSeconds(1));
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today + MainViewModel.UpdateCheckInterval + TimeSpan.FromSeconds(1));
 
         Assert.Equal(2, harness.Checker.CallCount);
     }
@@ -246,14 +248,14 @@ public sealed class UpdateCheckTests
     {
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0");
         var future = Today;
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: future);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: future);
         Assert.Equal(1, harness.Checker.CallCount);
 
         // The clock is put back a month; the stamp is now in the future.
         var corrected = future - TimeSpan.FromSeconds(86_400 * 30);
 
         Assert.True(harness.Coordinator.ShouldCheckForUpdate(corrected));
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: corrected);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: corrected);
         Assert.Equal(2, harness.Checker.CallCount);
     }
 
@@ -282,7 +284,7 @@ public sealed class UpdateCheckTests
         Assert.True(
             Path.GetFileName(harness.Downloader.Revealed) == "CanvasCountdown-Windows-1.3.0-x64-setup.exe",
             "The verified installer is handed on");
-        Assert.Equal("1.3.0 is in your Downloads. Run the installer to finish.", harness.Coordinator.UpdateMessage);
+        Assert.Equal("1.3.0 is in your Downloads. Open it to finish.", harness.Coordinator.UpdateMessage);
         Assert.False(harness.Coordinator.IsDownloadingUpdate);
     }
 
@@ -332,7 +334,7 @@ public sealed class UpdateCheckTests
         await harness.Coordinator.CheckForUpdateAsync();
 
         Assert.Null(harness.Record.LastUpdateCheck);
-        Assert.True(harness.Coordinator.ShouldCheckForUpdate());
+        Assert.True(harness.Coordinator.ShouldCheckForUpdate(harness.Clock.GetUtcNow()));
     }
 
     /// <summary>No version to compare against means every answer would be a guess.</summary>
@@ -354,7 +356,7 @@ public sealed class UpdateCheckTests
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0");
         await harness.Coordinator.CheckForUpdateAsync();
 
-        harness.Coordinator.CheckForUpdateManually();
+        _ = harness.Coordinator.CheckForUpdateManuallyAsync();
         await WaitUntil(() => !harness.Coordinator.IsCheckingForUpdate && harness.Checker.CallCount == 2);
 
         Assert.Equal(AppVersion.Parse("1.3.0"), harness.Coordinator.AvailableUpdate?.Version);
@@ -365,34 +367,37 @@ public sealed class UpdateCheckTests
     {
         var preferences = JsonPreferencesStore.InMemory();
         var harness = MakeHarness(running: "1.2.0", published: "1.3.0", preferences: preferences);
-        await harness.Coordinator.CheckForUpdateAsync(force: false, now: Today);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today);
 
         harness.Coordinator.DismissUpdate();
 
-        Assert.Equal("1.3.0", preferences.Get<string?>(PreferencesUpdateCheckRecord.DismissedUpdateVersionKey, null));
-        Assert.Equal(Today, preferences.GetOptional<DateTimeOffset>(PreferencesUpdateCheckRecord.LastUpdateCheckKey));
+        Assert.Equal("1.3.0", preferences.Get<string?>(DismissedUpdateVersionKey, null));
+        Assert.Equal(Today, preferences.GetOptional<DateTimeOffset>(LastUpdateCheckKey));
 
         var relaunched = MakeHarness(running: "1.2.0", published: "1.3.0", preferences: preferences);
-        await relaunched.Coordinator.CheckForUpdateAsync(force: false, now: AWeekAfter(Today));
+        await relaunched.Coordinator.CheckForUpdateAsync(force: false, at: AWeekAfter(Today));
         Assert.Null(relaunched.Coordinator.AvailableUpdate);
     }
 
+    private const string DismissedUpdateVersionKey = "CanvasCountdown.settings.dismissedUpdateVersion";
+
+    private const string LastUpdateCheckKey = "CanvasCountdown.settings.lastUpdateCheck";
+
+    /// <summary>The same keys as the Mac app, so the two read each other's notes.</summary>
     [Fact]
-    public void TheRecordUsesTheMacKeys()
+    public async Task TheRecordUsesTheMacKeys()
     {
-        Assert.Equal("CanvasCountdown.settings.dismissedUpdateVersion", PreferencesUpdateCheckRecord.DismissedUpdateVersionKey);
-        Assert.Equal("CanvasCountdown.settings.lastUpdateCheck", PreferencesUpdateCheckRecord.LastUpdateCheckKey);
+        var preferences = JsonPreferencesStore.InMemory();
+        var harness = MakeHarness(running: "1.2.0", published: "1.3.0", preferences: preferences);
+        await harness.Coordinator.CheckForUpdateAsync(force: false, at: Today);
+        harness.Coordinator.DismissUpdate();
 
-        var record = new PreferencesUpdateCheckRecord(JsonPreferencesStore.InMemory())
-        {
-            DismissedUpdateVersion = "1.3.0",
-            LastUpdateCheck = Today,
-        };
-        record.DismissedUpdateVersion = null;
-        record.LastUpdateCheck = null;
+        Assert.Equal("1.3.0", preferences.Get<string?>(DismissedUpdateVersionKey, null));
+        Assert.Equal(Today, preferences.GetOptional<DateTimeOffset>(LastUpdateCheckKey));
 
-        Assert.Null(record.DismissedUpdateVersion);
-        Assert.Null(record.LastUpdateCheck);
+        // A newer version clears the old dismissal only when asked for.
+        await harness.Coordinator.CheckForUpdateManuallyAsync();
+        Assert.Null(preferences.Get<string?>(DismissedUpdateVersionKey, null));
     }
 
     [Fact]
@@ -417,8 +422,10 @@ public sealed class UpdateCheckTests
 
         await harness.Coordinator.CheckForUpdateAsync();
 
-        Assert.Contains(nameof(UpdateCoordinator.AvailableUpdate), changed);
-        Assert.Contains(nameof(UpdateCoordinator.IsCheckingForUpdate), changed);
+        // The view model announces a change to everything at once, which is
+        // what the window's bindings listen for.
+        Assert.Contains(changed, name => string.IsNullOrEmpty(name) || name == nameof(MainViewModel.AvailableUpdate));
+        Assert.NotNull(harness.Coordinator.AvailableUpdate);
     }
 
     [Theory]
@@ -548,29 +555,26 @@ public sealed class UpdateCheckTests
     }
 
     private sealed record Harness(
-        UpdateCoordinator Coordinator,
+        MainViewModel Coordinator,
         ReleaseCheckerStub Checker,
         UpdateDownloaderSpy Downloader,
-        PreferencesUpdateCheckRecord Record,
+        SettingsStore Record,
         List<Uri> Opened,
         FakeTimeProvider Clock);
 
-    private static Harness MakeHarness(string? running, string published, bool withInstaller = true, IPreferencesStore? preferences = null)
+    private static Harness MakeHarness(string? running, string published, bool withInstaller = true, JsonPreferencesStore? preferences = null)
     {
-        var checker = new ReleaseCheckerStub { Release = UpdateFixtures.Release(published, withInstaller) };
-        var downloader = new UpdateDownloaderSpy();
-        var record = new PreferencesUpdateCheckRecord(preferences ?? JsonPreferencesStore.InMemory());
-        var opened = new List<Uri>();
-        var clock = new FakeTimeProvider(Today);
-        var coordinator = new UpdateCoordinator(
-            checker,
-            downloader,
-            record,
-            // Never the entry assembly: under a test runner that is the
-            // runner, whose version has nothing to do with the app's.
-            currentVersion: () => AppVersion.Parse(running),
-            openUrl: opened.Add,
-            timeProvider: clock);
-        return new Harness(coordinator, checker, downloader, record, opened, clock);
+        var owner = new ViewModelHarness(
+            dependencies => dependencies with
+            {
+                // Never the entry assembly: under a test runner that is the
+                // runner, whose version has nothing to do with the app's.
+                CurrentVersion = () => AppVersion.Parse(running),
+                UpdateInstaller = null,
+            },
+            preferences);
+        owner.Releases.Release = UpdateFixtures.Release(published, withInstaller);
+        owner.Clock.SetUtcNow(Today);
+        return new Harness(owner.ViewModel, owner.Releases, owner.Downloads, owner.Settings, owner.OpenedUrls, owner.Clock);
     }
 }

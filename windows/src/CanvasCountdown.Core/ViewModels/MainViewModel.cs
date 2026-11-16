@@ -353,7 +353,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var counts = new Dictionary<string, (string Name, int Count)>(StringComparer.Ordinal);
+            var counts = new Dictionary<string, (string Name, int Count, int Imported)>(StringComparer.Ordinal);
             foreach (var item in Assignments)
             {
                 var name = item.NormalizedCourseName;
@@ -362,10 +362,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 {
                     continue;
                 }
-                counts[key] = (name, (counts.TryGetValue(key, out var existing) ? existing.Count : 0) + 1);
+                var existing = counts.TryGetValue(key, out var found) ? found : (Name: name, Count: 0, Imported: 0);
+                counts[key] = (existing.Name, existing.Count + 1, existing.Imported + (item.IsManual ? 0 : 1));
             }
             return counts.Values
-                .Select(entry => new ManagedCourse(entry.Name, entry.Count))
+                .Select(entry => new ManagedCourse(entry.Name, entry.Count) { ImportedEventCount = entry.Imported })
                 .OrderBy(course => course.Name, TextOrder.Comparer)
                 .ToArray();
         }
@@ -870,7 +871,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             Present(error);
         }
-        ShowTransientStatus(removed == 1 ? "1 event removed" : $"{removed} events removed");
+        // A screenshot import can also have updated rows it then put back,
+        // so "0 events removed" would undersell what was undone.
+        ShowTransientStatus(addition.Undo is not null
+            ? "Import undone"
+            : removed == 1 ? "1 event removed" : $"{removed} events removed");
     }
 
     // ------------------------------------------------------------------

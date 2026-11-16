@@ -8,6 +8,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -19,11 +20,13 @@
             Visibility="Collapsed"
             TextTrimming="CharacterEllipsis" />
 
+        <!-- The scale and the way around it on one line, and the period on a
+             line of its own beneath: sharing a line with all of them left the
+             title a sliver wide, and "November" broke into syllables. -->
         <Grid Grid.Row="1" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <SelectorBar
@@ -38,16 +41,7 @@
                 <SelectorBarItem x:Name="YearScale" Text="Year" Tag="Year" AutomationProperties.AutomationId="ScaleYear" />
             </SelectorBar>
 
-            <TextBlock
-                x:Name="PeriodTitle"
-                Grid.Column="1"
-                AutomationProperties.AutomationId="CalendarTitle"
-                AutomationProperties.HeadingLevel="Level2"
-                VerticalAlignment="Center"
-                Style="{ThemeResource SubtitleTextBlockStyle}"
-                TextTrimming="CharacterEllipsis" />
-
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                 <Button x:Name="PreviousButton" AutomationProperties.AutomationId="CalendarPrevious" Content="Previous" Click="OnPrevious" />
                 <Button x:Name="TodayButton" AutomationProperties.AutomationId="CalendarToday" Content="Today" ToolTipService.ToolTip="Show today (Ctrl+T)" Click="OnToday" />
                 <Button x:Name="NextButton" AutomationProperties.AutomationId="CalendarNext" Content="Next" Click="OnNext" />
@@ -74,6 +68,7 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 <Button
                                     x:Name="GoButton"
+                                    AutomationProperties.AutomationId="GoToDateGo"
                                     HorizontalAlignment="Right"
                                     Content="Go"
                                     Style="{ThemeResource AccentButtonStyle}"
@@ -85,6 +80,15 @@
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="GridHost" Grid.Row="2" SizeChanged="OnHostSizeChanged" />
+        <TextBlock
+            x:Name="PeriodTitle"
+            Grid.Row="2"
+            AutomationProperties.AutomationId="CalendarTitle"
+            AutomationProperties.HeadingLevel="Level2"
+            Style="{ThemeResource SubtitleTextBlockStyle}"
+            TextWrapping="NoWrap"
+            TextTrimming="CharacterEllipsis" />
+
+        <Grid x:Name="GridHost" Grid.Row="3" SizeChanged="OnHostSizeChanged" />
     </Grid>
 </UserControl>

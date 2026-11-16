@@ -55,19 +55,21 @@
                 </Grid.RowDefinitions>
 
                 <!-- A newer version, said in the window rather than in a dialog
-                     that has to be dismissed before the deadlines can be read. -->
+                     that has to be dismissed before the deadlines can be read.
+                     Always "open" and shown or hidden as a whole: an InfoBar
+                     that closes itself stops following its binding. -->
                 <InfoBar
                     x:Name="UpdateBanner"
                     Grid.Row="0"
                     AutomationProperties.AutomationId="UpdateBanner"
                     Severity="Informational"
-                    IsClosable="True"
-                    IsOpen="{x:Bind app:Show.Has(ViewModel.AvailableUpdate), Mode=OneWay}"
+                    IsClosable="False"
+                    IsOpen="True"
+                    Visibility="{x:Bind app:Show.IfAny(ViewModel.AvailableUpdate), Mode=OneWay}"
                     Title="{x:Bind app:Text.UpdateTitle(ViewModel.AvailableUpdate), Mode=OneWay}"
-                    Message="{x:Bind app:Text.UpdateMessage(ViewModel.AvailableUpdate, ViewModel.UpdateMessage), Mode=OneWay}"
-                    CloseButtonClick="OnDismissUpdate">
-                    <!-- Two actions and a progress ring: more than the single
-                         ActionButton slot holds, so they go in the content. -->
+                    Message="{x:Bind app:Text.UpdateMessage(ViewModel.AvailableUpdate, ViewModel.UpdateMessage), Mode=OneWay}">
+                    <!-- More than the single ActionButton slot holds, so the
+                         actions go in the content, each with its own label. -->
                     <InfoBar.Content>
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
                             <Button
@@ -78,6 +80,11 @@
                                 ToolTipService.ToolTip="Download the new version, check it, and install it. Canvas Countdown reopens by itself."
                                 Click="OnInstallUpdate" />
                             <Button Content="What's New" Click="OnOpenReleasePage" />
+                            <Button
+                                AutomationProperties.AutomationId="SkipUpdate"
+                                Content="Skip This Version"
+                                ToolTipService.ToolTip="Stop mentioning this version. A newer one will still be offered, and Settings can always check again."
+                                Click="OnDismissUpdate" />
                             <ProgressRing
                                 Width="18"
                                 Height="18"
@@ -87,17 +94,22 @@
                     </InfoBar.Content>
                 </InfoBar>
 
+                <!-- The title takes what it needs and the command bar the rest,
+                     so when the window is narrow the commands move into the
+                     "More" menu instead of crushing the title. -->
                 <Grid Grid.Row="1" Padding="24,14,12,6" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
+                    <StackPanel VerticalAlignment="Center" MaxWidth="360">
                         <TextBlock
                             x:Name="SectionTitle"
                             AutomationProperties.AutomationId="SectionTitle"
                             AutomationProperties.HeadingLevel="Level1"
                             Style="{ThemeResource TitleTextBlockStyle}"
+                            TextWrapping="NoWrap"
+                            TextTrimming="CharacterEllipsis"
                             Text="{x:Bind app:Text.SectionTitle(ViewModel.SidebarSelection), Mode=OneWay}" />
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ProgressRing
@@ -109,6 +121,8 @@
                             <TextBlock
                                 Style="{ThemeResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="NoWrap"
+                                TextTrimming="CharacterEllipsis"
                                 Text="{x:Bind app:Text.RefreshStatus(ViewModel.IsRefreshing, ViewModel.LastRefreshDate, ViewModel.CurrentDate), Mode=OneWay}" />
                         </StackPanel>
                     </StackPanel>
@@ -120,15 +134,18 @@
                         Background="Transparent"
                         DefaultLabelPosition="Right"
                         IsDynamicOverflowEnabled="True"
+                        HorizontalAlignment="Right"
                         VerticalAlignment="Center">
-                        <!-- Only while something can be undone, and named after
-                             what it would take back; it outlives the toast. -->
+                        <!-- Only while something can be undone; it outlives the
+                             toast. The tooltip and Narrator name what it would
+                             take back, which is too long for a label. -->
                         <AppBarButton
                             x:Name="UndoAdditionButton"
                             AutomationProperties.AutomationId="UndoAddition"
-                            Label="{x:Bind ViewModel.UndoAdditionMenuTitle, Mode=OneWay}"
+                            Label="Undo Adding"
+                            AutomationProperties.Name="{x:Bind ViewModel.UndoAdditionMenuTitle, Mode=OneWay}"
                             Visibility="{x:Bind app:Show.If(ViewModel.CanUndoAddition), Mode=OneWay}"
-                            ToolTipService.ToolTip="Remove what was just added (Ctrl+Z)"
+                            ToolTipService.ToolTip="{x:Bind app:Text.UndoAdditionTip(ViewModel.UndoAdditionMenuTitle), Mode=OneWay}"
                             Click="OnUndoAddition">
                             <AppBarButton.Icon>
                                 <FontIcon Glyph="&#xE7A7;" />
@@ -249,15 +266,17 @@
                     </Grid>
                 </Grid>
 
+                <!-- A confirmation that leaves by itself after a moment, so it
+                     needs no close button. -->
                 <InfoBar
                     x:Name="StatusBar"
                     Grid.Row="3"
                     AutomationProperties.AutomationId="StatusBar"
                     Severity="Success"
-                    IsClosable="True"
-                    IsOpen="{x:Bind app:Show.HasText(ViewModel.StatusMessage), Mode=OneWay}"
-                    Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                    CloseButtonClick="OnCloseStatus" />
+                    IsClosable="False"
+                    IsOpen="True"
+                    Visibility="{x:Bind app:Show.IfText(ViewModel.StatusMessage), Mode=OneWay}"
+                    Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
             </Grid>
         </NavigationView>
 

@@ -59,6 +59,8 @@ public static class Text
 
     public static string UndoMessage(MainViewModel.UndoableAddition? addition) => addition?.Message ?? string.Empty;
 
+    public static string UndoAdditionTip(string menuTitle) => $"{menuTitle} (Ctrl+Z)";
+
     public static string Seconds(int? seconds) => seconds is { } value ? $"{value}s" : string.Empty;
 
     public static string UndoToastDescription(MainViewModel.UndoableAddition? addition, int? seconds)

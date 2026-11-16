@@ -81,10 +81,14 @@ jobs:
       # and photographs the window alone at every step.
       - name: UI tour
         shell: pwsh
-        run: >
-          dotnet run --project windows/tests/CanvasCountdown.UiTour -c Release --
-          --app "${{ github.workspace }}/windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe"
-          --out "${{ github.workspace }}/windows/artifacts/tour-${{ matrix.arch }}"
+        run: |
+          # A fresh runner can have the Start menu, search or the first
+          # sign-in screen open over everything; none of them is the app's.
+          Get-Process -Name 'StartMenuExperienceHost', 'SearchHost', 'SearchApp', 'WWAHost', 'UserOOBEBroker' -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          dotnet run --project windows/tests/CanvasCountdown.UiTour -c Release -- `
+            --app "${{ github.workspace }}/windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe" `
+            --out "${{ github.workspace }}/windows/artifacts/tour-${{ matrix.arch }}"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

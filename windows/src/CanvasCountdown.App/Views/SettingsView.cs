@@ -48,8 +48,11 @@ public sealed partial class SettingsView : UserControl
         Add(page, "updates", () => $"{ViewModel.IsCheckingForUpdate}|{ViewModel.AvailableUpdate?.Version}|{ViewModel.UpdateCheckAnnouncement}", BuildUpdates);
         Add(page, "data", () => "static", BuildData);
 
-        Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        AutomationProperties.SetAutomationId(this, "SettingsPage");
+        var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        // On the scroller: a UserControl is invisible to UI Automation.
+        AutomationProperties.SetAutomationId(scroller, "SettingsPage");
+        AutomationProperties.SetName(scroller, "Settings");
+        Content = scroller;
         ViewModel.PropertyChanged += OnViewModelChanged;
         Loaded += (_, _) =>
         {
@@ -500,8 +503,7 @@ public sealed partial class SettingsView : UserControl
             AutomationProperties.SetName(remove, $"Remove {course.Name}");
             remove.Click += async (_, _) =>
             {
-                var message = $"“{course.Name}” and its {course.EventCountDescription} will be deleted from this PC, and the Canvas feed will stop importing it. You can allow it again later.";
-                if (await Dialogs.ConfirmAsync(XamlRoot, "Remove this course?", message, "Remove Course") == ContentDialogResult.Primary)
+                if (await Dialogs.ConfirmAsync(XamlRoot, "Remove this course?", course.RemovalMessage, "Remove Course") == ContentDialogResult.Primary)
                 {
                     await ViewModel.RemoveCourseAsync(course.Name);
                 }

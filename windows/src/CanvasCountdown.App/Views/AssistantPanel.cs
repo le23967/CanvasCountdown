@@ -93,7 +93,10 @@ public sealed partial class AssistantPanel : UserControl
         middle.Children.Add(conversation);
         middle.Children.Add(drafts);
         conversationScroller.Content = middle;
-        AutomationProperties.SetAutomationId(conversation, "AssistantConversation");
+        // On the scroller, not the panel inside it: a panel is invisible to
+        // UI Automation.
+        AutomationProperties.SetAutomationId(conversationScroller, "AssistantConversation");
+        AutomationProperties.SetName(conversationScroller, "Conversation");
         Grid.SetRow(conversationScroller, 2);
         root.Children.Add(conversationScroller);
 
