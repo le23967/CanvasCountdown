@@ -59,7 +59,9 @@ if (-not $OutputDirectory) {
 
 function Fail([string] $message) {
     Write-Host "!! $message" -ForegroundColor Red
-    exit 1
+    # Thrown, not exit: a caller running several builds in a row must stop at
+    # the first one that fails, not carry on and package the next.
+    throw $message
 }
 
 function Step([string] $message) {
@@ -88,6 +90,9 @@ if (Test-Path $OutputDirectory) {
     Remove-Item -Recurse -Force $OutputDirectory
 }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+# Absolute from here on: Inno Setup resolves relative paths against the
+# installer script's folder, not the current one.
+$OutputDirectory = (Resolve-Path $OutputDirectory).Path
 
 # --- Tests -------------------------------------------------------------------
 if (-not $SkipTests) {
