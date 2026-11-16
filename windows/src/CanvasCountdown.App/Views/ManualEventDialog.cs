@@ -48,7 +48,7 @@ internal static class ManualEventDialog
         var date = new CalendarDatePicker
         {
             Header = "Due date",
-            Date = new DateTimeOffset(local.Date, TimeSpan.Zero),
+            Date = PickerDates.ToPicker(DateOnly.FromDateTime(local)),
             IsTodayHighlighted = true,
         };
         var time = new TimePicker
@@ -91,7 +91,7 @@ internal static class ManualEventDialog
             var deferral = args.GetDeferral();
             try
             {
-                var day = DateOnly.FromDateTime((date.Date ?? DateTimeOffset.Now).Date);
+                var day = PickerDates.FromPicker(date.Date ?? DateTimeOffset.Now);
                 var edited = draft with
                 {
                     Title = title.Text,

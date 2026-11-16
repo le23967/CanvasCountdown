@@ -47,13 +47,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # One machine west of Greenwich and one east of it (the owner's own
+        # zone), so a date that is only right in one direction fails one.
         include:
           - arch: x64
             platform: x64
             runner: windows-2025
+            timezone: Pacific Standard Time
           - arch: arm64
             platform: ARM64
             runner: windows-11-arm
+            timezone: AUS Eastern Standard Time
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
@@ -94,6 +98,8 @@ jobs:
       - name: UI tour
         shell: pwsh
         run: |
+          tzutil /s "${{ matrix.timezone }}"
+          Write-Host "Time zone: $(tzutil /g)"
           # A fresh runner can have the Start menu, search or the first
           # sign-in screen open over everything; none of them is the app's.
           Get-Process -Name 'StartMenuExperienceHost', 'SearchHost', 'SearchApp', 'WWAHost', 'UserOOBEBroker' -ErrorAction SilentlyContinue |

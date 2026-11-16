@@ -300,13 +300,13 @@ internal static class ScreenshotImportDialog
             when.Children.Clear();
             if (row.HasDueDate && row.DueDay is { } day && row.DueTimeOfDay is { } time)
             {
-                var date = new CalendarDatePicker { Date = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) };
+                var date = new CalendarDatePicker { Date = PickerDates.ToPicker(day) };
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(date, "Due date");
                 date.DateChanged += (_, args) =>
                 {
                     if (args.NewDate is { } picked)
                     {
-                        row.DueDay = DateOnly.FromDateTime(picked.Date);
+                        row.DueDay = PickerDates.FromPicker(picked);
                     }
                 };
                 var clock = new TimePicker { Time = time.ToTimeSpan(), MinuteIncrement = 1 };

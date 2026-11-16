@@ -1,3 +1,4 @@
+using CanvasCountdown.App.Infrastructure;
 using System.ComponentModel;
 using System.Globalization;
 using Microsoft.UI.Xaml;
@@ -423,7 +424,7 @@ public sealed partial class AssistantPanel : UserControl
         if (draft.DueDate is { } due)
         {
             var local = calendar.ToLocal(due);
-            var date = new CalendarDatePicker { Date = new DateTimeOffset(local.Date, TimeSpan.Zero) };
+            var date = new CalendarDatePicker { Date = PickerDates.ToPicker(DateOnly.FromDateTime(local)) };
             AutomationProperties.SetName(date, "Due date");
             date.DateChanged += (_, args) =>
             {
@@ -431,7 +432,7 @@ public sealed partial class AssistantPanel : UserControl
                 {
                     Edit(draft, current => current with
                     {
-                        DueDate = calendar.FromLocal(DateOnly.FromDateTime(picked.Date), calendar.TimeOf(current.DueDate ?? due)),
+                        DueDate = calendar.FromLocal(PickerDates.FromPicker(picked), calendar.TimeOf(current.DueDate ?? due)),
                     });
                 }
             };

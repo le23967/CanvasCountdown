@@ -124,6 +124,9 @@ internal static class Program
                 Wait(() => FindByName(window, "Add Event", ControlType.Button), "the Add Event button").AsButton().Invoke();
                 Wait(() => Find(window, "UndoToast"), "the undo offer");
                 Expect(ListContains(window, "Practice exam (tour)"), "the new event is in the list");
+                // The dialog suggests tomorrow; a date picker fed midnight UTC
+                // used to show, and save, the day before west of Greenwich.
+                Expect(ListContains(window, "Practice exam (tour), due in 1 day"), "the new event is due tomorrow, the day the dialog suggested");
                 Expect(Find(window, "UndoAddition") is { IsOffscreen: false }, "the toolbar offers Undo Adding");
             });
             Step("14-undone", window, () =>
