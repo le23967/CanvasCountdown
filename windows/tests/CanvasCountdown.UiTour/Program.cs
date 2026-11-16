@@ -89,6 +89,26 @@ internal static class Program
                 Expect(Find(window, "StatusBar") is null or { IsOffscreen: true }, "no status bar is left on screen once its message has gone");
             });
 
+            // The row's Actions menu: complete an event, find it under
+            // Completed, and put it back.
+            Step("11b-mark-complete", window, () =>
+            {
+                Invoke(Wait(() => FindByName(window, "Actions for Quiz 3", ControlType.Button), "the Actions button for Quiz 3"));
+                Invoke(Wait(() => FindMenuItem(automation, window, "Mark Complete"), "Mark Complete in the Actions menu"));
+                Thread.Sleep(800);
+                Expect(!ListContains(window, "Quiz 3"), "Quiz 3 leaves Upcoming once it is complete");
+            });
+            Step("11c-completed", window, () =>
+            {
+                Navigate(window, "NavCompleted", "Completed");
+                Expect(ListContains(window, "Quiz 3"), "Quiz 3 is listed under Completed");
+                Invoke(Wait(() => FindByName(window, "Actions for Quiz 3", ControlType.Button), "the Actions button for Quiz 3"));
+                Invoke(Wait(() => FindMenuItem(automation, window, "Mark Incomplete"), "Mark Incomplete in the Actions menu"));
+                Thread.Sleep(800);
+                Navigate(window, "NavUpcoming", "Upcoming");
+                Expect(ListContains(window, "Quiz 3"), "Quiz 3 is back in Upcoming");
+            });
+
             Step("12-add-manual-event", window, () =>
             {
                 Click(window, "Add");
@@ -289,6 +309,11 @@ internal static class Program
 
     private static AutomationElement? FindByName(AutomationElement root, string name, ControlType type)
         => root.FindFirstDescendant(condition => condition.ByName(name).And(condition.ByControlType(type)));
+
+    /// <summary>A menu item, in the window or in the popup window a menu can open in.</summary>
+    private static AutomationElement? FindMenuItem(UIA3Automation automation, Window window, string name)
+        => FindByName(window, name, ControlType.MenuItem)
+            ?? automation.GetDesktop().FindFirstDescendant(condition => condition.ByName(name).And(condition.ByControlType(ControlType.MenuItem)));
 
     /// <summary>Menus and flyouts can open in windows of their own.</summary>
     private static AutomationElement? FindOnDesktop(UIA3Automation automation, string automationId)

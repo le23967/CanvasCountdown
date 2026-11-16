@@ -52,35 +52,57 @@ internal sealed class ToastReminders : INotificationDelivery
 
     public Task ReplacePendingAsync(IReadOnlyList<ReminderNotificationRequest> requests, CancellationToken cancellationToken = default)
     {
-        var notifier = Notifier;
-        foreach (var scheduled in notifier.GetScheduledToastNotifications())
+        try
         {
-            notifier.RemoveFromSchedule(scheduled);
-        }
-
-        // Windows refuses a delivery time in the past, and one a moment away
-        // would arrive before anyone could read why.
-        var earliest = DateTimeOffset.Now.AddSeconds(5);
-        foreach (var request in requests.Where(request => request.TriggerDate > earliest))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var toast = new ScheduledToastNotification(Content(request.Title, request.Body, request.AssignmentId), request.TriggerDate)
+            var notifier = Notifier;
+            foreach (var scheduled in notifier.GetScheduledToastNotifications())
             {
-                Id = ShortKey(request.Identifier, 16),
-                Tag = ShortKey(request.Identifier, 32),
-                Group = Group,
-            };
-            notifier.AddToSchedule(toast);
+                notifier.RemoveFromSchedule(scheduled);
+            }
+
+            // Windows refuses a delivery time in the past, and one a moment away
+            // would arrive before anyone could read why.
+            var earliest = DateTimeOffset.Now.AddSeconds(5);
+            foreach (var request in requests.Where(request => request.TriggerDate > earliest))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var toast = new ScheduledToastNotification(Content(request.Title, request.Body, request.AssignmentId), request.TriggerDate)
+                {
+                    // Windows rejects a scheduled toast's id at 16 characters
+                    // (0x803E0120); 12 hex digits of a SHA-256 cannot collide
+                    // among the few hundred reminders this ever schedules.
+                    Id = ShortKey(request.Identifier, 12),
+                    Tag = ShortKey(request.Identifier, 32),
+                    Group = Group,
+                };
+                notifier.AddToSchedule(toast);
+            }
+        }
+        catch (System.Runtime.InteropServices.COMException exception)
+        {
+            CrashLog.Note($"Windows did not accept the reminders: 0x{exception.HResult:X8} {exception.Message}");
+            throw new InvalidOperationException(
+                "Windows did not accept the reminders, so none are scheduled. Check that notifications are on for Canvas Countdown in Windows Settings → System → Notifications.",
+                exception);
         }
         return Task.CompletedTask;
     }
 
     public Task RemoveAllPendingAsync(CancellationToken cancellationToken = default)
     {
-        var notifier = Notifier;
-        foreach (var scheduled in notifier.GetScheduledToastNotifications())
+        try
         {
-            notifier.RemoveFromSchedule(scheduled);
+            var notifier = Notifier;
+            foreach (var scheduled in notifier.GetScheduledToastNotifications())
+            {
+                notifier.RemoveFromSchedule(scheduled);
+            }
+        }
+        catch (System.Runtime.InteropServices.COMException exception)
+        {
+            // Nothing can be scheduled where nothing can be read back, so
+            // there is nothing to take away either.
+            CrashLog.Note($"Could not clear scheduled reminders: 0x{exception.HResult:X8} {exception.Message}");
         }
         return Task.CompletedTask;
     }

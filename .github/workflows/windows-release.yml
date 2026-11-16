@@ -1,0 +1,112 @@
+# Publishes a Windows release when a win-v* tag is pushed. It reads only
+# windows/ and never touches the macOS releases or the website.
+#
+# The release is created as a draft, its installers are downloaded back and
+# compared byte for byte with what was built, and only then is it published,
+# always as a pre-release. Promoting it is left to the owner: the website's
+# download button follows "latest", and a Windows build there would break it
+# for Mac users.
+name: Windows release
+
+on:
+  push:
+    tags: ['win-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build:
+    name: Installer (${{ matrix.arch }})
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      # Runs the core tests first and refuses to package anything the wrong
+      # architecture, the wrong version, or with stray files inside.
+      - name: Build, check and package
+        shell: pwsh
+        run: >
+          windows/scripts/build-release.ps1
+          -Tag '${{ github.ref_name }}'
+          -Architectures ${{ matrix.arch }}
+          -OutputDirectory windows/dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.arch }}
+          path: windows/dist/CanvasCountdown-Windows-*-setup.exe
+          if-no-files-found: error
+
+  publish:
+    name: Publish pre-release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: built
+          merge-multiple: true
+      - name: Create a draft with both installers
+        run: |
+          set -euo pipefail
+          version="${TAG#win-v}"
+          notes="windows/release-notes/${TAG}.md"
+          test -f "$notes" || { echo "Missing $notes"; exit 1; }
+          x64="built/CanvasCountdown-Windows-${version}-x64-setup.exe"
+          arm64="built/CanvasCountdown-Windows-${version}-arm64-setup.exe"
+          test -f "$x64" && test -f "$arm64"
+          {
+            cat "$notes"
+            echo
+            echo "## SHA-256"
+            echo
+            echo '```'
+            (cd built && sha256sum "CanvasCountdown-Windows-${version}-x64-setup.exe" "CanvasCountdown-Windows-${version}-arm64-setup.exe")
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" --draft --prerelease --latest=false \
+            --title "Canvas Countdown for Windows ${version}" \
+            --notes-file notes.md \
+            "${x64}#Canvas Countdown ${version} for Windows 10 (2004+) and 11, x64 (Intel and AMD)" \
+            "${arm64}#Canvas Countdown ${version} for Windows 10 (2004+) and 11, ARM64 (Snapdragon)"
+      - name: Download the installers back and compare them
+        run: |
+          set -euo pipefail
+          mkdir -p fetched
+          gh release download "$TAG" --dir fetched --pattern 'CanvasCountdown-Windows-*-setup.exe'
+          for built in built/*.exe; do
+            name="$(basename "$built")"
+            cmp "$built" "fetched/$name"
+            echo "identical: $name ($(sha256sum "$built" | cut -d' ' -f1))"
+          done
+          test "$(ls fetched | wc -l)" -eq "$(ls built | wc -l)"
+      - name: Publish as a pre-release
+        run: gh release edit "$TAG" --draft=false --prerelease --latest=false

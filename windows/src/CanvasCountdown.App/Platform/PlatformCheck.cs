@@ -47,16 +47,21 @@ internal static class PlatformCheck
 
     private static async Task<int> CheckAsync(string name, StringBuilder report, Func<Task<string>> check)
     {
+        // The result first: an interpolated AppendLine writes as it goes, so a
+        // check that throws would otherwise leave "ok" behind it.
+        string result;
         try
         {
-            report.AppendLine($"ok    {name}: {await check()}");
-            return 0;
+            result = await check();
         }
         catch (Exception exception)
         {
-            report.AppendLine($"FAIL  {name}: {exception.GetType().Name}: {exception.Message}");
+            var inner = exception.InnerException is { } cause ? $" ({cause.GetType().Name} 0x{cause.HResult:X8}: {cause.Message})" : string.Empty;
+            report.AppendLine($"FAIL  {name}: {exception.GetType().Name} 0x{exception.HResult:X8}: {exception.Message}{inner}");
             return 1;
         }
+        report.AppendLine($"ok    {name}: {result}");
+        return 0;
     }
 
     private static void Expect(bool condition, string description)
