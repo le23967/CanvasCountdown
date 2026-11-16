@@ -75,6 +75,12 @@ internal sealed class TrayIcon : IDisposable
     /// <summary>A left click, or Enter/Space on the focused icon.</summary>
     public event EventHandler? Invoked;
 
+    /// <summary>
+    /// The clock or the time zone changed, or the PC woke from sleep: anything
+    /// after which a countdown timer may have slept through midnight.
+    /// </summary>
+    public event EventHandler? SystemTimeChanged;
+
     /// <summary>Asked for when the menu is about to open, so it always reflects the current state.</summary>
     public Func<IReadOnlyList<TrayMenuItem>>? MenuProvider { get; set; }
 
@@ -161,6 +167,11 @@ internal sealed class TrayIcon : IDisposable
                     break;
             }
             return IntPtr.Zero;
+        }
+        if (message == NativeMethods.WmTimeChange
+            || (message == NativeMethods.WmPowerBroadcast && wParam.ToInt64() == NativeMethods.PbtApmResumeAutomatic))
+        {
+            SystemTimeChanged?.Invoke(this, EventArgs.Empty);
         }
         if (message == taskbarCreatedMessage && taskbarCreatedMessage != 0)
         {
@@ -276,6 +287,9 @@ internal sealed class TrayIcon : IDisposable
         public const uint TpmBottomAlign = 0x0020;
         public const uint WsExToolWindow = 0x00000080;
         public const int SmCxSmIcon = 49;
+        public const uint WmTimeChange = 0x001E;
+        public const uint WmPowerBroadcast = 0x0218;
+        public const long PbtApmResumeAutomatic = 0x12;
 
         public delegate IntPtr WndProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 

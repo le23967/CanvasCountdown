@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="CanvasCountdown.App.Views.CalendarView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="20,0,20,12" RowSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- One line, not the full card: above a grid the card would push the
+             weeks off the window. -->
+        <TextBlock
+            x:Name="CompactNextDeadline"
+            AutomationProperties.AutomationId="CompactNextDeadline"
+            Visibility="Collapsed"
+            TextTrimming="CharacterEllipsis" />
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <SelectorBar
+                x:Name="ScaleBar"
+                AutomationProperties.AutomationId="CalendarScale"
+                AutomationProperties.Name="Calendar scale"
+                ToolTipService.ToolTip="Show a day, a week, a month or the whole year (Ctrl+1 to Ctrl+4)"
+                SelectionChanged="OnScaleChanged">
+                <SelectorBarItem x:Name="DayScale" Text="Day" Tag="Day" AutomationProperties.AutomationId="ScaleDay" />
+                <SelectorBarItem x:Name="WeekScale" Text="Week" Tag="Week" AutomationProperties.AutomationId="ScaleWeek" />
+                <SelectorBarItem x:Name="MonthScale" Text="Month" Tag="Month" AutomationProperties.AutomationId="ScaleMonth" />
+                <SelectorBarItem x:Name="YearScale" Text="Year" Tag="Year" AutomationProperties.AutomationId="ScaleYear" />
+            </SelectorBar>
+
+            <TextBlock
+                x:Name="PeriodTitle"
+                Grid.Column="1"
+                AutomationProperties.AutomationId="CalendarTitle"
+                AutomationProperties.HeadingLevel="Level2"
+                VerticalAlignment="Center"
+                Style="{ThemeResource SubtitleTextBlockStyle}"
+                TextTrimming="CharacterEllipsis" />
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="PreviousButton" AutomationProperties.AutomationId="CalendarPrevious" Content="Previous" Click="OnPrevious" />
+                <Button x:Name="TodayButton" AutomationProperties.AutomationId="CalendarToday" Content="Today" ToolTipService.ToolTip="Show today (Ctrl+T)" Click="OnToday" />
+                <Button x:Name="NextButton" AutomationProperties.AutomationId="CalendarNext" Content="Next" Click="OnNext" />
+                <Button
+                    x:Name="GoToDateButton"
+                    AutomationProperties.AutomationId="GoToDate"
+                    Content="Go to Date…"
+                    ToolTipService.ToolTip="Go to a date (Ctrl+Shift+T)">
+                    <Button.Flyout>
+                        <Flyout x:Name="GoToDateFlyout" Placement="BottomEdgeAlignedRight" Opened="OnGoToDateOpened" Closed="OnGoToDateClosed">
+                            <StackPanel Width="280" Spacing="8">
+                                <TextBlock Text="Go to Date" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBox
+                                    x:Name="DateEntry"
+                                    AutomationProperties.AutomationId="DateEntry"
+                                    AutomationProperties.Name="Date"
+                                    PlaceholderText="Type a date, or a month and a day"
+                                    TextChanged="OnDateEntryChanged"
+                                    KeyDown="OnDateEntryKeyDown" />
+                                <TextBlock
+                                    x:Name="DateEntryMessage"
+                                    TextWrapping="Wrap"
+                                    Style="{ThemeResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <Button
+                                    x:Name="GoButton"
+                                    HorizontalAlignment="Right"
+                                    Content="Go"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    Click="OnGo" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="GridHost" Grid.Row="2" SizeChanged="OnHostSizeChanged" />
+    </Grid>
+</UserControl>

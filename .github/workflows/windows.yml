@@ -77,6 +77,19 @@ jobs:
         with:
           name: smoke-${{ matrix.arch }}
           path: windows/artifacts/smoke-${{ matrix.arch }}
+      # Drives the real window as a person would, with invented coursework,
+      # and photographs the window alone at every step.
+      - name: UI tour
+        shell: pwsh
+        run: >
+          dotnet run --project windows/tests/CanvasCountdown.UiTour -c Release --
+          --app "${{ github.workspace }}/windows/artifacts/app-${{ matrix.arch }}/CanvasCountdown.exe"
+          --out "${{ github.workspace }}/windows/artifacts/tour-${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tour-${{ matrix.arch }}
+          path: windows/artifacts/tour-${{ matrix.arch }}
 
   installer:
     name: Installer and updates (${{ matrix.arch }})

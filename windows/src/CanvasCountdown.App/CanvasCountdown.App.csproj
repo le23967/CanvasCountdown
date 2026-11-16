@@ -37,6 +37,8 @@
          would ship a machine-learning runtime, search indexing and widgets
          (about 60 MB) that this app never calls. -->
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.5" />
+    <!-- GDI+, to draw the countdown into the tray icon and taskbar badge. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.15" />
   </ItemGroup>
 
   <ItemGroup>

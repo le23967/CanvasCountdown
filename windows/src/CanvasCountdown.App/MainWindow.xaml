@@ -3,23 +3,268 @@
     x:Class="CanvasCountdown.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:CanvasCountdown.App.Views"
+    xmlns:app="using:CanvasCountdown.App"
     Title="Canvas Countdown">
 
-    <NavigationView
-        x:Name="Navigation"
-        IsBackButtonVisible="Collapsed"
-        PaneDisplayMode="Left"
-        IsSettingsVisible="True">
-        <NavigationView.MenuItems>
-            <NavigationViewItem Content="Upcoming" Tag="upcoming" />
-            <NavigationViewItem Content="All Events" Tag="allEvents" />
-            <NavigationViewItem Content="Calendar" Tag="calendar" />
-            <NavigationViewItem Content="Completed" Tag="completed" />
-        </NavigationView.MenuItems>
+    <Grid x:Name="Root" Loaded="OnRootLoaded">
+        <NavigationView
+            x:Name="Navigation"
+            AutomationProperties.AutomationId="Navigation"
+            IsBackButtonVisible="Collapsed"
+            PaneDisplayMode="Left"
+            OpenPaneLength="220"
+            IsSettingsVisible="True"
+            PaneTitle="Canvas Countdown"
+            SelectionChanged="OnNavigationSelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="UpcomingItem" Content="Upcoming" Tag="Upcoming" AutomationProperties.AutomationId="NavUpcoming">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE823;" />
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge
+                            Value="{x:Bind ViewModel.UpcomingCount, Mode=OneWay}"
+                            Visibility="{x:Bind app:Show.When(ViewModel.UpcomingCount), Mode=OneWay}"
+                            Style="{ThemeResource AttentionValueInfoBadgeStyle}" />
+                    </NavigationViewItem.InfoBadge>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="AllEventsItem" Content="All Events" Tag="AllEvents" AutomationProperties.AutomationId="NavAllEvents">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8FD;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="CalendarItem" Content="Calendar" Tag="Calendar" AutomationProperties.AutomationId="NavCalendar">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE787;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="CompletedItem" Content="Completed" Tag="Completed" AutomationProperties.AutomationId="NavCompleted">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE930;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
 
-        <StackPanel Padding="32" Spacing="8">
-            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Canvas Countdown" />
-            <TextBlock x:Name="VersionText" Style="{StaticResource BodyTextBlockStyle}" />
-        </StackPanel>
-    </NavigationView>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- A newer version, said in the window rather than in a dialog
+                     that has to be dismissed before the deadlines can be read. -->
+                <InfoBar
+                    x:Name="UpdateBanner"
+                    Grid.Row="0"
+                    AutomationProperties.AutomationId="UpdateBanner"
+                    Severity="Informational"
+                    IsClosable="True"
+                    IsOpen="{x:Bind app:Show.Has(ViewModel.AvailableUpdate), Mode=OneWay}"
+                    Title="{x:Bind app:Text.UpdateTitle(ViewModel.AvailableUpdate), Mode=OneWay}"
+                    Message="{x:Bind app:Text.UpdateMessage(ViewModel.AvailableUpdate, ViewModel.UpdateMessage), Mode=OneWay}"
+                    CloseButtonClick="OnDismissUpdate">
+                    <InfoBar.ActionButton>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button
+                                AutomationProperties.AutomationId="InstallUpdate"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                Content="Download and Install"
+                                IsEnabled="{x:Bind app:Show.Not(ViewModel.IsDownloadingUpdate), Mode=OneWay}"
+                                ToolTipService.ToolTip="Download the new version, check it, and install it. Canvas Countdown reopens by itself."
+                                Click="OnInstallUpdate" />
+                            <Button Content="What's New" Click="OnOpenReleasePage" />
+                            <ProgressRing
+                                Width="18"
+                                Height="18"
+                                IsActive="{x:Bind ViewModel.IsDownloadingUpdate, Mode=OneWay}"
+                                AutomationProperties.Name="Downloading the update" />
+                        </StackPanel>
+                    </InfoBar.ActionButton>
+                </InfoBar>
+
+                <Grid Grid.Row="1" Padding="24,14,12,6" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock
+                            x:Name="SectionTitle"
+                            AutomationProperties.AutomationId="SectionTitle"
+                            AutomationProperties.HeadingLevel="Level1"
+                            Style="{ThemeResource TitleTextBlockStyle}"
+                            Text="{x:Bind app:Text.SectionTitle(ViewModel.SidebarSelection), Mode=OneWay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ProgressRing
+                                Width="14"
+                                Height="14"
+                                IsActive="{x:Bind ViewModel.IsRefreshing, Mode=OneWay}"
+                                Visibility="{x:Bind app:Show.If(ViewModel.IsRefreshing), Mode=OneWay}"
+                                AutomationProperties.Name="Refreshing Canvas calendar" />
+                            <TextBlock
+                                Style="{ThemeResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind app:Text.RefreshStatus(ViewModel.IsRefreshing, ViewModel.LastRefreshDate, ViewModel.CurrentDate), Mode=OneWay}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <CommandBar
+                        x:Name="Toolbar"
+                        Grid.Column="1"
+                        AutomationProperties.AutomationId="Toolbar"
+                        Background="Transparent"
+                        DefaultLabelPosition="Right"
+                        IsDynamicOverflowEnabled="True"
+                        VerticalAlignment="Center">
+                        <!-- Only while something can be undone, and named after
+                             what it would take back; it outlives the toast. -->
+                        <AppBarButton
+                            x:Name="UndoAdditionButton"
+                            AutomationProperties.AutomationId="UndoAddition"
+                            Label="{x:Bind ViewModel.UndoAdditionMenuTitle, Mode=OneWay}"
+                            Visibility="{x:Bind app:Show.If(ViewModel.CanUndoAddition), Mode=OneWay}"
+                            ToolTipService.ToolTip="Remove what was just added (Ctrl+Z)"
+                            Click="OnUndoAddition">
+                            <AppBarButton.Icon>
+                                <FontIcon Glyph="&#xE7A7;" />
+                            </AppBarButton.Icon>
+                        </AppBarButton>
+                        <!-- The label itself says when a filter is on ("Filtered"),
+                             rather than a filled icon that has to be decoded. -->
+                        <AppBarButton
+                            x:Name="FilterButton"
+                            AutomationProperties.AutomationId="Filter"
+                            Label="{x:Bind app:Text.FilterLabel(ViewModel.IsFilterActive), Mode=OneWay}"
+                            AutomationProperties.Name="{x:Bind ViewModel.CourseFilterDescription, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.CourseFilterDescription, Mode=OneWay}">
+                            <AppBarButton.Icon>
+                                <FontIcon Glyph="&#xE71C;" />
+                            </AppBarButton.Icon>
+                            <AppBarButton.Flyout>
+                                <MenuFlyout x:Name="FilterMenu" Placement="BottomEdgeAlignedRight" Opening="OnFilterMenuOpening" />
+                            </AppBarButton.Flyout>
+                        </AppBarButton>
+                        <AppBarButton
+                            AutomationProperties.AutomationId="Refresh"
+                            Label="Refresh"
+                            ToolTipService.ToolTip="Refresh Canvas feed (Ctrl+R)"
+                            IsEnabled="{x:Bind app:Show.CanRefresh(ViewModel.IsRefreshing, ViewModel.HasConfiguredFeed), Mode=OneWay}"
+                            Click="OnRefresh">
+                            <AppBarButton.Icon>
+                                <FontIcon Glyph="&#xE72C;" />
+                            </AppBarButton.Icon>
+                        </AppBarButton>
+                        <AppBarButton
+                            AutomationProperties.AutomationId="Add"
+                            Label="Add"
+                            AutomationProperties.Name="Add or import events"
+                            ToolTipService.ToolTip="Add an event, or import from Canvas">
+                            <AppBarButton.Icon>
+                                <FontIcon Glyph="&#xE710;" />
+                            </AppBarButton.Icon>
+                            <AppBarButton.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem AutomationProperties.AutomationId="AddManualEvent" Text="Add Manual Event…" Click="OnAddManualEvent">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE787;" />
+                                        </MenuFlyoutItem.Icon>
+                                        <MenuFlyoutItem.KeyboardAccelerators>
+                                            <KeyboardAccelerator Modifiers="Control" Key="N" />
+                                        </MenuFlyoutItem.KeyboardAccelerators>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem AutomationProperties.AutomationId="ImportFeed" Text="Import Canvas Feed…" Click="OnImportFeed">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE71B;" />
+                                        </MenuFlyoutItem.Icon>
+                                    </MenuFlyoutItem>
+                                    <MenuFlyoutItem AutomationProperties.AutomationId="ImportScreenshot" Text="Import from Screenshot…" Click="OnImportScreenshot">
+                                        <MenuFlyoutItem.Icon>
+                                            <FontIcon Glyph="&#xE91B;" />
+                                        </MenuFlyoutItem.Icon>
+                                        <MenuFlyoutItem.KeyboardAccelerators>
+                                            <KeyboardAccelerator Modifiers="Control,Shift" Key="I" />
+                                        </MenuFlyoutItem.KeyboardAccelerators>
+                                    </MenuFlyoutItem>
+                                </MenuFlyout>
+                            </AppBarButton.Flyout>
+                        </AppBarButton>
+                        <AppBarToggleButton
+                            x:Name="AssistantButton"
+                            AutomationProperties.AutomationId="Assistant"
+                            Label="Assistant"
+                            IsChecked="{x:Bind ViewModel.IsAssistantOpen, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind app:Text.AssistantToggleTip(ViewModel.IsAssistantOpen), Mode=OneWay}"
+                            Click="OnToggleAssistant">
+                            <AppBarToggleButton.Icon>
+                                <FontIcon Glyph="&#xE8BD;" />
+                            </AppBarToggleButton.Icon>
+                        </AppBarToggleButton>
+                        <AppBarButton
+                            AutomationProperties.AutomationId="Search"
+                            Label="Search"
+                            ToolTipService.ToolTip="Search assignments or courses (Ctrl+F)"
+                            Click="OnSearch">
+                            <AppBarButton.Icon>
+                                <FontIcon Glyph="&#xE721;" />
+                            </AppBarButton.Icon>
+                        </AppBarButton>
+                    </CommandBar>
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="320" />
+                        <ColumnDefinition x:Name="AssistantColumn" Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressRing
+                        IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                        Visibility="{x:Bind app:Show.If(ViewModel.IsLoading), Mode=OneWay}"
+                        AutomationProperties.Name="Loading assignments" />
+                    <views:AssignmentListView
+                        x:Name="ListView"
+                        Visibility="{x:Bind app:Show.ListSection(ViewModel.SidebarSelection, ViewModel.IsLoading), Mode=OneWay}" />
+                    <views:CalendarView
+                        x:Name="CalendarSection"
+                        Visibility="{x:Bind app:Show.Section(ViewModel.SidebarSelection, 'Calendar'), Mode=OneWay}" />
+                    <views:SettingsView
+                        x:Name="SettingsSection"
+                        Visibility="{x:Bind app:Show.Section(ViewModel.SidebarSelection, 'Settings'), Mode=OneWay}" />
+
+                    <Grid
+                        Grid.Column="1"
+                        Width="{x:Bind ViewModel.PreferredSidebarWidth, Mode=OneWay}"
+                        Visibility="{x:Bind app:Show.If(ViewModel.IsAssistantOpen), Mode=OneWay}">
+                        <Rectangle
+                            Width="1"
+                            HorizontalAlignment="Left"
+                            Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <views:AssistantPanel x:Name="AssistantPanel" Margin="1,0,0,0" />
+                    </Grid>
+                </Grid>
+
+                <InfoBar
+                    x:Name="StatusBar"
+                    Grid.Row="3"
+                    AutomationProperties.AutomationId="StatusBar"
+                    Severity="Success"
+                    IsClosable="True"
+                    IsOpen="{x:Bind app:Show.HasText(ViewModel.StatusMessage), Mode=OneWay}"
+                    Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                    CloseButtonClick="OnCloseStatus" />
+            </Grid>
+        </NavigationView>
+
+        <views:UndoToast
+            x:Name="UndoToast"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,28" />
+
+        <views:SearchOverlay x:Name="SearchOverlay" />
+    </Grid>
 </Window>

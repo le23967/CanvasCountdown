@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="CanvasCountdown.App.Views.UndoToast"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:app="using:CanvasCountdown.App">
+
+    <!-- Floating, so it covers nothing and moves nothing: the list underneath
+         stays exactly where it was while the offer is up. -->
+    <Border
+        AutomationProperties.AutomationId="UndoToast"
+        AutomationProperties.Name="{x:Bind app:Text.UndoToastDescription(ViewModel.LastAddition, ViewModel.UndoToastSecondsRemaining), Mode=OneWay}"
+        AutomationProperties.LiveSetting="Polite"
+        Visibility="{x:Bind app:Show.If(ViewModel.IsUndoToastVisible), Mode=OneWay}"
+        Padding="16,10"
+        CornerRadius="8"
+        Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+            <TextBlock
+                VerticalAlignment="Center"
+                MaxWidth="360"
+                TextTrimming="CharacterEllipsis"
+                Text="{x:Bind app:Text.UndoMessage(ViewModel.LastAddition), Mode=OneWay}" />
+            <Button
+                AutomationProperties.AutomationId="UndoToastUndo"
+                Content="Undo"
+                Style="{ThemeResource AccentButtonStyle}"
+                ToolTipService.ToolTip="Remove what was just added"
+                Click="OnUndo" />
+            <Button
+                AutomationProperties.AutomationId="UndoToastKeep"
+                Content="Keep"
+                ToolTipService.ToolTip="Keep it. Undo stays in the toolbar until something else is added."
+                Click="OnKeep" />
+            <TextBlock
+                VerticalAlignment="Center"
+                Style="{ThemeResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind app:Text.Seconds(ViewModel.UndoToastSecondsRemaining), Mode=OneWay}" />
+        </StackPanel>
+    </Border>
+</UserControl>
