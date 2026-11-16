@@ -26,6 +26,7 @@ namespace CanvasCountdown.UiTour;
 internal static class Program
 {
     private static readonly List<(string Name, bool Passed, string Detail)> Results = [];
+    private static readonly List<string> Notes = [];
     private static string outputDirectory = ".";
     private static int appProcessId;
 
@@ -134,8 +135,7 @@ internal static class Program
 
             Step("15-search", window, () =>
             {
-                Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_F);
-                var field = Wait(() => Find(window, "SearchField"), "the search box");
+                var field = OpenSearch(automation, window);
                 SetText(field, "STAT");
                 Thread.Sleep(800);
                 var results = Find(window, "SearchResults");
@@ -236,7 +236,7 @@ internal static class Program
                 Results.Add((name + " (picture)", false, exception.Message));
             }
             // Written as it goes, so a tour that dies part-way still says how far it got.
-            WriteReport();
+            WriteReport(toConsole: false);
         }
     }
 
@@ -255,6 +255,34 @@ internal static class Program
         Invoke(settings);
         Thread.Sleep(800);
         Expect(Find(window, "SectionTitle")?.Name == "Settings", "Settings opened");
+    }
+
+    /// <summary>
+    /// Ctrl+F, as a keyboard user would, with the window brought to the front
+    /// first. If the shortcut still does not reach it — a fresh runner can
+    /// keep the window inactive — the toolbar's Search is used instead, and
+    /// the report says so rather than passing silently.
+    /// </summary>
+    private static AutomationElement OpenSearch(UIA3Automation automation, Window window)
+    {
+        window.SetForeground();
+        window.Focus();
+        Thread.Sleep(300);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_F);
+        var field = Retry.WhileNull(() => Find(window, "SearchField"), TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200)).Result;
+        if (field is not null)
+        {
+            return field;
+        }
+        Notes.Add("15-search: Ctrl+F did not reach the window (it was not in front); opened Search from the toolbar instead.");
+        var button = Find(window, "Search");
+        if (button is null)
+        {
+            Invoke(Wait(() => Find(window, "MoreButton"), "the command bar's More button"));
+            button = Wait(() => FindMenuItem(automation, window, "Search") ?? FindOnDesktop(automation, "Search"), "Search in the More menu");
+        }
+        Invoke(button);
+        return Wait(() => Find(window, "SearchField"), "the search box");
     }
 
     private static void ScrollSettings(Window window, double percent)
@@ -404,7 +432,7 @@ internal static class Program
         bitmap.Save(path, ImageFormat.Png);
     }
 
-    private static void WriteReport()
+    private static void WriteReport(bool toConsole = true)
     {
         var report = new StringBuilder();
         report.AppendLine("# UI tour");
@@ -413,8 +441,21 @@ internal static class Program
         {
             report.AppendLine($"- {(passed ? "ok  " : "FAIL")} {name}{(string.IsNullOrEmpty(detail) ? string.Empty : " — " + detail.ReplaceLineEndings(" "))}");
         }
+        if (Notes.Count > 0)
+        {
+            report.AppendLine();
+            report.AppendLine("## Notes");
+            report.AppendLine();
+            foreach (var note in Notes)
+            {
+                report.AppendLine($"- {note}");
+            }
+        }
         File.WriteAllText(Path.Combine(outputDirectory, "report.md"), report.ToString());
-        Console.WriteLine(report.ToString());
+        if (toConsole)
+        {
+            Console.WriteLine(report.ToString());
+        }
     }
 
     private static string? Argument(string[] args, string name)

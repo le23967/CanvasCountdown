@@ -97,9 +97,13 @@
 
                 <!-- The title takes what it needs and the command bar the rest,
                      so when the window is narrow the commands move into the
-                     "More" menu instead of crushing the title. -->
+                     "More" menu instead of crushing the title. Undo sits
+                     outside the bar: a command bar only brings an overflowed
+                     command back when its own width changes, so an Undo
+                     inside it that came and went left Search stuck in "More". -->
                 <Grid Grid.Row="1" Padding="24,14,12,6" ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
@@ -128,30 +132,36 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <!-- Only while something can be undone; it outlives the
+                         toast. The tooltip and Narrator name what it would
+                         take back, which is too long for a label. -->
+                    <Button
+                        x:Name="UndoAdditionButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="10,6"
+                        AutomationProperties.AutomationId="UndoAddition"
+                        AutomationProperties.Name="{x:Bind ViewModel.UndoAdditionMenuTitle, Mode=OneWay}"
+                        Visibility="{x:Bind app:Show.If(ViewModel.CanUndoAddition), Mode=OneWay}"
+                        ToolTipService.ToolTip="{x:Bind app:Text.UndoAdditionTip(ViewModel.UndoAdditionMenuTitle), Mode=OneWay}"
+                        Click="OnUndoAddition">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE7A7;" FontSize="16" />
+                            <TextBlock Text="Undo Adding" />
+                        </StackPanel>
+                    </Button>
+
                     <CommandBar
                         x:Name="Toolbar"
-                        Grid.Column="1"
+                        Grid.Column="2"
                         AutomationProperties.AutomationId="Toolbar"
                         Background="Transparent"
                         DefaultLabelPosition="Right"
                         IsDynamicOverflowEnabled="True"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center">
-                        <!-- Only while something can be undone; it outlives the
-                             toast. The tooltip and Narrator name what it would
-                             take back, which is too long for a label. -->
-                        <AppBarButton
-                            x:Name="UndoAdditionButton"
-                            AutomationProperties.AutomationId="UndoAddition"
-                            Label="Undo Adding"
-                            AutomationProperties.Name="{x:Bind ViewModel.UndoAdditionMenuTitle, Mode=OneWay}"
-                            Visibility="{x:Bind app:Show.If(ViewModel.CanUndoAddition), Mode=OneWay}"
-                            ToolTipService.ToolTip="{x:Bind app:Text.UndoAdditionTip(ViewModel.UndoAdditionMenuTitle), Mode=OneWay}"
-                            Click="OnUndoAddition">
-                            <AppBarButton.Icon>
-                                <FontIcon Glyph="&#xE7A7;" />
-                            </AppBarButton.Icon>
-                        </AppBarButton>
                         <!-- The label itself says when a filter is on ("Filtered"),
                              rather than a filled icon that has to be decoded. -->
                         <AppBarButton
