@@ -43,6 +43,10 @@ catch {
     Write-Host "DebugView unavailable: $($_.Exception.Message)"
 }
 
+# A fresh Windows 11 runner sits on the first-sign-in privacy screen, which
+# covers everything; it belongs to the image, not to this app.
+Get-Process -Name 'WWAHost', 'UserOOBEBroker' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
 $env:CANVAS_COUNTDOWN_ISOLATED_LAUNCH = '1'
 $process = Start-Process -FilePath $AppExe -PassThru
 Start-Sleep -Seconds $SettleSeconds

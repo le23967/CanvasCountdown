@@ -33,7 +33,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+    <!-- WinUI and what it depends on, not the whole SDK: the full package
+         would ship a machine-learning runtime, search indexing and widgets
+         (about 60 MB) that this app never calls. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.5" />
   </ItemGroup>
 
   <ItemGroup>
