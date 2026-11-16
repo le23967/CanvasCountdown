@@ -203,10 +203,29 @@ begin
   end;
 end;
 
+// Restart Manager finds a running copy during "Preparing to Install", but
+// Setup only closes it after ssInstall has been announced — too late for the
+// folder to be set aside. So any running copy is closed here, first. When the
+// app updates itself it has already quit by this point; this is for an
+// installer someone runs by hand while the app is open. Nothing is lost by
+// closing it: the app has saved everything before it would ever be closed.
+procedure CloseRunningCopies;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if ResultCode = 0 then
+  begin
+    Log('Closed the running copy before updating it.');
+    Sleep(1000);
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
   begin
+    CloseRunningCopies;
     RecoverInterruptedUpdate;
     if DirExists(CurrentDir) then
     begin
