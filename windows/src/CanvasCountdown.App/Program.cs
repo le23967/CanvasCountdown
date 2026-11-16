@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using CanvasCountdown.App.Platform;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
@@ -12,15 +13,32 @@ namespace CanvasCountdown.App;
 /// <remarks>
 /// Two copies would each schedule the same reminders and each draw a tray
 /// icon, and the second would fight the first over the database. A second
-/// launch — from the Start menu, a toast, or the installer relaunching after an
-/// update — therefore brings the running window forward instead.
+/// launch — from the Start menu, a reminder, or the installer relaunching
+/// after an update — therefore brings the running window forward instead,
+/// carrying its arguments (which event a reminder was about, say) with it.
 /// </remarks>
 public static class Program
 {
+    /// <summary>The arguments this process was started with, minus the executable.</summary>
+    public static IReadOnlyList<string> LaunchArguments { get; private set; } = [];
+
     [STAThread]
     private static int Main(string[] args)
     {
+        LaunchArguments = args;
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // Run by the uninstaller: no window, no single-instance handover.
+        if (args.Contains("--prepare-for-uninstall", StringComparer.OrdinalIgnoreCase))
+        {
+            UninstallPreparation.Run();
+            return 0;
+        }
+
+        if (!AppEnvironment.IsIsolatedLaunch)
+        {
+            AppIdentity.ApplyToProcess();
+        }
 
         if (RedirectedToRunningInstance())
         {

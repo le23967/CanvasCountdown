@@ -23,7 +23,10 @@ public sealed partial class MainWindow : Window
     private void SizeToFitDisplay()
     {
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-        var scale = Content?.XamlRoot?.RasterizationScale ?? 1.0;
+        // Window sizes are in physical pixels; the content is not laid out
+        // yet, so the display scale comes from the window itself.
+        var dpi = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var scale = dpi > 0 ? dpi / 96.0 : 1.0;
         var width = Math.Min((int)(1100 * scale), (int)(area.Width * 0.94));
         var height = Math.Min((int)(760 * scale), (int)(area.Height * 0.94));
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(
@@ -32,4 +35,7 @@ public sealed partial class MainWindow : Window
             width,
             height));
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 }

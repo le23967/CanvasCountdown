@@ -77,3 +77,46 @@ jobs:
         with:
           name: smoke-${{ matrix.arch }}
           path: windows/artifacts/smoke-${{ matrix.arch }}
+
+  installer:
+    name: Installer and updates (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build three consecutive versions
+        shell: pwsh
+        run: |
+          windows/scripts/build-release.ps1 -Architectures ${{ matrix.arch }} -SkipTests -Version 1.0.0 -OutputDirectory windows/artifacts/v1
+          windows/scripts/build-release.ps1 -Architectures ${{ matrix.arch }} -SkipTests -Version 1.0.1 -OutputDirectory windows/artifacts/v2
+          windows/scripts/build-release.ps1 -Architectures ${{ matrix.arch }} -SkipTests -Version 1.0.2 -SimulateFailure -OutputDirectory windows/artifacts/v3
+      - name: Install, update, fail an update, uninstall
+        shell: pwsh
+        run: >
+          windows/scripts/test-installer.ps1
+          -FirstInstaller windows/artifacts/v1/CanvasCountdown-Windows-1.0.0-${{ matrix.arch }}-setup.exe
+          -NextInstaller windows/artifacts/v2/CanvasCountdown-Windows-1.0.1-${{ matrix.arch }}-setup.exe
+          -BrokenInstaller windows/artifacts/v3/CanvasCountdown-Windows-1.0.2-${{ matrix.arch }}-setup.exe
+          -FirstVersion 1.0.0 -NextVersion 1.0.1
+          -LogDirectory windows/artifacts/installer-logs-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: installer-logs-${{ matrix.arch }}
+          path: windows/artifacts/installer-logs-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: installer-${{ matrix.arch }}
+          path: windows/artifacts/v1/CanvasCountdown-Windows-*-setup.exe
