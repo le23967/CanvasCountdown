@@ -173,10 +173,13 @@ public sealed class TrayAndSettingsTests
 
         harness.ViewModel.UpdateSettings(form => form with { RefreshInterval = RefreshInterval.Hourly });
         Assert.Equal("Settings updated", harness.ViewModel.StatusMessage);
+        Assert.True(harness.ViewModel.HasStatusMessage);
 
-        // A confirmation must not stay on screen for good.
+        // A confirmation must not stay on screen for good — including the bar
+        // it sits in, which the window shows by HasStatusMessage.
         await harness.AdvanceAsync(TimeSpan.FromSeconds(2.4));
         await ViewModelHarness.WaitUntil(() => harness.ViewModel.StatusMessage is null, "the confirmation has gone");
+        Assert.False(harness.ViewModel.HasStatusMessage);
     });
 
     /// <summary>

@@ -218,8 +218,10 @@ public sealed class UndoAndUpdateTests
         harness.Releases.Release = UpdateFixtures.Release("1.0.1");
         await harness.ViewModel.CheckForUpdateAsync();
 
+        Assert.True(harness.ViewModel.HasAvailableUpdate);
         harness.ViewModel.DismissUpdate();
         Assert.Null(harness.ViewModel.AvailableUpdate);
+        Assert.False(harness.ViewModel.HasAvailableUpdate);
         Assert.Equal("1.0.1", new SettingsStore(harness.Preferences).DismissedUpdateVersion);
 
         harness.Clock.Advance(TimeSpan.FromDays(1));

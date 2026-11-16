@@ -194,6 +194,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public string? StatusMessage { get; private set; }
 
+    /// <summary>
+    /// Whether there is a confirmation to show. A bool for the window to bind
+    /// to: WinUI does not re-run a binding function whose argument has become
+    /// null, so binding visibility to the message itself left an empty bar.
+    /// </summary>
+    public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
+
     public DateTimeOffset? LastRefreshDate { get; private set; }
 
     public bool HasConfiguredFeed => storedFeedUrlString.Length > 0;

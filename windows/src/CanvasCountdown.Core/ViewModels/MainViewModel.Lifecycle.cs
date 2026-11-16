@@ -145,6 +145,9 @@ public sealed partial class MainViewModel
     /// <summary>A newer release than the one running, that has not been waved away.</summary>
     public AppRelease? AvailableUpdate { get; private set; }
 
+    /// <summary>Whether to show the update banner; a bool for the same reason as <see cref="HasStatusMessage"/>.</summary>
+    public bool HasAvailableUpdate => AvailableUpdate is not null;
+
     public bool IsCheckingForUpdate { get; private set; }
 
     public bool IsDownloadingUpdate { get; private set; }

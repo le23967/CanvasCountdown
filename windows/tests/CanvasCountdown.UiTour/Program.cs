@@ -76,10 +76,18 @@ internal static class Program
             Step("09-completed", window, () => Navigate(window, "NavCompleted", "Completed"));
             Step("10-settings", window, () => NavigateToSettings(window));
             // Further down Settings: the tray previews, labels, the assistant, system and updates.
-            Step("10b-settings-appearance", window, () => ScrollSettings(window, 30));
-            Step("10c-settings-middle", window, () => ScrollSettings(window, 60));
-            Step("10d-settings-end", window, () => ScrollSettings(window, 100));
-            Step("11-upcoming-again", window, () => Navigate(window, "NavUpcoming", "Upcoming"));
+            Step("10b-settings-notifications", window, () => ScrollSettings(window, 15));
+            Step("10c-settings-appearance", window, () => ScrollSettings(window, 30));
+            Step("10d-settings-courses", window, () => ScrollSettings(window, 50));
+            Step("10e-settings-assistant", window, () => ScrollSettings(window, 70));
+            Step("10f-settings-end", window, () => ScrollSettings(window, 100));
+            Step("11-upcoming-again", window, () =>
+            {
+                Navigate(window, "NavUpcoming", "Upcoming");
+                // Every confirmation so far has had time to go, bar and all.
+                Thread.Sleep(2500);
+                Expect(Find(window, "StatusBar") is null or { IsOffscreen: true }, "no status bar is left on screen once its message has gone");
+            });
 
             Step("12-add-manual-event", window, () =>
             {
@@ -233,6 +241,9 @@ internal static class Program
     {
         var page = Wait(() => Find(window, "SettingsPage"), "the Settings page");
         Expect(page.Patterns.Scroll.IsSupported, "the Settings page scrolls");
+        // The sections are drawn once the page has loaded; scrolling before
+        // that measures a page a fraction of its real length.
+        Retry.WhileFalse(() => page.Patterns.Scroll.Pattern.VerticalViewSize.Value < 60, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
         page.Patterns.Scroll.Pattern.SetScrollPercent(-1, percent);
         Thread.Sleep(600);
     }

@@ -56,8 +56,9 @@
 
                 <!-- A newer version, said in the window rather than in a dialog
                      that has to be dismissed before the deadlines can be read.
-                     Always "open" and shown or hidden as a whole: an InfoBar
-                     that closes itself stops following its binding. -->
+                     Shown or hidden through a bool: a binding function is not
+                     run again when its argument becomes null, so one taking
+                     the release itself would leave the banner up for good. -->
                 <InfoBar
                     x:Name="UpdateBanner"
                     Grid.Row="0"
@@ -65,7 +66,7 @@
                     Severity="Informational"
                     IsClosable="False"
                     IsOpen="True"
-                    Visibility="{x:Bind app:Show.IfAny(ViewModel.AvailableUpdate), Mode=OneWay}"
+                    Visibility="{x:Bind app:Show.If(ViewModel.HasAvailableUpdate), Mode=OneWay}"
                     Title="{x:Bind app:Text.UpdateTitle(ViewModel.AvailableUpdate), Mode=OneWay}"
                     Message="{x:Bind app:Text.UpdateMessage(ViewModel.AvailableUpdate, ViewModel.UpdateMessage), Mode=OneWay}">
                     <!-- More than the single ActionButton slot holds, so the
@@ -275,7 +276,7 @@
                     Severity="Success"
                     IsClosable="False"
                     IsOpen="True"
-                    Visibility="{x:Bind app:Show.IfText(ViewModel.StatusMessage), Mode=OneWay}"
+                    Visibility="{x:Bind app:Show.If(ViewModel.HasStatusMessage), Mode=OneWay}"
                     Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
             </Grid>
         </NavigationView>
