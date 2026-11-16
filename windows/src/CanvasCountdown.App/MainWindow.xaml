@@ -66,8 +66,10 @@
                     Title="{x:Bind app:Text.UpdateTitle(ViewModel.AvailableUpdate), Mode=OneWay}"
                     Message="{x:Bind app:Text.UpdateMessage(ViewModel.AvailableUpdate, ViewModel.UpdateMessage), Mode=OneWay}"
                     CloseButtonClick="OnDismissUpdate">
-                    <InfoBar.ActionButton>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- Two actions and a progress ring: more than the single
+                         ActionButton slot holds, so they go in the content. -->
+                    <InfoBar.Content>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
                             <Button
                                 AutomationProperties.AutomationId="InstallUpdate"
                                 Style="{ThemeResource AccentButtonStyle}"
@@ -82,7 +84,7 @@
                                 IsActive="{x:Bind ViewModel.IsDownloadingUpdate, Mode=OneWay}"
                                 AutomationProperties.Name="Downloading the update" />
                         </StackPanel>
-                    </InfoBar.ActionButton>
+                    </InfoBar.Content>
                 </InfoBar>
 
                 <Grid Grid.Row="1" Padding="24,14,12,6" ColumnSpacing="12">
