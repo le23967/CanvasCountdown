@@ -12,14 +12,6 @@ public sealed partial class MainViewModel
     /// </remarks>
     public void ApplySettings(SettingsFormState form)
     {
-        // Controls report their own value back when they are first drawn —
-        // a radio group does, on loading. That is not a change, and saying
-        // "Settings updated" for it would be saying something untrue.
-        if (form == SettingsForm)
-        {
-            return;
-        }
-
         // The feed URL is kept in Credential Manager and only ever changes
         // through the preview and import flow, so the form's copy is never
         // written back.
@@ -119,7 +111,20 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Changes one setting, the way every switch and picker in Settings does.</summary>
-    public void UpdateSettings(Func<SettingsFormState, SettingsFormState> change) => ApplySettings(change(SettingsForm));
+    /// <remarks>
+    /// Controls report their own value back when they are first drawn — a
+    /// radio group does, on loading. That is not a change, and answering it
+    /// with "Settings updated" would be saying something untrue.
+    /// </remarks>
+    public void UpdateSettings(Func<SettingsFormState, SettingsFormState> change)
+    {
+        var changed = change(SettingsForm);
+        if (changed == SettingsForm)
+        {
+            return;
+        }
+        ApplySettings(changed);
+    }
 
     // ------------------------------------------------------------------
     // Countdown appearance

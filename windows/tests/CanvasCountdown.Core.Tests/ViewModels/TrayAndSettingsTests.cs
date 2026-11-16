@@ -191,7 +191,7 @@ public sealed class TrayAndSettingsTests
         var renders = harness.Dock.Renders.Count;
 
         harness.ViewModel.UpdateSettings(form => form with { RefreshInterval = form.RefreshInterval });
-        harness.ViewModel.ApplySettings(harness.ViewModel.SettingsForm with { });
+        harness.ViewModel.UpdateSettings(form => form with { });
 
         Assert.Null(harness.ViewModel.StatusMessage);
         Assert.Equal(renders, harness.Dock.Renders.Count);
