@@ -34,7 +34,11 @@ public sealed class CalendarTextTests
     public void AWeekAcrossTwoMonthsNamesBoth()
     {
         Assert.Equal("Jul 26 – Aug 1, 2026", AssignmentCalendar.WeekTitle(At(2026, 7, 29), Sydney, English));
-        Assert.Equal("26 Jul – 1 Aug 2026", AssignmentCalendar.WeekTitle(At(2026, 7, 29), Sydney, Australian));
+        // Built from the culture's own abbreviations: CLDR has changed them
+        // ("Jul" became "July" in Australian English), and Windows and macOS
+        // ship different releases of it.
+        var months = Australian.DateTimeFormat.AbbreviatedMonthNames;
+        Assert.Equal($"26 {months[6]} – 1 {months[7]} 2026", AssignmentCalendar.WeekTitle(At(2026, 7, 29), Sydney, Australian));
     }
 
     [Theory]
@@ -97,7 +101,9 @@ public sealed class CalendarTextTests
         var sundayFirst = AssignmentCalendar.NarrowWeekdaySymbols(Sydney, English);
         var mondayFirst = AssignmentCalendar.NarrowWeekdaySymbols(SydneyMondayFirst, English);
 
-        Assert.Equal(["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"], sundayFirst);
+        // The culture's own shortest names, whatever release of the culture
+        // data the machine has: one letter on Windows, two on some others.
+        Assert.Equal(English.DateTimeFormat.ShortestDayNames, sundayFirst);
         Assert.Equal(sundayFirst.Skip(1).Append(sundayFirst[0]), mondayFirst);
         Assert.All(sundayFirst, symbol => Assert.True(symbol.Length < "Sun".Length));
     }

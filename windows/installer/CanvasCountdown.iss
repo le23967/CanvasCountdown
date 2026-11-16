@@ -91,7 +91,11 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #ifdef SimulateFailure
-Source: "{#SourceDir}\{#AppExe}"; DestDir: "{app}\simulated-failure"; Flags: ignoreversion; BeforeInstall: FailOnPurpose
+; Tests only. A file that is not there, listed after everything else, so the
+; copy fails half-way — the way a vanished download or a full disk would.
+; (An exception raised from a BeforeInstall hook does not do this: Setup logs
+; it and carries on.)
+Source: "{#SourceDir}\simulated-failure-missing-file.bin"; DestDir: "{app}\simulated-failure"; Flags: external
 #endif
 
 [Icons]
@@ -264,9 +268,3 @@ begin
     Exec(AddBackslash(CurrentDir) + '{#AppExe}', '--update-failed', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
 end;
 
-#ifdef SimulateFailure
-procedure FailOnPurpose;
-begin
-  RaiseException('Simulated failure half-way through the update (test build).');
-end;
-#endif
