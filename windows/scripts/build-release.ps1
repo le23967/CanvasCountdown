@@ -117,7 +117,7 @@ if (-not $iscc) {
 
 $machineTypes = @{ x64 = 0x8664; arm64 = 0xAA64 }
 $platforms = @{ x64 = 'x64'; arm64 = 'ARM64' }
-$required = @('CanvasCountdown.exe', 'CanvasCountdown.dll', 'CanvasCountdown.Core.dll', 'Microsoft.WinUI.dll', 'resources.pri', 'Assets\AppIcon.ico', 'Assets\AppIcon-64.png')
+$required = @('CanvasCountdown.exe', 'CanvasCountdown.dll', 'CanvasCountdown.Core.dll', 'Microsoft.WinUI.dll', 'Assets\AppIcon.ico', 'Assets\AppIcon-64.png')
 $forbidden = @('*.ics', '*.log', '*.pdb', '*Tests*.dll', 'xunit*.dll', 'install-complete')
 $summary = @()
 
@@ -156,6 +156,13 @@ foreach ($arch in $Architectures) {
         if (-not (Test-Path (Join-Path $publishDir $file))) {
             Fail "$file is missing from the $arch build; the app would not start"
         }
+    }
+    # The app's own resource index holds its compiled XAML. It has shipped
+    # missing once already, and the symptom — the first window failing with
+    # "XAML parsing failed" — says nothing about why.
+    $appResources = @('resources.pri', 'CanvasCountdown.pri') | Where-Object { Test-Path (Join-Path $publishDir $_) }
+    if (-not $appResources) {
+        Fail "The $arch build has no resource index of its own (resources.pri); its windows would not load"
     }
 
     $machine = Get-PeMachine $exe
