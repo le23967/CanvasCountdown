@@ -65,9 +65,11 @@ public static class Program
     private static bool RedirectedToRunningInstance()
     {
         // An isolated launch (tests, screenshots) must never hand over to, or
-        // take over from, the user's real copy.
+        // take over from, the user's real copy. A test of the handover itself
+        // gives its isolated launches a key to share.
+        var shared = Environment.GetEnvironmentVariable("CANVAS_COUNTDOWN_INSTANCE_KEY");
         var key = AppEnvironment.IsIsolatedLaunch
-            ? $"CanvasCountdown.Isolated.{Environment.ProcessId}"
+            ? $"CanvasCountdown.Isolated.{(string.IsNullOrWhiteSpace(shared) ? Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture) : shared)}"
             : "CanvasCountdown.Main";
         var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
         var primary = AppInstance.FindOrRegisterForKey(key);

@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -41,6 +43,8 @@ internal static class Program
         start.Environment["CANVAS_COUNTDOWN_DEMO_DATA"] = "1";
 
         using var automation = new UIA3Automation();
+        SignInAndReopen(automation, appPath);
+
         var app = Application.Launch(start);
         var processId = app.ProcessId;
         appProcessId = processId;
@@ -207,7 +211,252 @@ internal static class Program
     }
 
     // ------------------------------------------------------------------
+    // Signing in, and closing to the notification area
+
+    /// <summary>
+    /// The launch Windows makes at sign-in when "Start at sign-in" is on: no
+    /// window, but the countdown drawn from the stored events at once. Then
+    /// the window opened from the Start menu, which hands over to the copy
+    /// already running, closed to the notification area, and opened again.
+    /// Windows makes a new taskbar button, without the badge, each time the
+    /// window appears, so the badge has to be put back each time.
+    /// </summary>
+    private static void SignInAndReopen(UIA3Automation automation, string appPath)
+    {
+        // Shared by these launches and nothing else.
+        var key = $"ui-tour-{Environment.ProcessId}";
+        ProcessStartInfo Launch(params string[] arguments)
+        {
+            var start = new ProcessStartInfo(appPath) { UseShellExecute = false };
+            foreach (var argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+            start.Environment["CANVAS_COUNTDOWN_ISOLATED_LAUNCH"] = "1";
+            start.Environment["CANVAS_COUNTDOWN_DEMO_DATA"] = "1";
+            start.Environment["CANVAS_COUNTDOWN_INSTANCE_KEY"] = key;
+            return start;
+        }
+
+        Process running;
+        try
+        {
+            running = Process.Start(Launch("--background")) ?? throw new InvalidOperationException("no process");
+        }
+        catch (Exception exception)
+        {
+            Results.Add(("00a-sign-in-launch", false, $"The sign-in launch did not start: {exception.Message}"));
+            return;
+        }
+        appProcessId = running.Id;
+        var log = Path.Combine(Path.GetTempPath(), "CanvasCountdown-Isolated", running.Id.ToString(CultureInfo.InvariantCulture), "logs", "diagnostics.log");
+        var app = Application.Attach(running.Id);
+        Window? window = null;
+        var badges = 0;
+        try
+        {
+            Check("00a-sign-in-launch", () =>
+            {
+                var shown = Retry.WhileNull(() => CountdownInTray(ReadLog(log)), TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result;
+                Expect(shown is not null, "the tray to show the countdown from the stored events, without the window");
+                Expect(!HasVisibleWindow(running.Id), "no window at sign-in");
+                Notes.Add(ReadLog(log).Contains("Window content loaded", StringComparison.Ordinal)
+                    ? "00a-sign-in-launch: the window's content loaded although the window was never shown."
+                    : $"00a-sign-in-launch: the tray showed \"{shown}\" while the window's content had still not loaded, so the countdown no longer waits for it.");
+            });
+
+            Check("00b-opened-from-start-menu", () =>
+            {
+                HandOver(Launch());
+                var opened = WaitForWindow(automation, app);
+                window = opened;
+                Wait(() => Find(opened, "NextDeadlineCard"), "the next-deadline card");
+                badges = WaitForBadges(log, 1);
+                CaptureWindow(opened, Path.Combine(outputDirectory, "00b-opened-from-start-menu.png"));
+                CaptureTaskbarButton(automation, "00b-taskbar-button.png");
+            });
+
+            Check("00c-closed-to-notification-area", () =>
+            {
+                var open = window ?? throw new InvalidOperationException("There was no window to close.");
+                // As the × in the title bar does.
+                if (open.Patterns.Window.IsSupported)
+                {
+                    open.Patterns.Window.Pattern.Close();
+                }
+                else
+                {
+                    open.Close();
+                }
+                Expect(Retry.WhileTrue(() => HasVisibleWindow(running.Id), TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Success, "the window gone from the screen");
+                Thread.Sleep(1000);
+                running.Refresh();
+                Expect(!running.HasExited, "the app still running in the notification area");
+            });
+
+            Check("00d-reopened", () =>
+            {
+                HandOver(Launch());
+                var reopened = WaitForWindow(automation, app);
+                window = reopened;
+                WaitForBadges(log, badges + 1);
+                CaptureWindow(reopened, Path.Combine(outputDirectory, "00d-reopened.png"));
+                CaptureTaskbarButton(automation, "00d-taskbar-button.png");
+            });
+        }
+        finally
+        {
+            try
+            {
+                File.WriteAllText(Path.Combine(outputDirectory, "00-sign-in-diagnostics.log"), ReadLog(log));
+            }
+            catch (IOException)
+            {
+            }
+            try
+            {
+                if (!running.HasExited)
+                {
+                    running.Kill();
+                    running.WaitForExit(10_000);
+                }
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                // Already gone.
+            }
+            running.Dispose();
+            WriteReport(toConsole: false);
+        }
+    }
+
+    /// <summary>A second launch, as from the Start menu: it hands over to the running copy and exits.</summary>
+    private static void HandOver(ProcessStartInfo start)
+    {
+        using var second = Process.Start(start) ?? throw new InvalidOperationException("The second launch did not start.");
+        if (!second.WaitForExit(30_000))
+        {
+            second.Kill();
+            throw new InvalidOperationException("The second launch neither handed over nor exited.");
+        }
+        Expect(second.ExitCode == 0, $"the second launch to hand over and exit cleanly (exit code {second.ExitCode})");
+    }
+
+    private static Window WaitForWindow(UIA3Automation automation, Application app)
+        => Retry.WhileNull(() => app.GetMainWindow(automation, TimeSpan.FromSeconds(2)), TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result
+            ?? throw new InvalidOperationException("The window never appeared.");
+
+    /// <summary>What the tray icon last said, once it is the countdown of a real event rather than "nothing due".</summary>
+    private static string? CountdownInTray(string log)
+    {
+        var drawn = Regex.Matches(log, @"Tray icon drawn at \d+ px: ((?:Due today|\d+ days? left) · [^\r\n]+)");
+        return drawn.Count == 0 ? null : drawn[^1].Groups[1].Value;
+    }
+
+    /// <summary>Waits until the badge has been put on at least <paramref name="atLeast"/> new taskbar buttons.</summary>
+    private static int WaitForBadges(string log, int atLeast)
+    {
+        static int Count(string text) => Regex.Matches(text, @"Taskbar badge put on a new taskbar button: (?:Due today|\d+ days? left)").Count;
+        Retry.WhileFalse(() => Count(ReadLog(log)) >= atLeast, TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250));
+        var count = Count(ReadLog(log));
+        Expect(count >= atLeast, $"the countdown badge put on {atLeast} new taskbar button(s) (the log shows {count})");
+        return count;
+    }
+
+    private static string ReadLog(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static bool HasVisibleWindow(int processId)
+    {
+        var found = false;
+        EnumWindows((handle, _) =>
+        {
+            if (IsWindowVisible(handle) && GetWindowThreadProcessId(handle, out var owner) != 0 && owner == processId
+                && GetWindowRect(handle, out var frame) && frame.Right - frame.Left > 1 && frame.Bottom - frame.Top > 1)
+            {
+                found = true;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    /// <summary>
+    /// The app's own taskbar button and nothing else, to see the badge on it.
+    /// How the taskbar shows itself to UI Automation differs between Windows
+    /// versions, so a missing picture is a note, not a failure; the badge
+    /// itself is checked through the app's log.
+    /// </summary>
+    private static void CaptureTaskbarButton(UIA3Automation automation, string fileName)
+    {
+        try
+        {
+            var taskbar = automation.GetDesktop().FindFirstChild(condition => condition.ByClassName("Shell_TrayWnd"));
+            if (taskbar is null)
+            {
+                Notes.Add($"{fileName}: there is no taskbar to photograph.");
+                return;
+            }
+            var buttons = taskbar.FindAllDescendants(condition => condition.ByControlType(ControlType.Button));
+            var button = buttons.FirstOrDefault(element => element.Name?.Contains("Canvas", StringComparison.OrdinalIgnoreCase) == true);
+            if (button is null)
+            {
+                var names = buttons.Select(element => element.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Take(20);
+                Notes.Add($"{fileName}: no Canvas Countdown button on the taskbar (its buttons: {string.Join("; ", names)}).");
+                return;
+            }
+            var bounds = button.BoundingRectangle;
+            if (bounds.Width < 2 || bounds.Height < 2)
+            {
+                Notes.Add($"{fileName}: the taskbar button \"{button.Name}\" has no size on screen.");
+                return;
+            }
+            using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size);
+            }
+            bitmap.Save(Path.Combine(outputDirectory, fileName), ImageFormat.Png);
+            Notes.Add($"{fileName}: the taskbar button \"{button.Name}\", {bounds.Width}×{bounds.Height} px.");
+        }
+        catch (Exception exception)
+        {
+            Notes.Add($"{fileName}: the taskbar button could not be photographed ({exception.GetType().Name}: {exception.Message}).");
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Steps
+
+    /// <summary>A step with no window of its own to photograph.</summary>
+    private static void Check(string name, Action action)
+    {
+        try
+        {
+            action();
+            Results.Add((name, true, string.Empty));
+        }
+        catch (Exception exception)
+        {
+            Results.Add((name, false, exception.Message));
+        }
+        finally
+        {
+            WriteReport(toConsole: false);
+        }
+    }
 
     private static void Step(string name, Window window, Action action, bool captureScreen = false)
     {

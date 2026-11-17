@@ -49,11 +49,31 @@ public sealed partial class MainWindow : Window
         Close();
     }
 
+    /// <summary>
+    /// A sign-in launch: the list, the countdown and the reminders start
+    /// without the window, which loads the first time it is opened.
+    /// </summary>
+    public void StartInBackground()
+    {
+        if (AppEnvironment.IsIsolatedLaunch)
+        {
+            CrashLog.Note("Started in the background; the window has not been shown.");
+        }
+        _ = ViewModel.StartAsync();
+    }
+
     private async void OnRootLoaded(object sender, RoutedEventArgs e)
     {
+        if (AppEnvironment.IsIsolatedLaunch)
+        {
+            CrashLog.Note("Window content loaded.");
+        }
         SyncNavigation();
+        // After a sign-in launch this has long since started, and returns at once.
         await ViewModel.StartAsync();
         AppServices.Current.WindowDidLoad(this);
+        // Anything asked for while there was no window to show it in, such as an error.
+        OnViewModelChanged(this, new PropertyChangedEventArgs(null));
     }
 
     /// <summary>

@@ -31,9 +31,15 @@ public partial class App : Application
         services.Attach(window);
 
         // Started at sign-in: the tray icon and the reminders are what matter,
-        // and a window appearing on every boot would be in the way.
+        // and a window appearing on every boot would be in the way. A window
+        // that is never shown never loads, though, and loading is what starts
+        // everything else, so that is started without it.
         var startsHidden = Program.LaunchArguments.Contains("--background", StringComparer.OrdinalIgnoreCase);
-        if (!startsHidden)
+        if (startsHidden)
+        {
+            window.StartInBackground();
+        }
+        else
         {
             window.Activate();
         }

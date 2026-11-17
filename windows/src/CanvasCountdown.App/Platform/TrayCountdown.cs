@@ -49,6 +49,9 @@ internal sealed class TrayCountdown : IDockRenderer, IDisposable
         window = mainWindow;
         this.quit = quit;
         this.refresh = refresh;
+        // Before the window is first shown, so the badge goes on its very
+        // first taskbar button too.
+        overlay ??= new TaskbarOverlay(mainWindow.Handle);
         try
         {
             tray = new TrayIcon();
@@ -66,11 +69,7 @@ internal sealed class TrayCountdown : IDockRenderer, IDisposable
         }
     }
 
-    public void WindowDidLoad(MainWindow mainWindow)
-    {
-        overlay ??= new TaskbarOverlay(mainWindow.Handle);
-        Redraw();
-    }
+    public void WindowDidLoad(MainWindow mainWindow) => Redraw();
 
     public void Render(int? daysRemaining, string label, AssignmentListItem? item)
     {
