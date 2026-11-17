@@ -43,8 +43,6 @@ internal static class Program
         start.Environment["CANVAS_COUNTDOWN_DEMO_DATA"] = "1";
 
         using var automation = new UIA3Automation();
-        SignInAndReopen(automation, appPath);
-
         var app = Application.Launch(start);
         var processId = app.ProcessId;
         appProcessId = processId;
@@ -150,15 +148,29 @@ internal static class Program
             });
             Step("16-search-closed", window, () =>
             {
-                Keyboard.Press(VirtualKeyShort.ESCAPE);
-                Thread.Sleep(500);
-                Expect(Find(window, "SearchPanel") is null or { IsOffscreen: true }, "Esc closes search");
+                PressInWindow(window, VirtualKeyShort.ESCAPE, Find(window, "SearchField"));
+                if (!Eventually(() => SearchIsClosed(window)))
+                {
+                    // The dimmed backdrop, below the panel; a click there closes search too.
+                    Notes.Add("16-search-closed: Esc did not reach the window (it was not in front); closed search by clicking outside the panel instead.");
+                    var bounds = window.BoundingRectangle;
+                    Mouse.Click(new Point(bounds.Left + bounds.Width / 2, bounds.Bottom - 40));
+                }
+                Expect(Eventually(() => SearchIsClosed(window)), "search closed, its box gone from the window");
             });
 
             Step("17-filter-menu", window, () => Click(window, "Filter"), captureScreen: true);
             Step("18-assistant", window, () =>
             {
-                Keyboard.Press(VirtualKeyShort.ESCAPE);
+                PressInWindow(window, VirtualKeyShort.ESCAPE);
+                if (!Eventually(() => FindMenuItem(automation, window, "All Courses") is null or { IsOffscreen: true }))
+                {
+                    Notes.Add("18-assistant: Esc did not reach the Filter menu; closed it by clicking the section title instead.");
+                    Mouse.Click(Wait(() => Find(window, "SectionTitle"), "the section title").GetClickablePoint());
+                }
+                // The Assistant button is a toggle, which UI Automation can
+                // only press with a real click, so nothing may be over it.
+                Expect(SearchIsClosed(window), "nothing covering the toolbar");
                 Click(window, "Assistant");
                 Wait(() => Find(window, "AssistantComposer"), "the assistant's box");
             });
@@ -206,6 +218,11 @@ internal static class Program
             }
         }
 
+        // Last, once the copy above has gone and its taskbar button with it.
+        // It presses no keys, so it cannot change what the steps above see.
+        Thread.Sleep(1500);
+        SignInAndReopen(automation, appPath);
+
         WriteReport();
         return Results.All(result => result.Passed) ? 0 : 1;
     }
@@ -245,7 +262,7 @@ internal static class Program
         }
         catch (Exception exception)
         {
-            Results.Add(("00a-sign-in-launch", false, $"The sign-in launch did not start: {exception.Message}"));
+            Results.Add(("20a-sign-in-launch", false, $"The sign-in launch did not start: {exception.Message}"));
             return;
         }
         appProcessId = running.Id;
@@ -255,28 +272,29 @@ internal static class Program
         var badges = 0;
         try
         {
-            Check("00a-sign-in-launch", () =>
+            Check("20a-sign-in-launch", () =>
             {
                 var shown = Retry.WhileNull(() => CountdownInTray(ReadLog(log)), TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(250)).Result;
                 Expect(shown is not null, "the tray to show the countdown from the stored events, without the window");
                 Expect(!HasVisibleWindow(running.Id), "no window at sign-in");
                 Notes.Add(ReadLog(log).Contains("Window content loaded", StringComparison.Ordinal)
-                    ? "00a-sign-in-launch: the window's content loaded although the window was never shown."
-                    : $"00a-sign-in-launch: the tray showed \"{shown}\" while the window's content had still not loaded, so the countdown no longer waits for it.");
+                    ? "20a-sign-in-launch: the window's content loaded although the window was never shown."
+                    : $"20a-sign-in-launch: the tray showed \"{shown}\" while the window's content had still not loaded, so the countdown no longer waits for it.");
             });
 
-            Check("00b-opened-from-start-menu", () =>
+            Check("20b-opened-from-start-menu", () =>
             {
                 HandOver(Launch());
                 var opened = WaitForWindow(automation, app);
                 window = opened;
                 Wait(() => Find(opened, "NextDeadlineCard"), "the next-deadline card");
                 badges = WaitForBadges(log, 1);
-                CaptureWindow(opened, Path.Combine(outputDirectory, "00b-opened-from-start-menu.png"));
-                CaptureTaskbarButton(automation, "00b-taskbar-button.png");
+                NoteWhetherInFront("20b-opened-from-start-menu", opened);
+                CaptureWindow(opened, Path.Combine(outputDirectory, "20b-opened-from-start-menu.png"));
+                CaptureTaskbarButton(automation, "20b-taskbar-button.png");
             });
 
-            Check("00c-closed-to-notification-area", () =>
+            Check("20c-closed-to-notification-area", () =>
             {
                 var open = window ?? throw new InvalidOperationException("There was no window to close.");
                 // As the × in the title bar does.
@@ -294,21 +312,22 @@ internal static class Program
                 Expect(!running.HasExited, "the app still running in the notification area");
             });
 
-            Check("00d-reopened", () =>
+            Check("20d-reopened", () =>
             {
                 HandOver(Launch());
                 var reopened = WaitForWindow(automation, app);
                 window = reopened;
                 WaitForBadges(log, badges + 1);
-                CaptureWindow(reopened, Path.Combine(outputDirectory, "00d-reopened.png"));
-                CaptureTaskbarButton(automation, "00d-taskbar-button.png");
+                NoteWhetherInFront("20d-reopened", reopened);
+                CaptureWindow(reopened, Path.Combine(outputDirectory, "20d-reopened.png"));
+                CaptureTaskbarButton(automation, "20d-taskbar-button.png");
             });
         }
         finally
         {
             try
             {
-                File.WriteAllText(Path.Combine(outputDirectory, "00-sign-in-diagnostics.log"), ReadLog(log));
+                File.WriteAllText(Path.Combine(outputDirectory, "20-sign-in-diagnostics.log"), ReadLog(log));
             }
             catch (IOException)
             {
@@ -340,6 +359,19 @@ internal static class Program
             throw new InvalidOperationException("The second launch neither handed over nor exited.");
         }
         Expect(second.ExitCode == 0, $"the second launch to hand over and exit cleanly (exit code {second.ExitCode})");
+    }
+
+    /// <summary>
+    /// Whether the window came to the front, recorded rather than required:
+    /// the launches here come from this test, not from someone's click, and
+    /// Windows may refuse the front to any of them on a runner.
+    /// </summary>
+    private static void NoteWhetherInFront(string step, Window window)
+    {
+        // The taskbar animates a new button in; this also lets it finish.
+        Thread.Sleep(2000);
+        var inFront = GetForegroundWindow() == window.Properties.NativeWindowHandle.Value;
+        Notes.Add($"{step}: the window {(inFront ? "came to the front" : "appeared, but not in front")}.");
     }
 
     private static Window WaitForWindow(UIA3Automation automation, Application app)
@@ -551,6 +583,29 @@ internal static class Program
     private static void Click(Window window, string automationId)
         => Invoke(Wait(() => Find(window, automationId), automationId));
 
+    /// <summary>
+    /// A key press with the window brought to the front first: keys go to
+    /// whatever has focus, and on a fresh runner that is not always this window.
+    /// </summary>
+    private static void PressInWindow(Window window, VirtualKeyShort key, AutomationElement? focus = null)
+    {
+        window.SetForeground();
+        focus?.Focus();
+        Thread.Sleep(300);
+        Keyboard.Press(key);
+        Thread.Sleep(300);
+    }
+
+    private static bool Eventually(Func<bool> condition)
+        => Retry.WhileFalse(condition, TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200)).Success;
+
+    /// <summary>
+    /// Whether the search panel has gone. Asked of the search box: the panel's
+    /// own name is on a Border, which UI Automation cannot see, so asking for
+    /// it found nothing whether the panel was open or not.
+    /// </summary>
+    private static bool SearchIsClosed(Window window) => Find(window, "SearchField") is null or { IsOffscreen: true };
+
     /// <summary>Presses a control the way assistive technology would, so nothing on top of the window can intercept it.</summary>
     private static void Invoke(AutomationElement element)
     {
@@ -741,6 +796,9 @@ internal static class Program
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr handle, out int processId);

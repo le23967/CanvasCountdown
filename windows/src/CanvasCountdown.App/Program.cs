@@ -88,6 +88,13 @@ public static class Program
     /// </summary>
     private static void RedirectActivation(AppActivationArguments activation, AppInstance primary)
     {
+        // Windows lets the launch someone just clicked come to the front, not
+        // the copy it hands over to. That copy's window may be hidden in the
+        // notification area until the handover reaches it, too late for this
+        // process to bring it forward itself, so the permission is passed on
+        // first and the running copy brings its own window forward.
+        NativeMethods.AllowSetForegroundWindow(primary.ProcessId);
+
         var redirected = NativeMethods.CreateEvent(IntPtr.Zero, bManualReset: true, bInitialState: false, lpName: null);
         _ = Task.Run(() =>
         {
@@ -120,5 +127,8 @@ public static class Program
 
         [DllImport("user32.dll")]
         public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool AllowSetForegroundWindow(uint processId);
     }
 }
