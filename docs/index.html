@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canvas Countdown — Canvas LMS deadlines in your Mac's Dock</title>
+<title>Canvas Countdown: Canvas LMS deadlines in your Mac's Dock</title>
 <meta name="description" content="A native macOS app that reads your Canvas LMS calendar feed and draws the days left until your next assignment straight onto the Dock icon. Free, open source, no account, nothing uploaded.">
 <meta name="author" content="le23967">
 <link rel="canonical" href="https://le23967.github.io/CanvasCountdown/">
@@ -12,13 +12,13 @@
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Canvas Countdown">
-<meta property="og:title" content="Canvas Countdown — Canvas LMS deadlines in your Mac's Dock">
+<meta property="og:title" content="Canvas Countdown: Canvas LMS deadlines in your Mac's Dock">
 <meta property="og:description" content="A native macOS app that reads your Canvas calendar feed and draws the days left until your next assignment straight onto the Dock icon. Free and open source.">
 <meta property="og:url" content="https://le23967.github.io/CanvasCountdown/">
 <meta property="og:image" content="https://le23967.github.io/CanvasCountdown/img/upcoming.png">
 <meta property="og:image:alt" content="Canvas Countdown showing upcoming assignments with the days remaining beside each one">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Canvas Countdown — Canvas LMS deadlines in your Mac's Dock">
+<meta name="twitter:title" content="Canvas Countdown: Canvas LMS deadlines in your Mac's Dock">
 <meta name="twitter:description" content="A native macOS app that puts the days left until your next Canvas assignment on your Dock icon.">
 <meta name="twitter:image" content="https://le23967.github.io/CanvasCountdown/img/upcoming.png">
 
@@ -31,7 +31,6 @@
   "operatingSystem": "macOS 14.0 or later",
   "url": "https://le23967.github.io/CanvasCountdown/",
   "downloadUrl": "https://github.com/le23967/CanvasCountdown/releases/latest",
-  "softwareVersion": "1.1.0",
   "license": "https://github.com/le23967/CanvasCountdown/blob/main/LICENSE",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -43,7 +42,7 @@
 
 <style>
 :root{
-  /* One theme. Light by default, dark when the system asks for it — the page
+  /* One theme. Light by default, dark when the system asks for it. The page
      never mixes the two, and no section inverts against its neighbour. */
   --bg:#ffffff; --bg-elev:#f6f7f9;
   --fg:#0d1015; --fg-soft:#5a6070; --fg-dim:#868c9a;
@@ -81,15 +80,19 @@ section{padding:clamp(80px,13vh,150px) 0;scroll-margin-top:56px;overflow:hidden;
 section.elev{background:var(--bg-elev)}
 .muted{color:var(--fg-soft)}
 
-h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.035em;line-height:1.05}
+h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.035em;line-height:1.05;text-wrap:balance}
 h1{font-size:clamp(2.6rem,7.4vw,5.2rem)}
 h2{font-size:clamp(2rem,4.6vw,3.4rem);margin-bottom:18px}
 h3{font-size:clamp(1.25rem,2.1vw,1.6rem);letter-spacing:-.02em;margin-bottom:10px}
 .kicker{font-size:13px;letter-spacing:.16em;text-transform:uppercase;
   font-weight:700;color:var(--accent);margin-bottom:18px}
 .lede{font-size:clamp(1.06rem,1.9vw,1.35rem);line-height:1.5;max-width:56ch;color:var(--fg-soft)}
+.lede,.muted,.fine,.hint,figcaption{text-wrap:pretty}
 .center{text-align:center}
-.center .lede{margin-left:auto;margin-right:auto}
+/* Either way round: a centred block of text, or text inside a centred block.
+   Written only the second way, a paragraph that was itself marked centre had
+   its lines centred inside a box that stayed against the left edge. */
+.center .lede,.lede.center{margin-left:auto;margin-right:auto}
 
 header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 78%,transparent);
   backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line)}
@@ -160,7 +163,7 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 7
 .hint{margin-top:14px;font-size:12.8px;color:var(--fg-dim)}
 
 
-/* horizontal carousel picker — a dial of appearances, with a scale -------- */
+/* horizontal carousel picker: a dial of appearances, with a scale ------- */
 .picker{position:relative;margin-top:20px}
 .rail{display:flex;gap:14px;overflow-x:auto;
   padding:20px calc(50% - 33px) 14px;
@@ -292,7 +295,7 @@ footer b{color:var(--fg-soft)}
     <p class="kicker rv">For macOS</p>
     <h1 class="rv">Your next deadline,<br>on your Dock.</h1>
     <p class="lede center rv" style="margin-top:20px">Canvas Countdown reads the calendar feed your
-      university already publishes and draws the days remaining onto the Dock icon — so you know
+      university already publishes and draws the days remaining onto the Dock icon, so you know
       where you stand without opening anything.</p>
 
     <div class="cta rv">
@@ -325,21 +328,22 @@ footer b{color:var(--fg-soft)}
           <button type="button" id="plus" aria-label="More days">+</button>
         </div>
       </div>
-      <p class="hint">It counts down on its own. Drag the row, or use the arrow keys — whichever
-        appearance ends up under the needle is the one the tile takes. Twelve of them: the first
-        four ship with the app, and the rest are examples of what you can mix and save under a name.</p>
+      <p class="hint">It counts down on its own. Drag the row or use the arrow keys, and the tile
+        takes whichever appearance ends up under the needle. There are twelve: the four in the
+        middle ship with the app, and the rest are examples of what you can mix and save under a name.</p>
     </div>
   </div>
 </div>
 
 <!-- the clip -->
 <section class="elev" id="watch">
-  <div class="wrap">
+  <div class="wrap center">
     <p class="kicker rv">Watch</p>
     <h2 class="rv">Describe a semester. Correct it in a sentence.</h2>
-    <p class="lede rv">Type what you have to do. The optional assistant turns it into drafts you
-      review before anything is written — and if it gets one wrong, you say so rather than starting
-      again. Nothing is saved until you confirm, and the confirmation counts what it is about to add.</p>
+    <p class="lede rv">Type what you have to do, in English or Chinese. The optional assistant turns
+      it into drafts you review before anything is written, and if it gets one wrong, you say so
+      rather than starting again. Nothing is saved until you confirm, and the confirmation counts
+      what it is about to add.</p>
 
     <figure class="rv narrow" style="margin-top:44px">
       <div class="frame">
@@ -366,7 +370,7 @@ footer b{color:var(--fg-soft)}
         <p class="muted">Assignments arrive from your Canvas feed and are listed with the days
           remaining beside each one, nearest first.</p>
         <p class="muted">Deadlines that arrive as 00:00 are shown as <b>11:59&nbsp;PM</b>, because
-          that is what they mean. Only the clock is corrected — the day and the countdown never
+          that is what they mean. Only the clock is corrected. The day and the countdown never
           move, and turning the setting off restores the original times.</p>
       </div>
       <figure><div class="frame"><img src="img/upcoming.png" alt="Upcoming assignments listed with days remaining" loading="lazy" width="1600" height="1067"></div></figure>
@@ -407,8 +411,8 @@ footer b{color:var(--fg-soft)}
     <p class="kicker rv">Reversible</p>
     <h2 class="rv">Nothing is added without a way back.</h2>
     <p class="lede center rv">Saving several tasks at once asks first, and says what it is about to
-      do. Afterwards a panel offers Undo for ten seconds — then it moves to the Edit menu, so you
-      never have to know a keyboard shortcut to take something back.</p>
+      do. Afterwards a panel offers Undo for ten seconds, and after that it stays in the Edit menu,
+      so you never need a keyboard shortcut to take something back.</p>
     <div class="cards">
       <figure class="card rv" style="padding:0;overflow:hidden">
         <img src="img/confirm.png" alt="A confirmation reading Add 8 tasks with the courses and date range" loading="lazy">
@@ -487,7 +491,7 @@ footer b{color:var(--fg-soft)}
     </div>
 
     <p class="fine">Checked August 2026 against each app's own documentation and store listing.
-      TickTick has had a Countdown feature since 2025 and AI since 2026 — the rows above are about
+      TickTick has had a Countdown feature since 2025 and AI since 2026. The rows above are about
       <em>where</em> the countdown lives and <em>where</em> the AI runs, not whether they exist.
       Days Matter syncs its own events out to iCal rather than subscribing to a feed. The free
       Days&nbsp;Matter product is the separate iPhone app, Days&nbsp;Matter&nbsp;Air. If anything
@@ -512,13 +516,13 @@ footer b{color:var(--fg-soft)}
       developer account.</p>
     <ol class="steps rv">
       <li>Download the <b>.dmg</b> above, or from the
-        <a href="https://github.com/le23967/CanvasCountdown/releases/latest" style="color:#8ab4ff">latest release</a>.</li>
+        <a href="https://github.com/le23967/CanvasCountdown/releases/latest" style="color:var(--accent)">latest release</a>.</li>
       <li>Open it and drag <b>Canvas Countdown</b> into <b>Applications</b>.</li>
       <li><b>Right-click the app and choose Open</b>, then confirm. Double-clicking is blocked by
         Gatekeeper the first time.</li>
       <li>If macOS still refuses, open <b>System Settings → Privacy &amp; Security</b> and choose
         <b>Open Anyway</b>.</li>
-      <li>In the app, paste your <b>Canvas calendar feed URL</b> — in Canvas, go to
+      <li>In the app, paste your <b>Canvas calendar feed URL</b>. In Canvas, it is under
         <b>Calendar → Calendar Feed</b>.</li>
     </ol>
     <p class="note rv">Needs <b>macOS 14 (Sonoma) or later</b>. macOS 13 and earlier cannot run it:
@@ -535,8 +539,8 @@ footer b{color:var(--fg-soft)}
       <li><b>No account and no server.</b> Nothing to sign up for. It talks to your institution's
         Canvas feed and nothing else of its own.</li>
       <li><b>No analytics, no tracking.</b> Nothing counted, logged or phoned home.</li>
-      <li><b>Your feed URL lives in the macOS Keychain</b>, never in preferences or diagnostics —
-        it is a private address that shows your whole timetable.</li>
+      <li><b>Your feed URL lives in the macOS Keychain</b>, never in preferences or diagnostics.
+        It is a private address that shows your whole timetable.</li>
       <li><b>Your deadlines stay on your Mac</b>, in a local database inside the app's sandbox.</li>
       <li><b>The assistant is optional and local by default.</b> Pointed at a model on your own Mac,
         nothing is uploaded. Choose a cloud service instead and the panel says so, every time,
@@ -621,26 +625,29 @@ footer b{color:var(--fg-soft)}
   }
 
   /* ---- the Dock tile -------------------------------------------------- */
-  // Twelve chosen by hand rather than generated. The app's own four come first
-  // with the hex values it really draws; the rest are examples of what you can
-  // mix, picked to read as their own thing rather than points on a colour wheel.
-  // Two of them are pale faces with a dark number, which keeps the run from
-  // being ten variations on a bright square.
+  // Twelve chosen by hand rather than generated. The app's own four sit in the
+  // middle with the hex values it really draws, so the row opens with faces on
+  // both sides of the needle rather than all of them off to the right. The rest
+  // are examples of what you can mix, picked to read as their own thing rather
+  // than points on a colour wheel. Two of them are pale faces with a dark
+  // number, which keeps the run from being ten variations on a bright square.
   var THEMES = [
-    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
-    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
-    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
-    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
     { name: 'Sunset',  mixed: 1, top: '#FF9E5E', bot: '#C2385C', num: '#FFFFFF', lbl: '#FFE7DA' },
     { name: 'Forest',  mixed: 1, top: '#5FB37A', bot: '#17512F', num: '#FFFFFF', lbl: '#DCF2E3' },
     { name: 'Grape',   mixed: 1, top: '#A177FF', bot: '#46209E', num: '#FFFFFF', lbl: '#EDE4FF' },
     { name: 'Sand',    mixed: 1, top: '#F6E9CE', bot: '#E0C89B', num: '#6B3E0F', lbl: '#7A5A24' },
+    { name: 'Days Matter Inspired', top: '#F5F5F7', bot: '#E3E4E8', num: '#D83A2E', lbl: '#5A5A5F' },
+    { name: 'Default Blue',         top: '#3D7AD1', bot: '#21448C', num: '#FFFFFF', lbl: '#EAF1FF' },
+    { name: 'Dark',                 top: '#2B2B2F', bot: '#131316', num: '#F2F2F7', lbl: '#A1A1AA' },
+    { name: 'High Contrast',        top: '#000000', bot: '#000000', num: '#FFFFFF', lbl: '#FFFF00' },
     { name: 'Ocean',   mixed: 1, top: '#4FC3D9', bot: '#10495E', num: '#FFFFFF', lbl: '#DCF4FA' },
     { name: 'Crimson', mixed: 1, top: '#FF6E6E', bot: '#96131C', num: '#FFFFFF', lbl: '#FFE0E0' },
     { name: 'Slate',   mixed: 1, top: '#6B7688', bot: '#1F2733', num: '#FFFFFF', lbl: '#CFD7E2' },
     { name: 'Mint',    mixed: 1, top: '#E8F7EE', bot: '#CDE9D8', num: '#1B6B44', lbl: '#2F7A55' }
   ];
   var START = 14;
+  // Default Blue, the one the app itself starts on.
+  var FIRST = THEMES.findIndex(function (t) { return t.name === 'Default Blue'; });
 
   var tile = document.getElementById('tile');
   var wrap = document.getElementById('tilewrap');
@@ -662,11 +669,11 @@ footer b{color:var(--fg-soft)}
     tile.style.setProperty('--lbl', t.lbl);
     wrap.style.setProperty('--ring', t.top);
     tag.innerHTML = 'Theme: <b>' + t.name + '</b>' +
-      (t.mixed ? ' <span style="opacity:.7">— one you could mix</span>' : '');
+      (t.mixed ? ' <span style="opacity:.7">(one you could mix)</span>' : '');
   }
 
   // The ring that leaves the tile. Fired once when the row comes to rest, not
-  // on every appearance the needle passes on the way — a flick across the
+  // on every appearance the needle passes on the way. A flick across the
   // twelve would otherwise set off a dozen of them.
   function burst() {
     if (reduce) { return; }
@@ -768,8 +775,8 @@ footer b{color:var(--fg-soft)}
   // snap yanks every move back to the nearest point, which is what made the old
   // dial feel stuck. They stand aside for the drag and the glide, and come back
   // afterwards so the wheel and the keyboard still snap natively.
-  var COAST = 0.325;   // s — how far a flick is projected
-  var SETTLE = 0.5;    // s — how long the glide takes to arrive
+  var COAST = 0.325;   // seconds: how far a flick is projected
+  var SETTLE = 0.5;    // seconds: how long the glide takes to arrive
   var frame = null, pointerId = null, samples = [], dragging = false;
   var clickGuard = false, startX = 0, startScroll = 0, startIndex = 0;
 
@@ -785,8 +792,8 @@ footer b{color:var(--fg-soft)}
   }
 
   // One motion, not two. Where the flick would come to rest picks the target,
-  // and a critically damped spring — started at the speed the hand let go with
-  // — carries the row there. Coasting to a stop and then running a separate
+  // and a critically damped spring, started at the speed the hand let go with,
+  // carries the row there. Coasting to a stop and then running a separate
   // snap is what reads as stiff. Solved per frame rather than integrated, so it
   // comes out the same on a 60Hz screen and a 120Hz one.
   function glide(target, v0) {
@@ -971,10 +978,9 @@ footer b{color:var(--fg-soft)}
   document.getElementById('plus').addEventListener('click', function () { takeOver(1); });
 
   setDays(START, false);
-  // Start on Default Blue, the one the app itself starts on.
   measure();
   unsnap();
-  rail.scrollLeft = points[0];
+  rail.scrollLeft = points[FIRST];
   rail.style.scrollSnapType = '';
   rail.style.scrollBehavior = '';
   paint();

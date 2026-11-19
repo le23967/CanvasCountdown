@@ -13,50 +13,50 @@ no paid dependency.
 
 ## Features
 
-- **Canvas Calendar Feed import** — paste your feed URL once; the app refreshes
+- **Canvas Calendar Feed import.** Paste your feed URL once; the app refreshes
   on a schedule while it is running.
-- **Screenshot import with mandatory review** — recognition runs locally with
+- **Screenshot import with mandatory review.** Recognition runs locally with
   Apple Vision, and nothing is saved until you have checked it.
-- **AI deadline Assistant** — one box. Ask what is most urgent, or write a task
+- **AI deadline Assistant.** One box. Ask what is most urgent, or write a task
   in a sentence, give it a course and a label, and review the draft before it is
-  saved. It reads which of the two you meant — in English or in Chinese — and
+  saved. It reads which of the two you meant, in English or in Chinese, and
   says so under the box before you send, and you can pin it to one or the
-  other. While a review is on screen
-  the same box changes those drafts rather than starting again. One click undoes
+  other. While a review is on screen the same box changes those drafts rather
+  than starting again. One click undoes
   everything a batch just added. Optional, and local by default.
-- **Any AI service, saved by name** — anything speaking the common
+- **Any AI service, saved by name.** Anything speaking the common
   chat-completions API works, including a model running locally through Ollama.
   Settings suggests the major services and fills in their address for you. Keep
   several models, each with its own key in the Keychain, and switch between them
   from the Assistant itself, beside the sentence they will answer.
-- **Tells you when there is a new version** — it asks GitHub once a day and says
+- **Tells you when there is a new version.** It asks GitHub once a day and says
   so in the window, never in a dialog you have to dismiss to read your
   deadlines. **Download** fetches the disk image and opens it; the last step is
   dragging the app to Applications, because a sandboxed app cannot replace
   itself. Dismissing a version means you are not asked about it again, only
   about the one after it. **Settings → Updates** has a Check for Updates button
   that always answers.
-- **11:59 PM due times** — a Canvas deadline that arrives as midnight is shown
+- **11:59 PM due times.** A Canvas deadline that arrives as midnight is shown
   as the end of that day, which is what it means. The day and the countdown
   never move, and it can be turned off.
-- **Labels** — a name and a colour of your own (Important, Personal, Society,
+- **Labels.** A name and a colour of your own (Important, Personal, Society,
   whatever you need), shown in the list and on the calendar.
-- **Calendar** — day, week, month and year views, with ⌘1–⌘4, ⌘T for today and
+- **Calendar.** Day, week, month and year views, with ⌘1 to ⌘4, ⌘T for today and
   ⌘⇧T to type a date and jump to it.
-- **Notifications** — local reminders at 7 days, 3 days, 1 day and on the due
+- **Notifications.** Local reminders at 7 days, 3 days, 1 day and on the due
   day by default, and any schedule you add.
-- **Manual events** — countdowns that have nothing to do with Canvas.
-- **Course filtering** — narrow Upcoming, the nearest-deadline card and the
+- **Manual events.** Countdowns that have nothing to do with Canvas.
+- **Course filtering.** Narrow Upcoming, the nearest-deadline card and the
   Dock countdown to the courses you care about.
-- **Course removal** — take an old course out for good, so the Canvas feed
+- **Course removal.** Take an old course out for good, so the Canvas feed
   stops importing a subject you finished last year. Events you added
   yourself under that course, by hand or from a screenshot, are kept.
   Reversible.
-- **Live Dock countdown** — the days remaining, drawn in the Dock tile while the
+- **Live Dock countdown.** The days remaining, drawn in the Dock tile while the
   app runs.
-- **Custom Dock appearance** — number size and weight, background, number and
+- **Custom Dock appearance.** Number size and weight, background, number and
   header colours, four built-in themes, and a Chinese or English header label.
-- **Reusable Dock theme presets** — save a colour scheme you like, rename it,
+- **Reusable Dock theme presets.** Save a colour scheme you like, rename it,
   duplicate it, apply it again later.
 
 ## Requirements
@@ -141,13 +141,13 @@ simply reports that it cannot be reached. Nothing is sent anywhere.
 
 **Settings → AI Assistant** keeps a list of models, each either:
 
-- **On this Mac** — a local server. Nothing is uploaded.
-- **A hosted service** — any that speaks the chat-completions API; Settings
+- **On this Mac.** A local server. Nothing is uploaded.
+- **A hosted service.** Any that speaks the chat-completions API; Settings
   suggests several well-known ones and fills in their address. Choosing one is
   a separate, deliberate act and requires your own API key.
 
 **What is sent when you use the cloud provider:** assignment titles, course
-names and due dates for the deadlines currently in scope — and, when you ask
+names and due dates for the deadlines currently in scope, and when you ask
 about one specific assignment, only that one. Nothing else is sent: not your
 Canvas feed URL, not your completed or ignored marks, not the database, not any
 screenshot or recognised text.
@@ -169,7 +169,7 @@ rather than a task with an invented deadline.
 
 - Assignment data, labels and settings stay on this Mac, in the app's sandbox
   container.
-- The private Canvas feed URL is stored in the macOS Keychain — never in
+- The private Canvas feed URL is stored in the macOS Keychain, never in
   preferences, the database, or exported diagnostics.
 - Feed downloads go directly from your Mac to the HTTPS URL you supplied.
 - Screenshot recognition runs locally and screenshots are not retained after the
@@ -289,7 +289,7 @@ suite without the app, is recognised the same way, by XCTest being loaded.
 
 ## Licence and Copyright
 
-Copyright © 2026 le23967. Released under the MIT Licence — see
+Copyright © 2026 le23967. Released under the MIT Licence. See
 [LICENSE](LICENSE).
 
 The MIT Licence lets anyone use, change and redistribute this code, including
