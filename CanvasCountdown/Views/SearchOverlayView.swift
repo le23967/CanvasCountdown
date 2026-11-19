@@ -181,7 +181,7 @@ struct SearchOverlayView: View {
         guard total > shown else {
             return shown == 1 ? "1 result" : "\(shown) results"
         }
-        return "\(shown) of \(total) results — type more to narrow"
+        return "\(shown) of \(total) shown. Type more to narrow."
     }
 
     /// Says which keys do what, because a panel that only answers to keys

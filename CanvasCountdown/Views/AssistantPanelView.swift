@@ -838,7 +838,7 @@ struct AssistantPanelView: View {
     /// resolve to.
     private var composerPlaceholder: String {
         guard viewModel.assistantComposerRole != .reviseDrafts else {
-            return "Change these — “put them under 41021”"
+            return "Change these: “put them under 41021”"
         }
         switch viewModel.assistantComposerMode {
         case .automatic:
@@ -846,7 +846,7 @@ struct AssistantPanelView: View {
         case .ask:
             return "Ask about your deadlines"
         case .addTask:
-            return "Describe a task — essay draft due next Friday at 5pm"
+            return "Describe a task, like “essay draft due next Friday at 5pm”"
         }
     }
 

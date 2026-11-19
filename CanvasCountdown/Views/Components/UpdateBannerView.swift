@@ -120,7 +120,7 @@ struct UpdateBannerView: View {
             Image(systemName: "xmark")
         }
         .buttonStyle(.borderless)
-        .help("Not now — ask again when there is a newer version")
+        .help("Not now. Ask again when there is a newer version.")
         .accessibilityLabel("Dismiss this update")
     }
 }

@@ -207,9 +207,9 @@ enum DockThemeStatus: Equatable, Sendable {
         case .saved(let preset):
             preset.name
         case .modified(let preset):
-            "\(preset.name) — Modified"
+            "\(preset.name) (Modified)"
         case .unsaved:
-            "Custom — Unsaved"
+            "Custom (Unsaved)"
         }
     }
 

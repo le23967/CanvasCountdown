@@ -174,7 +174,7 @@ final class DockThemePresetTests: XCTestCase {
         let status = DockThemePresetLibrary.empty.status(for: appearance)
 
         XCTAssertEqual(status, .unsaved)
-        XCTAssertEqual(status.title, "Custom — Unsaved")
+        XCTAssertEqual(status.title, "Custom (Unsaved)")
         XCTAssertTrue(status.isSavable)
     }
 
@@ -197,7 +197,7 @@ final class DockThemePresetTests: XCTestCase {
         let status = existing.status(for: appearance)
 
         XCTAssertEqual(status, .modified(preset))
-        XCTAssertEqual(status.title, "Green Gradient — Modified")
+        XCTAssertEqual(status.title, "Green Gradient (Modified)")
         XCTAssertEqual(status.editedPreset, preset)
     }
 
@@ -322,7 +322,7 @@ final class DockThemePresetTests: XCTestCase {
         context.viewModel.settingsForm.dockAppearance.colours.number = "#D7F7E4"
         XCTAssertEqual(
             context.viewModel.dockThemeStatus.title,
-            "Green Gradient — Modified"
+            "Green Gradient (Modified)"
         )
 
         context.viewModel.updateSelectedDockThemePreset()
@@ -383,7 +383,7 @@ final class DockThemePresetTests: XCTestCase {
             context.viewModel.settingsForm.dockAppearance.colours,
             colours()
         )
-        XCTAssertEqual(context.viewModel.dockThemeStatus.title, "Custom — Unsaved")
+        XCTAssertEqual(context.viewModel.dockThemeStatus.title, "Custom (Unsaved)")
     }
 
     /// The reported bug, at the level it was seen: pick white, press nothing

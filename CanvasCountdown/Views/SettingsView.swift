@@ -235,7 +235,7 @@ struct SettingsView: View {
                 isOn: $settings.treatsMidnightAsEndOfDay
             )
 
-            Text("Only the time changes. The day, the days-left count and the Dock number stay exactly as they are, and nothing Canvas sent is altered — turning this off brings the original times straight back.")
+            Text("Only the time changes. The day, the days-left count and the Dock number stay exactly as they are, and nothing Canvas sent is altered. Turning this off brings the original times straight back.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -385,7 +385,7 @@ struct SettingsView: View {
 
             Picker("Header label", selection: $settings.dockLabel) {
                 ForEach(DockLabelOption.allCases) { option in
-                    Text("\(option.title) — \(option.renderedLabel)").tag(option)
+                    Text("\(option.title) (\(option.renderedLabel))").tag(option)
                 }
             }
 
@@ -728,7 +728,7 @@ struct SettingsView: View {
         } header: {
             Text("Labels")
         } footer: {
-            Text("A label is a name and a colour — Important, Personal, Society, whatever you need. Put one on an event from the ⋯ menu beside it, and it colours that event in the list and on the calendar. Nothing is labelled automatically.")
+            Text("A label is a name and a colour, such as Important, Personal or Society. Put one on an event from the ⋯ menu beside it, and it colours that event in the list and on the calendar. Nothing is labelled automatically.")
         }
     }
 
@@ -881,7 +881,7 @@ struct SettingsView: View {
                 Button {
                     assistant.add(service)
                 } label: {
-                    Text("\(service.name) — \(service.note)")
+                    Text("\(service.name): \(service.note)")
                 }
             }
 
@@ -1013,7 +1013,7 @@ struct SettingsView: View {
                         Button {
                             models.onDownload(suggestion.name)
                         } label: {
-                            Text("\(suggestion.name) — \(suggestion.approximateSize). \(suggestion.note)")
+                            Text("\(suggestion.name), \(suggestion.approximateSize). \(suggestion.note)")
                         }
                         .disabled(models.installed.contains { $0.name == suggestion.name })
                     }
@@ -1122,7 +1122,7 @@ struct SettingsView: View {
             // Said here rather than discovered halfway through: the app cannot
             // install over itself, and somebody about to update should know
             // where it will stop before they start.
-            Text("Canvas Countdown checks once a day and tells you in the window. Downloading opens the disk image — the last step is dragging the app to Applications yourself, because a sandboxed app cannot replace itself.")
+            Text("Canvas Countdown checks once a day and tells you in the window. Downloading opens the disk image. The last step is dragging the app to Applications yourself, because a sandboxed app cannot replace itself.")
         }
     }
 
