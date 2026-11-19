@@ -981,14 +981,33 @@ footer b{color:var(--fg-soft)}
   startIndex = current;
 }());
 
-// The download button follows whatever the newest release is, so publishing a
-// release is the whole of updating this page. Without it the link already
-// points at /releases/latest, which always resolves.
+// The download button follows whatever the newest Mac release is, so
+// publishing a release is the whole of updating this page. Without it the link
+// already points at /releases/latest, which always resolves.
+//
+// Read from the list rather than from /releases/latest: the Windows build is
+// published here too, and if one of its releases is ever the latest, asking
+// for latest would hand this button a release with no disk image in it.
 (function () {
-  fetch('https://api.github.com/repos/le23967/CanvasCountdown/releases/latest',
+  function isMacVersion(tag) { return /^v\d+(\.\d+){0,3}$/.test(tag || ''); }
+  function parts(tag) { return tag.replace(/^v/, '').split('.').map(Number); }
+  function newer(a, b) {
+    var x = parts(a.tag_name), y = parts(b.tag_name);
+    for (var i = 0; i < Math.max(x.length, y.length); i++) {
+      var p = x[i] || 0, q = y[i] || 0;
+      if (p !== q) { return p > q; }
+    }
+    return false;
+  }
+  fetch('https://api.github.com/repos/le23967/CanvasCountdown/releases?per_page=30',
         { headers: { Accept: 'application/vnd.github+json' } })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function (rel) {
+    .then(function (list) {
+      var rel = (list || []).filter(function (r) {
+        return !r.draft && !r.prerelease && isMacVersion(r.tag_name) &&
+          (r.assets || []).some(function (a) { return /\.dmg$/i.test(a.name); });
+      }).reduce(function (best, r) { return !best || newer(r, best) ? r : best; }, null);
+      if (!rel) { return; }
       var dmg = (rel.assets || []).filter(function (a) { return /\.dmg$/i.test(a.name); })[0];
       var btn = document.getElementById('download');
       var version = (rel.tag_name || '').replace(/^v/, '');

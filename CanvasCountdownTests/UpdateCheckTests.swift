@@ -79,6 +79,75 @@ final class UpdateCheckTests: XCTestCase {
         )
     }
 
+    /// The Windows build is published in the same place under `win-v` tags.
+    /// Asked for "latest", a Mac copy could be handed one of those and fail;
+    /// read from the list, it is passed over.
+    func testAWindowsReleaseIsPassedOverForTheNewestMacOne() throws {
+        let list = Data("""
+        [
+          {"tag_name":"win-v1.0.0","draft":false,"prerelease":false,
+           "html_url":"https://github.com/le23967/CanvasCountdown/releases/tag/win-v1.0.0",
+           "assets":[{"name":"CanvasCountdown-Setup-1.0.0-x64.exe",
+                      "browser_download_url":"https://example.invalid/setup.exe"}]},
+          {"tag_name":"v1.3.2","draft":false,"prerelease":false,"body":"Fixes.",
+           "html_url":"https://github.com/le23967/CanvasCountdown/releases/tag/v1.3.2",
+           "assets":[{"name":"CanvasCountdown-1.3.2.dmg",
+                      "browser_download_url":"https://example.invalid/CanvasCountdown-1.3.2.dmg"}]},
+          {"tag_name":"v1.3.1","draft":false,"prerelease":false,
+           "html_url":"https://github.com/le23967/CanvasCountdown/releases/tag/v1.3.1",
+           "assets":[]}
+        ]
+        """.utf8)
+
+        let release = try XCTUnwrap(GitHubReleaseChecker.parseList(list))
+
+        XCTAssertEqual(release.version, AppVersion("1.3.2"))
+        XCTAssertEqual(release.downloadURL?.lastPathComponent, "CanvasCountdown-1.3.2.dmg")
+        XCTAssertEqual(release.pageURL.lastPathComponent, "v1.3.2")
+    }
+
+    func testTheHighestMacVersionWinsWhateverTheOrder() throws {
+        let list = Data("""
+        [
+          {"tag_name":"v1.2.0","draft":false,"prerelease":false,"assets":[]},
+          {"tag_name":"v9.0.0","draft":false,"prerelease":true,"assets":[]},
+          {"tag_name":"v1.10.0","draft":false,"prerelease":false,"assets":[]},
+          {"tag_name":"v1.9.0","draft":false,"prerelease":false,"assets":[]}
+        ]
+        """.utf8)
+
+        XCTAssertEqual(
+            try GitHubReleaseChecker.parseList(list)?.version,
+            AppVersion("1.10.0"),
+            "A pre-release is never offered, and 1.10 is newer than 1.9"
+        )
+    }
+
+    func testAListWithNoMacReleaseIsNoUpdateRatherThanAnError() throws {
+        let list = Data("""
+        [{"tag_name":"win-v1.0.0","draft":false,"prerelease":false,"assets":[]}]
+        """.utf8)
+
+        XCTAssertNil(try GitHubReleaseChecker.parseList(list))
+        XCTAssertNil(try GitHubReleaseChecker.parseList(Data("[]".utf8)))
+        XCTAssertThrowsError(
+            try GitHubReleaseChecker.parseList(Data(#"{"tag_name":"v1.0.0"}"#.utf8))
+        )
+    }
+
+    func testNotesWithWindowsLineEndingsStillHaveAFirstParagraph() throws {
+        let release = AppRelease(
+            version: try XCTUnwrap(AppVersion("1.3.2")),
+            tag: "v1.3.2",
+            name: "Canvas Countdown 1.3.2",
+            notes: "Copyright notice.\r\n\r\nThe first paragraph.\r\n\r\nThe second.",
+            downloadURL: nil,
+            pageURL: URL(string: "https://example.invalid")!
+        )
+
+        XCTAssertEqual(release.summary, "The first paragraph.")
+    }
+
     func testNonsenseIsAnErrorRatherThanAnUpdate() {
         XCTAssertThrowsError(
             try GitHubReleaseChecker.parse(Data("not json".utf8))
@@ -128,6 +197,38 @@ final class UpdateCheckTests: XCTestCase {
             harness.viewModel.updateCheckAnnouncement,
             "A check nobody asked for does not report its own failure"
         )
+    }
+
+    /// The check also runs when the app comes to the front. Without a pause
+    /// after a failure, every switch back to the app behind a captive portal
+    /// would have asked GitHub again.
+    func testAFailedCheckIsNotRepeatedForAnHour() async throws {
+        let harness = try makeHarness(running: "1.2.0", published: "1.3.0")
+        harness.checker.failure = ReleaseCheckError.rateLimited
+        let now = Date()
+
+        await harness.viewModel.checkForUpdate(now: now)
+        XCTAssertEqual(harness.checker.callCount, 1)
+
+        harness.checker.failure = nil
+        await harness.viewModel.checkForUpdate(now: now.addingTimeInterval(60))
+        XCTAssertEqual(harness.checker.callCount, 1, "Not asked again a minute later")
+
+        await harness.viewModel.checkForUpdate(now: now.addingTimeInterval(3_601))
+        XCTAssertEqual(harness.checker.callCount, 2, "Asked again after an hour")
+        XCTAssertEqual(harness.viewModel.availableUpdate?.version, AppVersion("1.3.0"))
+    }
+
+    func testTheButtonStillAsksStraightAfterAFailure() async throws {
+        let harness = try makeHarness(running: "1.2.0", published: "1.3.0")
+        harness.checker.failure = ReleaseCheckError.rateLimited
+        await harness.viewModel.checkForUpdate()
+
+        harness.checker.failure = nil
+        await harness.viewModel.checkForUpdate(force: true)
+
+        XCTAssertEqual(harness.checker.callCount, 2)
+        XCTAssertNotNil(harness.viewModel.availableUpdate)
     }
 
     /// A button that says nothing back is a button people press twice.

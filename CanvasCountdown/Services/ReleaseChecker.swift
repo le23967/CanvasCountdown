@@ -51,10 +51,19 @@ struct GitHubReleaseChecker: ReleaseChecking {
         self.repository = repository
     }
 
+    /// Reads the list of releases rather than asking for "latest".
+    ///
+    /// GitHub's latest is whichever full release was flagged so most recently,
+    /// whatever its tag. The Windows version is published here too, under
+    /// `win-v…` tags, and the day one of those became latest every Mac copy
+    /// asking for latest would have been handed a tag that is not a Mac
+    /// version: the check failed at launch without a word, and the button in
+    /// Settings said the newest release could not be read. The list is read
+    /// instead, and the newest Mac version in it is the answer.
     func latestRelease() async throws -> AppRelease? {
         var request = URLRequest(
             url: URL(
-                string: "https://api.github.com/repos/\(repository)/releases/latest"
+                string: "https://api.github.com/repos/\(repository)/releases?per_page=30"
             )!
         )
         request.setValue(
@@ -89,7 +98,25 @@ struct GitHubReleaseChecker: ReleaseChecking {
             throw ReleaseCheckError.httpStatus(http.statusCode)
         }
 
-        return try Self.parse(data)
+        return try Self.parseList(data)
+    }
+
+    /// The newest published Mac release in a list of releases, or `nil` when
+    /// there is none.
+    ///
+    /// Drafts, pre-releases and anything whose tag is not a version this app
+    /// produces — the Windows build's `win-v1.0.0`, say — are passed over
+    /// rather than treated as an error: they are someone else's releases, not
+    /// a broken answer. The highest version wins rather than the first listed,
+    /// so the order GitHub happens to sort by cannot offer an older build.
+    static func parseList(_ data: Data) throws -> AppRelease? {
+        guard let root = try? JSONSerialization.jsonObject(with: data),
+              let list = root as? [[String: Any]] else {
+            throw ReleaseCheckError.unreadableResponse
+        }
+        return list
+            .compactMap(release(from:))
+            .max { $0.version < $1.version }
     }
 
     /// Reads the fields this app uses, and refuses anything it cannot make a
@@ -103,9 +130,21 @@ struct GitHubReleaseChecker: ReleaseChecking {
             || object["prerelease"] as? Bool == true {
             return nil
         }
+        guard let release = release(from: object) else {
+            throw ReleaseCheckError.unreadableResponse
+        }
+        return release
+    }
+
+    /// One release, if it is a published Mac version.
+    private static func release(from object: [String: Any]) -> AppRelease? {
+        if object["draft"] as? Bool == true
+            || object["prerelease"] as? Bool == true {
+            return nil
+        }
         guard let tag = object["tag_name"] as? String,
               let version = AppVersion(tag) else {
-            throw ReleaseCheckError.unreadableResponse
+            return nil
         }
 
         let assets = (object["assets"] as? [[String: Any]]) ?? []
@@ -115,8 +154,11 @@ struct GitHubReleaseChecker: ReleaseChecking {
         let downloadURL = (disk?["browser_download_url"] as? String)
             .flatMap(URL.init(string:))
 
+        // The release's own page, never "latest", which may be another
+        // platform's release.
         let pageURL = (object["html_url"] as? String).flatMap(URL.init(string:))
-            ?? URL(string: "https://github.com/\(repository)/releases/latest")!
+            ?? URL(string: "https://github.com/\(repository)/releases/tag/\(tag)")
+            ?? URL(string: "https://github.com/\(repository)/releases")!
 
         return AppRelease(
             version: version,

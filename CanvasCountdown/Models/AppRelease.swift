@@ -88,7 +88,11 @@ struct AppRelease: Equatable, Sendable {
     /// The first line or two of the notes, for a banner that must not become a
     /// wall of text.
     var summary: String {
+        // Notes written on Windows, or pasted from one, end their lines in
+        // CRLF, and split on bare newlines the whole of them was one
+        // paragraph.
         let firstParagraph = notes
+            .replacingOccurrences(of: "\r\n", with: "\n")
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { line in

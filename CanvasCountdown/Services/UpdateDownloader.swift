@@ -61,6 +61,16 @@ struct DownloadsFolderUpdateDownloader: UpdateDownloading {
             throw UpdateDownloadError.networkFailure(code: nil)
         }
 
+        // The download is a temporary file until it is moved, and nothing else
+        // will clean it up: a failed attempt used to leave several megabytes
+        // behind each time.
+        var kept = false
+        defer {
+            if !kept {
+                try? FileManager.default.removeItem(at: temporary)
+            }
+        }
+
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw UpdateDownloadError.httpStatus(http.statusCode)
         }
@@ -70,6 +80,7 @@ struct DownloadsFolderUpdateDownloader: UpdateDownloading {
         )
         do {
             try FileManager.default.moveItem(at: temporary, to: destination)
+            kept = true
         } catch {
             throw UpdateDownloadError.couldNotSave
         }
