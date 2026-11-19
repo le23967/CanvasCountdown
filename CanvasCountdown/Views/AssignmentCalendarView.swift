@@ -56,36 +56,80 @@ struct AssignmentCalendarView: View {
         }
     }
 
+    /// On one line while it fits, then on two, then on three.
+    ///
+    /// Everything here but the title is a control that cannot be made
+    /// narrower, so on one line in a narrow column the title was squeezed to
+    /// nothing — the calendar stopped saying which month it was showing — and
+    /// then the arrows were pushed off the edge, leaving no way to page.
     private var navigationBar: some View {
-        HStack(spacing: 12) {
-            Text(viewModel.calendarTitle)
-                .font(.title3.weight(.semibold))
-                .lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                title
+                Spacer(minLength: 8)
+                scalePicker
+                goToDateButton
+                stepControls
+            }
 
-            Spacer(minLength: 8)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    title
+                    Spacer(minLength: 8)
+                    goToDateButton
+                    stepControls
+                }
+                scalePicker
+            }
 
-            scalePicker
-            goToDateButton
-            stepControls
+            VStack(alignment: .leading, spacing: 8) {
+                title
+                HStack(spacing: 8) {
+                    scaleMenu
+                    Spacer(minLength: 8)
+                    goToDateButton
+                }
+                stepControls
+            }
         }
         .padding(.horizontal, 22)
         .padding(.bottom, 10)
     }
 
+    private var title: some View {
+        Text(viewModel.calendarTitle)
+            .font(.title3.weight(.semibold))
+            .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var scaleSelection: Binding<CalendarScale> {
+        Binding(
+            get: { viewModel.calendarScale },
+            set: { viewModel.showCalendarScale($0) }
+        )
+    }
+
     private var scalePicker: some View {
-        Picker(
-            "Calendar scale",
-            selection: Binding(
-                get: { viewModel.calendarScale },
-                set: { viewModel.showCalendarScale($0) }
-            )
-        ) {
+        Picker("Calendar scale", selection: scaleSelection) {
             ForEach(CalendarScale.allCases) { scale in
                 Text(scale.title).tag(scale)
             }
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("Show a day, a week, a month or the whole year")
+    }
+
+    /// The same choice as a menu, for a column too narrow for four segments.
+    private var scaleMenu: some View {
+        Picker("Calendar scale", selection: scaleSelection) {
+            ForEach(CalendarScale.allCases) { scale in
+                Text(scale.title).tag(scale)
+            }
+        }
+        .pickerStyle(.menu)
         .labelsHidden()
         .fixedSize()
         .help("Show a day, a week, a month or the whole year")

@@ -48,6 +48,31 @@ final class AssistantProfileTests: XCTestCase {
         XCTAssertNotEqual(copy.id, original.id)
     }
 
+    func testDuplicatingALongNameStillGivesAReadableName() throws {
+        var library = AssistantProfileLibrary.empty
+        let long = "Model name for a long and careful test"
+        XCTAssertLessThanOrEqual(long.count, AssistantProfileLibrary.maximumNameLength)
+        let id = try XCTUnwrap(
+            library.add(
+                AssistantProfile(
+                    name: long,
+                    provider: .cloud,
+                    baseURL: "https://example.com/v1",
+                    model: "m"
+                )
+            )
+        )
+
+        let copyID = try XCTUnwrap(library.duplicate(id))
+        let copy = try XCTUnwrap(library.profile(withID: copyID))
+
+        XCTAssertNil(UUID(uuidString: copy.name), "Not named after a UUID")
+        XCTAssertTrue(copy.name.hasPrefix("Model name"))
+        XCTAssertTrue(copy.name.hasSuffix(" Copy"), copy.name)
+        XCTAssertLessThanOrEqual(copy.name.count, AssistantProfileLibrary.maximumNameLength)
+        XCTAssertNotEqual(copy.name.lowercased(), long.lowercased())
+    }
+
     func testRenamingToATakenNameIsRefusedAndChangesNothing() throws {
         var library = AssistantProfileLibrary.empty
         library.add(AssistantProfile(service: .groq))
@@ -93,6 +118,48 @@ final class AssistantProfileTests: XCTestCase {
             AssistantProfileLibrary.maximumCount
         )
         XCTAssertTrue(library.isFull)
+    }
+
+    /// The address field writes through on every keystroke. A half-typed
+    /// address used to be saved as it stood, and the next launch dropped the
+    /// whole model for having no usable address.
+    func testAHalfTypedAddressIsNotWrittenOverAGoodOne() throws {
+        var library = AssistantProfileLibrary.empty
+        let id = try XCTUnwrap(library.add(AssistantProfile(service: .deepSeek)))
+
+        XCTAssertFalse(
+            library.update(
+                id,
+                provider: .cloud,
+                baseURL: "api.deepseek.com/v1",
+                model: "deepseek-chat"
+            ),
+            "No scheme means no host, and a model with no host cannot be selected"
+        )
+        XCTAssertEqual(
+            library.profile(withID: id)?.baseURL,
+            AssistantService.deepSeek.baseURL
+        )
+
+        let reread = try JSONDecoder().decode(
+            AssistantProfileLibrary.self,
+            from: JSONEncoder().encode(library)
+        )
+        XCTAssertEqual(reread.profiles.map(\.id), [id], "Still there after a relaunch")
+    }
+
+    /// A library saved before keys were tied to a host has no such field, and
+    /// has to read exactly as it did.
+    func testALibrarySavedBeforeKeyHostsStillReads() throws {
+        let stored = Data(#"{"version":1,"profiles":[{"id":"4C1D0E9A-0000-4000-A000-000000000002","name":"Example","provider":"cloud","baseURL":"https://example.com/v1","model":"x"}]}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(
+            AssistantProfileLibrary.self,
+            from: stored
+        )
+
+        XCTAssertEqual(decoded.profiles.map(\.name), ["Example"])
+        XCTAssertNil(decoded.profiles.first?.keyHost)
     }
 
     /// The same rule the Dock presets and the labels follow: a library written
@@ -239,6 +306,103 @@ final class AssistantProfileTests: XCTestCase {
         )
         XCTAssertEqual(stored.baseURL, "http://localhost:1234/v1")
         XCTAssertEqual(stored.model, "something-else")
+    }
+
+    // MARK: - A key stays with the service it was saved for
+
+    /// The suggested services under the address field rewrite the address of
+    /// the model in use. Its key used to go with it: a key saved for one
+    /// service was sent, with the very next question, to whichever service
+    /// had been clicked.
+    @MainActor
+    func testAKeyIsNeverSentToAnAddressItWasNotSavedFor() async throws {
+        let recorder = KeyRecorder()
+        let viewModel = try makeViewModel(recorder: recorder)
+        await viewModel.start()
+
+        viewModel.addAssistantProfile(for: .groq)
+        viewModel.saveAssistantKey("gsk-example-for-groq")
+        try await waitUntil { viewModel.assistantAPIKey == "gsk-example-for-groq" }
+
+        await viewModel.ask("what is due?")
+        XCTAssertEqual(recorder.last?.host, "api.groq.com")
+        XCTAssertEqual(recorder.last?.key, "gsk-example-for-groq")
+        XCTAssertNil(viewModel.assistantKeyNote)
+
+        viewModel.useAssistantService(.deepSeek)
+        await viewModel.ask("what is due?")
+
+        XCTAssertEqual(recorder.last?.host, "api.deepseek.com")
+        XCTAssertNil(
+            recorder.last?.key,
+            "A key saved for one service must not be handed to another"
+        )
+        XCTAssertNil(viewModel.assistantKeyForCurrentAddress)
+        XCTAssertEqual(
+            viewModel.assistantKeyNote,
+            "The key saved with this model is for api.groq.com, so it is not sent to api.deepseek.com. Save a key for this address to use it, or put the address back."
+        )
+
+        // Nothing was thrown away: the address goes back, and so does the key.
+        viewModel.useAssistantService(.groq)
+        await viewModel.ask("what is due?")
+        XCTAssertEqual(recorder.last?.host, "api.groq.com")
+        XCTAssertEqual(recorder.last?.key, "gsk-example-for-groq")
+        XCTAssertNil(viewModel.assistantKeyNote)
+    }
+
+    @MainActor
+    func testSavingAKeyForTheNewAddressMakesItThatAddressesKey() async throws {
+        let recorder = KeyRecorder()
+        let viewModel = try makeViewModel(recorder: recorder)
+        await viewModel.start()
+        viewModel.addAssistantProfile(for: .groq)
+        viewModel.saveAssistantKey("gsk-example-for-groq")
+        try await waitUntil { viewModel.assistantAPIKey == "gsk-example-for-groq" }
+
+        viewModel.useAssistantService(.deepSeek)
+        viewModel.saveAssistantKey("sk-example-for-deepseek")
+        try await waitUntil { viewModel.assistantAPIKey == "sk-example-for-deepseek" }
+
+        await viewModel.ask("what is due?")
+        XCTAssertEqual(recorder.last?.host, "api.deepseek.com")
+        XCTAssertEqual(recorder.last?.key, "sk-example-for-deepseek")
+        XCTAssertEqual(viewModel.activeAssistantProfile?.keyHost, "api.deepseek.com")
+    }
+
+    /// A key saved by an earlier version has no host recorded. It is tied to
+    /// the address it is sitting beside, which is the only one it can mean.
+    @MainActor
+    func testAKeySavedBeforeHostsWereRecordedIsTiedToItsAddress() async throws {
+        let suiteName = "AssistantProfileTests.\(UUID().uuidString)"
+        let store = UserDefaults(suiteName: suiteName)!
+        store.removePersistentDomain(forName: suiteName)
+        let settings = SettingsStore(defaults: store)
+        var library = AssistantProfileLibrary.empty
+        let id = try XCTUnwrap(library.add(AssistantProfile(service: .groq)))
+        settings.assistantProfiles = library
+        settings.assistant = AssistantSettings.applying(
+            try XCTUnwrap(library.profile(withID: id)),
+            to: settings.assistant
+        )
+        let keys = IsolatedAssistantKeyStore()
+        await keys.save("gsk-example", for: id)
+
+        let recorder = KeyRecorder()
+        let viewModel = try makeViewModel(
+            settings: settings,
+            keys: keys,
+            recorder: recorder
+        )
+        await viewModel.start()
+
+        XCTAssertEqual(viewModel.activeAssistantProfile?.keyHost, "api.groq.com")
+        await viewModel.ask("what is due?")
+        XCTAssertEqual(recorder.last?.key, "gsk-example", "It works as it did")
+
+        viewModel.useAssistantService(.openRouter)
+        await viewModel.ask("what is due?")
+        XCTAssertNil(recorder.last?.key)
     }
 
     @MainActor
@@ -718,10 +882,80 @@ final class AssistantProfileTests: XCTestCase {
         )
     }
 
+    /// A view model whose keys live in memory and whose assistant only notes
+    /// what it was handed.
+    @MainActor
+    private func makeViewModel(
+        settings: SettingsStore? = nil,
+        keys: IsolatedAssistantKeyStore = IsolatedAssistantKeyStore(),
+        recorder: KeyRecorder
+    ) throws -> MainViewModel {
+        let store: SettingsStore
+        if let settings {
+            store = settings
+        } else {
+            let suiteName = "AssistantProfileTests.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+            store = SettingsStore(defaults: defaults)
+        }
+        let container = try ModelContainer(
+            for: AssignmentEvent.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return MainViewModel(
+            repository: SwiftDataAssignmentRepository(modelContainer: container),
+            refreshCoordinator: DueTimeCoordinatorStub(),
+            feedURLStore: DueTimeFeedURLStore(),
+            settingsStore: store,
+            dockRenderer: DueTimeDockStub(),
+            notificationScheduler: DueTimeNotificationSpy(),
+            calendar: calendar,
+            automaticActivityEnabled: false,
+            assistantKeyStore: keys,
+            courseBlocklist: IsolatedCourseBlocklistStore(),
+            assistantFactory: { settings, apiKey, _ in
+                recorder.record(
+                    host: settings.resolvedURL?.host,
+                    key: apiKey
+                )
+                return ConversationAssistantStub()
+            }
+        )
+    }
+
+    @MainActor
+    private func waitUntil(
+        _ condition: @MainActor () -> Bool
+    ) async throws {
+        for _ in 0..<400 {
+            if condition() {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTFail("Timed out waiting for the view model to update")
+    }
+
     @MainActor
     private struct Harness {
         let viewModel: MainViewModel
         let settings: SettingsStore
         let repository: any AssignmentRepository
+    }
+}
+
+/// Notes which host a request was built for and which key went with it.
+@MainActor
+private final class KeyRecorder {
+    struct Request {
+        let host: String?
+        let key: String?
+    }
+
+    private(set) var last: Request?
+
+    func record(host: String?, key: String?) {
+        last = Request(host: host, key: key)
     }
 }

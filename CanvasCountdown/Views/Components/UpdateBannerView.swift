@@ -15,64 +15,41 @@ struct UpdateBannerView: View {
     let onReadMore: () -> Void
     let onDismiss: () -> Void
 
+    /// On one line while the words have room beside the buttons, and with
+    /// the buttons underneath when they do not.
+    ///
+    /// On one line in a narrow window the words were given whatever was left
+    /// beside the buttons, and "Version 1.3.3 is available" wrapped a letter
+    /// at a time — the one notice meant to be read.
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "arrow.down.circle.fill")
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Version \(release.version.description) is available")
-                    .font(.callout.weight(.semibold))
-
-                if let message {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if !release.summary.isEmpty {
-                    Text(release.summary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 10) {
+                icon
+                words
+                    // The notes are the one thing here that can be any
+                    // length, so they are the one thing that gives way.
+                    // Without this a long first paragraph claims the whole
+                    // row and pushes Download off the end of the window — a
+                    // notice about an update with no way to get it.
+                    .frame(minWidth: 160, idealWidth: 160, maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(-1)
+                Spacer(minLength: 8)
+                actions
+                dismissButton
             }
 
-            // The notes are the one thing here that can be any length, so they
-            // are the one thing that gives way. Without this a long first
-            // paragraph claims the whole row and pushes Download off the end of
-            // the window — a notice about an update with no way to get it.
-            .layoutPriority(-1)
-
-            Spacer(minLength: 8)
-
-            if isDownloading {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityLabel("Downloading the update")
-            } else {
-                Button("What's New") {
-                    onReadMore()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 10) {
+                    icon
+                    words
+                    Spacer(minLength: 0)
+                    dismissButton
                 }
-                .buttonStyle(.link)
-                .font(.callout)
-
-                Button("Download") {
-                    onDownload()
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+                    actions
                 }
-                .buttonStyle(.borderedProminent)
-                .help("Download the disk image and open it")
             }
-
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .help("Not now — ask again when there is a newer version")
-            .accessibilityLabel("Dismiss this update")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -81,5 +58,69 @@ struct UpdateBannerView: View {
         .overlay(alignment: .bottom) {
             Divider()
         }
+    }
+
+    private var icon: some View {
+        Image(systemName: "arrow.down.circle.fill")
+            .foregroundStyle(.tint)
+            .accessibilityHidden(true)
+    }
+
+    private var words: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Version \(release.version.description) is available")
+                .font(.callout.weight(.semibold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !release.summary.isEmpty {
+                Text(release.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        if isDownloading {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Downloading the update")
+        } else {
+            HStack(spacing: 10) {
+                Button("What's New") {
+                    onReadMore()
+                }
+                .buttonStyle(.link)
+                .font(.callout)
+                .fixedSize()
+
+                Button("Download") {
+                    onDownload()
+                }
+                .buttonStyle(.borderedProminent)
+                .fixedSize()
+                .help("Download the disk image and open it")
+            }
+        }
+    }
+
+    private var dismissButton: some View {
+        Button {
+            onDismiss()
+        } label: {
+            Image(systemName: "xmark")
+        }
+        .buttonStyle(.borderless)
+        .help("Not now — ask again when there is a newer version")
+        .accessibilityLabel("Dismiss this update")
     }
 }

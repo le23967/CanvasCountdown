@@ -9,6 +9,39 @@ import XCTest
 final class ReminderScheduleTests: XCTestCase {
     // MARK: - Schedule model
 
+    /// The clocks in Sydney go back an hour on Sunday 5 April 2026. "1 day
+    /// before" a deadline at 23:59 that Sunday is 23:59 on the Saturday — not
+    /// 00:59 on the Sunday, which is where 24 hours of minutes lands.
+    func testADayBeforeIsTheSameTimeTheDayBeforeAcrossAClockChange() throws {
+        var sydney = Calendar(identifier: .gregorian)
+        sydney.timeZone = try XCTUnwrap(TimeZone(identifier: "Australia/Sydney"))
+        let due = try XCTUnwrap(
+            sydney.date(from: DateComponents(year: 2026, month: 4, day: 5, hour: 23, minute: 59))
+        )
+
+        let fire = try XCTUnwrap(
+            NotificationService.fireDate(
+                for: ReminderRule(amount: 1, unit: .days),
+                before: due,
+                calendar: sydney
+            )
+        )
+
+        let parts = sydney.dateComponents([.day, .hour, .minute], from: fire)
+        XCTAssertEqual(parts.day, 4)
+        XCTAssertEqual(parts.hour, 23)
+        XCTAssertEqual(parts.minute, 59)
+
+        let hourly = try XCTUnwrap(
+            NotificationService.fireDate(
+                for: ReminderRule(amount: 2, unit: .hours),
+                before: due,
+                calendar: sydney
+            )
+        )
+        XCTAssertEqual(due.timeIntervalSince(hourly), 7_200, "Hours stay hours")
+    }
+
     func testDefaultsMatchTheDocumentedSchedule() {
         let schedule = ReminderSchedule.defaults
 

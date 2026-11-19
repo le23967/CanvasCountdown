@@ -110,14 +110,154 @@ final class AssistantPresentationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(width, AssistantLayout.sidebarMinimum)
     }
 
-    func testATinyWindowSplitsTheDifferenceInsteadOfHidingThePanel() {
-        let available: CGFloat = 400
+    func testAColumnALittleShortOfBothFloorsIsHalved() {
+        let available: CGFloat = 580
         let width = AssistantLayout.fittedSidebarWidth(
             preferred: AssistantLayout.sidebarIdeal,
             availableWidth: available
         )
 
         XCTAssertEqual(width, available / 2)
+        XCTAssertGreaterThanOrEqual(width, AssistantLayout.paneMinimum)
+    }
+
+    /// Halving a column this narrow would hand each pane less than it can be
+    /// laid out in. That is what put the assistant on top of the list: its row
+    /// of chips cannot shrink, so it was drawn at its own width, centred on
+    /// room that was too small for it.
+    func testAColumnTooNarrowForTwoPanesGoesToThePanelWhole() {
+        for available in [CGFloat(280), 362, 400, 559] {
+            XCTAssertEqual(
+                AssistantLayout.fittedSidebarWidth(
+                    preferred: AssistantLayout.sidebarIdeal,
+                    availableWidth: available
+                ),
+                available,
+                "The panel is not hidden and not squeezed at \(available)"
+            )
+        }
+    }
+
+    // MARK: - Where the two panes go
+
+    func testAWideColumnPutsThePanelBesideTheList() {
+        let panes = AssistantLayout.panes(
+            isPanelShown: true,
+            preferred: 380,
+            columnWidth: 1_000
+        )
+
+        XCTAssertFalse(panes.panelCoversList)
+        XCTAssertEqual(panes.panelWidth, 381, "The panel and its divider")
+        XCTAssertEqual(panes.listWidth, 619)
+    }
+
+    func testEveryWidthLeavesBothPanesWideEnoughToRead() {
+        for column in stride(from: CGFloat(0), through: 1_800, by: 1) {
+            let panes = AssistantLayout.panes(
+                isPanelShown: true,
+                preferred: AssistantLayout.sidebarMaximum,
+                columnWidth: column
+            )
+
+            if panes.panelCoversList {
+                XCTAssertEqual(panes.panelWidth, column)
+                XCTAssertEqual(
+                    panes.listWidth,
+                    column,
+                    "Underneath, the list keeps the whole column"
+                )
+                XCTAssertLessThan(column, AssistantLayout.minimumWidthToShare)
+            } else {
+                XCTAssertEqual(
+                    panes.listWidth + panes.panelWidth,
+                    column,
+                    accuracy: 0.001,
+                    "Nothing is asked of the window at \(column)"
+                )
+                // The divider is a point of the panel's share.
+                XCTAssertGreaterThanOrEqual(
+                    panes.listWidth,
+                    AssistantLayout.paneMinimum - 1
+                )
+                XCTAssertGreaterThanOrEqual(
+                    panes.panelWidth,
+                    AssistantLayout.paneMinimum
+                )
+            }
+        }
+    }
+
+    /// The three windows this was reported from, by the width of the column
+    /// the two panes had to share in each.
+    func testTheReportedWindowsAreLaidOutWithoutOverlap() {
+        // 1041 wide with the navigation sidebar showing.
+        let wide = AssistantLayout.panes(
+            isPanelShown: true,
+            preferred: nil,
+            columnWidth: 824
+        )
+        XCTAssertFalse(wide.panelCoversList)
+        XCTAssertGreaterThanOrEqual(wide.listWidth, AssistantLayout.mainContentFloor)
+
+        // 583 wide with the navigation sidebar folded: a little short of both
+        // floors, so halved.
+        let folded = AssistantLayout.panes(
+            isPanelShown: true,
+            preferred: nil,
+            columnWidth: 583
+        )
+        XCTAssertFalse(folded.panelCoversList)
+        XCTAssertEqual(folded.listWidth, 583 - 292.5, accuracy: 0.001)
+
+        // 579 wide with the navigation sidebar brought back by hand, which
+        // left 362 for both. Each half got 181 and neither fitted in it.
+        let squeezed = AssistantLayout.panes(
+            isPanelShown: true,
+            preferred: nil,
+            columnWidth: 362
+        )
+        XCTAssertTrue(squeezed.panelCoversList)
+        XCTAssertEqual(squeezed.panelWidth, 362)
+    }
+
+    func testAClosedPanelTakesNothing() {
+        let panes = AssistantLayout.panes(
+            isPanelShown: false,
+            preferred: 380,
+            columnWidth: 400
+        )
+
+        XCTAssertEqual(panes.panelWidth, 0)
+        XCTAssertEqual(panes.listWidth, 400)
+        XCTAssertFalse(panes.panelCoversList)
+    }
+
+    func testAnUnmeasuredColumnDoesNotProduceNonsense() {
+        for width in [CGFloat(0), -40, .infinity, .nan] {
+            let panes = AssistantLayout.panes(
+                isPanelShown: true,
+                preferred: 380,
+                columnWidth: width
+            )
+            XCTAssertEqual(panes.panelWidth, 0)
+            XCTAssertEqual(panes.listWidth, 0)
+        }
+    }
+
+    /// The detached window may be made this narrow, so the panel has to be
+    /// usable at it.
+    func testThePaneFloorMatchesTheDetachedWindow() {
+        XCTAssertEqual(AssistantLayout.paneMinimum, 280)
+        XCTAssertEqual(
+            AssistantLayout.minimumWidthToShare,
+            560
+        )
+        XCTAssertLessThan(
+            AssistantLayout.minimumWidthToShare,
+            AssistantLayout.minimumWidthForBoth,
+            "The navigation sidebar is folded before the list is ever covered"
+        )
     }
 
     func testAnUnmeasuredWindowFallsBackToThePreferredWidth() {
@@ -296,6 +436,54 @@ final class AssistantPresentationTests: XCTestCase {
         XCTAssertEqual(context.viewModel.assistantDigests().count, all)
     }
 
+    /// Asked about something outside the list on screen — here, a course
+    /// the filter is hiding — the request used to carry every upcoming item
+    /// and leave out the one thing it was about.
+    func testAskingAboutSomethingOutsideTheFilterSendsOnlyThat() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        let item = try XCTUnwrap(context.viewModel.assignments.first)
+        context.viewModel.selectCourse("A course with nothing in it")
+        XCTAssertTrue(context.viewModel.visibleUpcomingAssignments.isEmpty)
+
+        context.viewModel.openAssistant(about: item)
+
+        XCTAssertEqual(
+            context.viewModel.assistantDigests().map(\.title),
+            [item.title],
+            "Only the assignment that was asked about leaves this Mac"
+        )
+    }
+
+    /// Whether something is done is never sent to the model, so asked about
+    /// finished work all it could say is that it is late. Finished work is not
+    /// offered as something to ask about, and a question already about it
+    /// stops being about it once it is marked done.
+    func testFinishedWorkIsNotWhatAQuestionIsAbout() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        let item = try XCTUnwrap(context.viewModel.assignments.first)
+
+        context.viewModel.openAssistant(about: item)
+        XCTAssertEqual(context.viewModel.assistantContext?.id, item.id)
+
+        context.viewModel.toggleCompleted(item)
+        for _ in 0..<200 where context.viewModel.assistantContext != nil {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertNil(context.viewModel.assistantContext)
+        XCTAssertFalse(
+            context.viewModel.assistantDigests().contains { $0.title == item.title },
+            "Finished work is not sent as though it were still due"
+        )
+
+        let finished = try XCTUnwrap(
+            context.viewModel.assignments.first { $0.id == item.id }
+        )
+        context.viewModel.openAssistant(about: finished)
+        XCTAssertNil(context.viewModel.assistantContext)
+    }
+
     func testTheContextChipTruncatesALongTitle() {
         let long = AssistantContext(
             AssignmentListItem(
@@ -355,6 +543,37 @@ final class AssistantPresentationTests: XCTestCase {
             "A cloud service must never be labelled as staying on this Mac"
         )
         XCTAssertFalse(context.viewModel.assistantStaysOnThisMac)
+    }
+
+    /// It used to add the provider's own title, which read "Cloud · AI (Cloud)"
+    /// for every hosted service there is.
+    func testThePrivacyLabelNamesTheServiceWhenItKnowsIt() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        var form = context.viewModel.settingsForm
+        form.assistant.provider = .cloud
+        form.assistant.baseURL = AssistantService.groq.baseURL
+        context.viewModel.applySettings(form)
+        XCTAssertEqual(context.viewModel.assistantPrivacyLabel, "Cloud · Groq")
+        XCTAssertEqual(
+            context.viewModel.assistantPrivacyDescription,
+            "What you type here, and the titles, courses and due dates of your assignments, are sent to api.groq.com."
+        )
+
+        form.assistant.baseURL = "https://models.example.com/v1"
+        context.viewModel.applySettings(form)
+        XCTAssertEqual(context.viewModel.assistantPrivacyLabel, "Cloud")
+        XCTAssertFalse(
+            context.viewModel.assistantPrivacyLabel.contains("AI (Cloud)")
+        )
+
+        form.assistant = AssistantSettings.applying(.local, to: form.assistant)
+        context.viewModel.applySettings(form)
+        XCTAssertEqual(
+            context.viewModel.assistantPrivacyDescription,
+            "The assistant runs on this Mac. Nothing is uploaded."
+        )
     }
 
     func testLocalPointedAtARemoteHostIsNotLabelledPrivate() async throws {

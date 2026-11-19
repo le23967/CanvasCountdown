@@ -116,11 +116,17 @@ struct CalendarTimeGridView: View {
                             Button {
                                 onOpen(item)
                             } label: {
+                                // As tall as its text. The chip's colour bar
+                                // takes whatever height it is offered, and
+                                // nothing here limits it, so a single all-day
+                                // deadline stretched the strip down over half
+                                // of the hours below.
                                 CalendarEventChip(
                                     item: item,
                                     labelColor: labelColor(item),
                                     isCompact: days.count > 1
                                 )
+                                .fixedSize(horizontal: false, vertical: true)
                             }
                             .buttonStyle(.plain)
                         }
@@ -171,8 +177,11 @@ struct CalendarTimeGridView: View {
                 }
 
                 ForEach(entries) { entry in
+                    // No floor wider than the share: a floor made several chips
+                    // at the same time wider than their day together, and the
+                    // last of them sat in the next day's column.
                     let width = max(
-                        28,
+                        4,
                         (proxy.size.width - 4) / CGFloat(entry.columnCount) - 2
                     )
                     Button {
@@ -186,9 +195,14 @@ struct CalendarTimeGridView: View {
                             .frame(width: width, height: chipHeight, alignment: .topLeading)
                     }
                     .buttonStyle(.plain)
+                    // Never lower than the last chip-height of the day, so a
+                    // deadline late in the evening is drawn inside the grid.
                     .offset(
                         x: 2 + CGFloat(entry.column) * (width + 2),
-                        y: CGFloat(entry.minuteOfDay) / 60 * hourHeight
+                        y: min(
+                            CGFloat(entry.minuteOfDay) / 60 * hourHeight,
+                            totalHeight - chipHeight
+                        )
                     )
                 }
 
@@ -213,19 +227,24 @@ struct CalendarTimeGridView: View {
         .accessibilityHidden(true)
     }
 
+    /// Follows the clock by itself. It used to be placed from the app's idea
+    /// of now, which only moves when the list is reloaded, so a calendar left
+    /// open showed the line hours behind.
     private var nowLine: some View {
-        let minute = CalendarTimeGrid.minuteOfDay(now, calendar: calendar)
-        return ZStack(alignment: .leading) {
-            Rectangle()
-                .fill(Color.red)
-                .frame(height: 1.5)
-            Circle()
-                .fill(Color.red)
-                .frame(width: 6, height: 6)
-                .offset(x: -3)
+        TimelineView(.everyMinute) { context in
+            let minute = CalendarTimeGrid.minuteOfDay(context.date, calendar: calendar)
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.red)
+                    .frame(height: 1.5)
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 6, height: 6)
+                    .offset(x: -3)
+            }
+            .offset(y: CGFloat(minute) / 60 * hourHeight)
+            .accessibilityLabel("Now")
         }
-        .offset(y: CGFloat(minute) / 60 * hourHeight)
-        .accessibilityLabel("Now")
     }
 
     /// Opens on the first deadline of the day rather than on midnight, with an

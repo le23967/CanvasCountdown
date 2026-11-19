@@ -113,6 +113,18 @@ final class ImmediateSettingsTests: XCTestCase {
         )
     }
 
+    /// Only a failure the network can recover from by itself is retried in
+    /// minutes. A refused or broken feed would fail the same way every time.
+    func testOnlyAPassingFailureIsRetriedSoon() {
+        XCTAssertTrue(MainViewModel.isPassing(CanvasFeedFetchError.networkFailure(code: -1009)))
+        XCTAssertTrue(MainViewModel.isPassing(CanvasFeedFetchError.HTTPStatus(503)))
+        XCTAssertTrue(MainViewModel.isPassing(CanvasFeedFetchError.HTTPStatus(429)))
+        XCTAssertFalse(MainViewModel.isPassing(CanvasFeedFetchError.HTTPStatus(401)))
+        XCTAssertFalse(MainViewModel.isPassing(CanvasFeedFetchError.HTTPStatus(404)))
+        XCTAssertFalse(MainViewModel.isPassing(CanvasFeedFetchError.emptyResponse))
+        XCTAssertFalse(MainViewModel.isPassing(RefreshCoordinatorError.refreshFailed))
+    }
+
     func testLaunchAtLoginStaysInertUnderAutomatedRuns() async throws {
         let context = try makeContext()
         await context.viewModel.start()

@@ -13,8 +13,22 @@ enum AppEnvironment: Equatable, Sendable {
     case automatedTesting
 
     static var current: AppEnvironment {
-        detected(in: ProcessInfo.processInfo.environment)
+        if isInsideTestRunner {
+            return .automatedTesting
+        }
+        return detected(in: ProcessInfo.processInfo.environment)
     }
+
+    /// Whether this code is running inside a test runner that says nothing
+    /// about itself in the environment.
+    ///
+    /// The markers below are set by Xcode's own test host. `swift test` loads
+    /// the same suite into a bare command-line runner that sets none of them,
+    /// so there the launch read as production, and the suite's login-item
+    /// tests registered a real login item for the runner. XCTest being loaded
+    /// at all is the one thing both runners have in common, and it is never
+    /// loaded into the app anyone installs.
+    private static let isInsideTestRunner = NSClassFromString("XCTestCase") != nil
 
     static func detected(in environment: [String: String]) -> AppEnvironment {
         let testingKeys = [

@@ -117,18 +117,25 @@ struct DockThemePresetLibrary: Equatable, Codable, Sendable {
 
     /// "Green Gradient" becomes "Green Gradient Copy", then "Green Gradient
     /// Copy 2", so duplicating twice does not fail on the name.
+    ///
+    /// The original's name is shortened first when it has to be, so that the
+    /// copy's name still fits. A name of 36 characters or more used to leave
+    /// no room for " Copy", every candidate was refused, and the copy was
+    /// called something like "1B4E28BA-2FA1-11D2-883F-0016D3CCA427".
     func availableCopyName(for preset: UserDockThemePreset) -> String {
-        let base = "\(preset.name) Copy"
-        if case .success(let name) = Self.validate(name: base, in: self) {
-            return name
-        }
-        for suffix in 2...99 {
-            let candidate = "\(base) \(suffix)"
-            if case .success(let name) = Self.validate(name: candidate, in: self) {
+        for suffix in [""] + (2...99).map({ " \($0)" }) {
+            let ending = " Copy" + suffix
+            let room = Self.maximumNameLength - ending.count
+            let stem = String(preset.name.prefix(room))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if case .success(let name) = Self.validate(
+                name: stem + ending,
+                in: self
+            ) {
                 return name
             }
         }
-        return UUID().uuidString
+        return String(UUID().uuidString.prefix(Self.maximumNameLength))
     }
 
     // MARK: - Changing the library

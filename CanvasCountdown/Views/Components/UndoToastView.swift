@@ -47,7 +47,11 @@ struct UndoToastView: View {
         }
         .shadow(color: .black.opacity(0.22), radius: 14, y: 5)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(message). Undo available for \(secondsRemaining) more seconds.")
+        .accessibilityLabel(
+            secondsRemaining == 1
+                ? "\(message). Undo available for 1 more second."
+                : "\(message). Undo available for \(secondsRemaining) more seconds."
+        )
     }
 
     /// The seconds left, drawn as a ring that empties. Shown as a number too:

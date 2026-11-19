@@ -379,7 +379,11 @@ struct ScreenshotImportView: View {
                 Button("Import \(viewModel.importableCount) Selected") {
                     Task {
                         await viewModel.importSelected()
-                        await onFinished()
+                        // Only when it worked. The window used to say the
+                        // import was complete after one that had failed.
+                        if case .finished = viewModel.stage {
+                            await onFinished()
+                        }
                     }
                 }
                 .keyboardShortcut(.defaultAction)

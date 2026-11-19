@@ -19,8 +19,9 @@ no paid dependency.
   Apple Vision, and nothing is saved until you have checked it.
 - **AI deadline Assistant** — one box. Ask what is most urgent, or write a task
   in a sentence, give it a course and a label, and review the draft before it is
-  saved. It reads which of the two you meant and says so under the box before
-  you send, and you can pin it to one or the other. While a review is on screen
+  saved. It reads which of the two you meant — in English or in Chinese — and
+  says so under the box before you send, and you can pin it to one or the
+  other. While a review is on screen
   the same box changes those drafts rather than starting again. One click undoes
   everything a batch just added. Optional, and local by default.
 - **Any AI service, saved by name** — anything speaking the common
@@ -48,7 +49,9 @@ no paid dependency.
 - **Course filtering** — narrow Upcoming, the nearest-deadline card and the
   Dock countdown to the courses you care about.
 - **Course removal** — take an old course out for good, so the Canvas feed
-  stops importing a subject you finished last year. Reversible.
+  stops importing a subject you finished last year. Events you added
+  yourself under that course, by hand or from a screenshot, are kept.
+  Reversible.
 - **Live Dock countdown** — the days remaining, drawn in the Dock tile while the
   app runs.
 - **Custom Dock appearance** — number size and weight, background, number and
@@ -112,6 +115,11 @@ picker, drag and drop, or paste.
 - **Screenshots are held in memory only for the length of the review** and are
   dropped when the sheet closes. No image, image path or recognised text is
   written to the database or to exported diagnostics.
+- **What you import is yours to change.** An event read from a screenshot opens
+  in the editor like one you typed, so a misread title or date can be corrected
+  later, and it can be deleted. Once corrected, a later screenshot can no longer
+  write over it; one that shows the same thing is flagged as a possible
+  duplicate instead.
 
 Recognition is imperfect, which is why the review step is not optional:
 
@@ -131,11 +139,12 @@ is pointed at `http://localhost:11434`, the address of a local model server such
 as [Ollama](https://ollama.com). If nothing is running there, the Assistant
 simply reports that it cannot be reached. Nothing is sent anywhere.
 
-Two providers are offered in **Settings → AI Assistant**:
+**Settings → AI Assistant** keeps a list of models, each either:
 
 - **On this Mac** — a local server. Nothing is uploaded.
-- **Groq (cloud)** — a hosted model. Choosing it is a separate, deliberate act
-  and requires your own API key.
+- **A hosted service** — any that speaks the chat-completions API; Settings
+  suggests several well-known ones and fills in their address. Choosing one is
+  a separate, deliberate act and requires your own API key.
 
 **What is sent when you use the cloud provider:** assignment titles, course
 names and due dates for the deadlines currently in scope — and, when you ask
@@ -147,8 +156,10 @@ The privacy label in the Assistant's header reads the configured endpoint rather
 than the provider's name, so pointing "local" at a remote host is reported as
 cloud rather than as "On this Mac".
 
-Your Groq API key is stored in the macOS Keychain, never in preferences or
-diagnostics. Never publish your API key or your private schedule.
+Each model's API key is stored in the macOS Keychain, never in preferences or
+diagnostics, and is only ever sent to the address it was saved for: point a
+model at a different service and its old key is held back until you save one
+for the new address. Never publish your API key or your private schedule.
 
 Anything the Assistant proposes is reviewed by you before it is saved. It never
 edits or deletes an existing event, and an unreadable reply produces no task
@@ -272,8 +283,9 @@ An automated launch is detected and composed from isolated dependencies: an
 in-memory store, an in-memory feed URL store, an offline fetcher, inert
 notifications and an inert Dock renderer, with no refresh loops and no
 login-item changes. A test run therefore cannot read the Keychain feed URL,
-contact Canvas, or touch the production database. `LaunchIsolationTests` guards
-each of those properties.
+contact Canvas, or touch the production database. `swift test`, which runs the
+suite without the app, is recognised the same way, by XCTest being loaded.
+`LaunchIsolationTests` guards each of those properties.
 
 ## Licence and Copyright
 

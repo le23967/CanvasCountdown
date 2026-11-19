@@ -214,22 +214,46 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         }
 
         return try await send(
-            system: """
-            You help a student manage coursework deadlines. Answer briefly and \
-            concretely, in the user's language. Use only the figures and items \
-            given below; the counts are already correct, so do not recount \
-            them. Never invent a deadline that is not listed. If something is \
-            not in the list, say so.
-
-            Figures:
-            \(facts.promptLines)
-
-            Items:
-            \(lines.isEmpty ? "none" : lines)
-            """,
+            system: Self.answerInstructions(
+                figures: facts.promptLines,
+                items: lines
+            ),
             user: trimmed,
             history: recent
         )
+    }
+
+    /// What the model is told before a question.
+    ///
+    /// The second paragraph is there because of what the first one did on its
+    /// own. Told only that it helps with coursework and must stick to the list,
+    /// a model asked to "remind me to do the laundry at one" replied that it
+    /// could only manage coursework deadlines — and said so again when told
+    /// that it could. Neither was true of the app: the list holds anything
+    /// with a date, and the same box adds to it. An answer cannot add
+    /// anything, so the honest reply is where to go to do that.
+    static func answerInstructions(figures: String, items: String) -> String {
+        """
+        You are the assistant inside Canvas Countdown, an app that keeps a \
+        student's deadlines: coursework imported from Canvas, and anything \
+        else they have added themselves, personal tasks included. Answer \
+        briefly and concretely, in the language the user writes in. Use only \
+        the figures and items given below; the counts are already correct, so \
+        do not recount them. Never invent a deadline that is not listed. If \
+        something is not in the list, say so.
+
+        This reply cannot change the list. If the user wants something added, \
+        scheduled or remembered, do not refuse and do not say the app only \
+        handles coursework: tell them to choose "Add task" on the chip under \
+        the message box and send the sentence again, and it will be drafted \
+        for them to check before anything is saved.
+
+        Figures:
+        \(figures)
+
+        Items:
+        \(items.isEmpty ? "none" : items)
+        """
     }
 
     func summarise(
@@ -268,22 +292,42 @@ actor ChatCompletionsAssistantService: AssistantServicing {
             return []
         }
 
-        let dayFormatter = DateFormatter()
-        dayFormatter.calendar = calendar
-        dayFormatter.timeZone = calendar.timeZone
-        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dayFormatter.dateFormat = "yyyy-MM-dd"
-        let today = dayFormatter.string(from: now)
         let reply = try await send(
             system: """
-            Extract tasks with deadlines. Reply with JSON only, as \
+            Extract the tasks in what the user wrote, one for each separate \
+            thing to do. They may be coursework or anything personal. Reply \
+            with JSON only, as \
             {"tasks":[{"title":"...","course":null,"due":"YYYY-MM-DDTHH:MM"}]}. \
-            Today is \(today). Use 23:59 when no time is given. \
-            If no deadline is stated, use null for due.
+            Keep each title short, in the language the user wrote it in, and \
+            leave the date out of it. \(Self.clock(at: now, calendar: calendar)) \
+            Give due in that same local time, with no time zone. Use 23:59 \
+            when a day is given with no time. When only a part of the day is \
+            given, or the user leaves the time to you, choose a sensible \
+            hour: 09:00 for morning, 12:00 for noon, 15:00 for afternoon, \
+            20:00 for evening or night. If no day or time is stated at all, \
+            use null for due.
             """,
             user: trimmed
         )
         return Self.parseDrafts(reply, sourceText: trimmed, calendar: calendar)
+    }
+
+    /// What day and time it is, written the way a model can use.
+    ///
+    /// The weekday is said outright rather than left to be worked out. A date
+    /// alone means the model has to know that the nineteenth is a Thursday
+    /// before it can find "Friday", and that is exactly the arithmetic these
+    /// models get wrong. The time is there for "in two hours" and for "this
+    /// evening" said at eleven at night.
+    static func clock(at now: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEEE yyyy-MM-dd"
+        let day = formatter.string(from: now)
+        formatter.dateFormat = "HH:mm"
+        return "Today is \(day) and the time is \(formatter.string(from: now))."
     }
 
     func reviseDrafts(
@@ -296,12 +340,6 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         guard !trimmed.isEmpty, !drafts.isEmpty else {
             return drafts
         }
-
-        let dayFormatter = DateFormatter()
-        dayFormatter.calendar = calendar
-        dayFormatter.timeZone = calendar.timeZone
-        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dayFormatter.dateFormat = "yyyy-MM-dd"
 
         let reply = try await send(
             system: """
@@ -316,8 +354,9 @@ actor ChatCompletionsAssistantService: AssistantServicing {
             Return the whole list, not only what changed. Keep the id of every \
             task you are keeping, so edits line up with what is on screen; use \
             a new id only for a task you are adding, and leave a task out only \
-            if the user asked for it to go. Today is \(dayFormatter.string(from: now)). \
-            Use 23:59 when no time is given.
+            if the user asked for it to go. \(Self.clock(at: now, calendar: calendar)) \
+            Give due in that same local time, with no time zone. Use 23:59 \
+            when a day is given with no time.
             """,
             user: trimmed
         )
@@ -446,12 +485,6 @@ actor ChatCompletionsAssistantService: AssistantServicing {
             return []
         }
 
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
-
         return tasks.compactMap { entry in
             guard let title = (entry["title"] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -460,7 +493,9 @@ actor ChatCompletionsAssistantService: AssistantServicing {
             }
             let course = (entry["course"] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let due = (entry["due"] as? String).flatMap(formatter.date(from:))
+            let due = (entry["due"] as? String).flatMap {
+                dueDate(from: $0, calendar: calendar)
+            }
             return AssistantDraftTask(
                 id: identifier(entry),
                 title: title,
@@ -469,6 +504,123 @@ actor ChatCompletionsAssistantService: AssistantServicing {
                 sourceText: sourceText
             )
         }
+    }
+
+    /// Reads the date a model wrote, as the day and the clock time it names.
+    ///
+    /// It is asked for `2026-08-07T17:00` and often sends something close to
+    /// it instead: seconds on the end, a `Z`, a space where the `T` should be,
+    /// or the day with no time. An exact match threw every one of those away,
+    /// and the draft arrived saying "No date was given" about a date that was
+    /// sitting in the reply. So this reads the day, then the hour and minute
+    /// if they are there, and stops.
+    ///
+    /// Anything after the minutes is ignored rather than honoured. The model
+    /// is told the local date and time and nothing about the time zone, so an
+    /// offset on its reply is decoration: treating it as real would move a
+    /// one o'clock task by however far this Mac is from Greenwich.
+    ///
+    /// Still strict where it matters. A day that does not exist, or text that
+    /// is not a date at all, yields nothing, and the draft says so.
+    static func dueDate(from text: String, calendar: Calendar) -> Date? {
+        let scanner = Scanner(
+            string: text.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        scanner.charactersToBeSkipped = nil
+
+        func separator() -> Bool {
+            scanner.scanString("-") != nil || scanner.scanString("/") != nil
+        }
+        func number(digits: ClosedRange<Int>) -> Int? {
+            guard let run = scanner.scanCharacters(from: .decimalDigits),
+                  digits.contains(run.count) else {
+                return nil
+            }
+            return Int(run)
+        }
+
+        guard let year = number(digits: 4...4), separator(),
+              let month = number(digits: 1...2), separator(),
+              let day = number(digits: 1...2) else {
+            return nil
+        }
+
+        // A day with no time is the end of that day, the same rule the model
+        // is given.
+        var hour = 23
+        var minute = 59
+        if !scanner.isAtEnd {
+            guard scanner.scanString("T") != nil
+                || scanner.scanString("t") != nil
+                || scanner.scanCharacters(from: .whitespaces) != nil,
+                  let statedHour = number(digits: 1...2),
+                  scanner.scanString(":") != nil,
+                  let statedMinute = number(digits: 2...2) else {
+                return nil
+            }
+            // A clock written the American way, "5:00 PM", after any seconds.
+            // Ignored, it read as five in the morning.
+            let rest = scanner.string[scanner.currentIndex...].lowercased()
+            if let meridiem = Self.meridiem(in: rest) {
+                guard (1...12).contains(statedHour) else {
+                    return nil
+                }
+                hour = statedHour % 12 + (meridiem == "p" ? 12 : 0)
+                minute = statedMinute
+            } else if statedHour == 24, statedMinute == 0 {
+                // 24:00 is how the last moment of a day gets written.
+                hour = 23
+                minute = 59
+            } else {
+                hour = statedHour
+                minute = statedMinute
+            }
+        }
+        guard (0...23).contains(hour), (0...59).contains(minute) else {
+            return nil
+        }
+
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        // `date(from:)` rolls the 31st of June over into July. A date that
+        // rolled is one the model did not write.
+        guard let date = calendar.date(from: components) else {
+            return nil
+        }
+        let read = calendar.dateComponents([.year, .month, .day], from: date)
+        guard read.year == year, read.month == month, read.day == day else {
+            return nil
+        }
+        return date
+    }
+
+    /// "a" or "p" when what follows the minutes is a meridiem — after
+    /// optional seconds and spaces, as "am", "pm", "a.m." or "p.m." — and nil
+    /// otherwise.
+    private static func meridiem(in rest: String) -> Character? {
+        var text = Substring(rest)
+        if text.first == ":" {
+            text = text.dropFirst().drop(while: { $0.isNumber || $0 == "." })
+        }
+        text = text.drop(while: { $0 == " " })
+        guard let letter = text.first, letter == "a" || letter == "p" else {
+            return nil
+        }
+        let after = text.dropFirst().drop(while: { $0 == "." })
+        guard after.first == "m" else {
+            return nil
+        }
+        let end = after.dropFirst().first
+        guard end == nil || !(end!.isLetter) else {
+            return nil
+        }
+        return letter
     }
 
     private func send(
@@ -524,7 +676,7 @@ actor ChatCompletionsAssistantService: AssistantServicing {
                   let content = message["content"] as? String else {
                 throw AssistantError.badResponse
             }
-            return content
+            return AssistantReplyText.withoutReasoning(content)
         } catch let error as AssistantError {
             throw error
         } catch is CancellationError {
@@ -534,6 +686,20 @@ actor ChatCompletionsAssistantService: AssistantServicing {
         }
     }
 }
+
+/// Where assistant API keys are kept.
+///
+/// A protocol so that a launch which must not touch the real Keychain — an
+/// automated run, or the suite itself — can be handed somewhere else to put
+/// them. `nil` addresses the single key earlier versions stored.
+protocol AssistantKeyStoring: Sendable {
+    func save(_ key: String, for profileID: UUID?) async throws
+    func load(for profileID: UUID?) async throws -> String?
+    func delete(for profileID: UUID?) async throws
+    func adoptLegacyKey(as profileID: UUID) async throws
+}
+
+extension KeychainAssistantKeyStore: AssistantKeyStoring {}
 
 /// Stores assistant API keys beside the feed URL, so none is ever written to
 /// preferences or diagnostics.

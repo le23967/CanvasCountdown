@@ -56,9 +56,14 @@ final class AssistantWindowController: NSObject, NSWindowDelegate {
         panel.setContentSize(NSSize(width: 340, height: 460))
         panel.minSize = NSSize(width: 280, height: 320)
         // Remembers where it was left, so it does not reappear in the middle of
-        // whatever the user is reading.
-        panel.setFrameAutosaveName("CanvasCountdown.assistantPanel")
-        panel.center()
+        // whatever the user is reading. Centred only the first time: it used
+        // to be centred every time, after the saved place had been read back,
+        // so the place it was left was never where it came back.
+        let autosaveName = "CanvasCountdown.assistantPanel"
+        if !panel.setFrameUsingName(autosaveName) {
+            panel.center()
+        }
+        panel.setFrameAutosaveName(autosaveName)
         panel.makeKeyAndOrderFront(nil)
 
         self.panel = panel

@@ -207,6 +207,14 @@ enum CanvasDateTextParser {
     /// Only substitutions that cannot mean anything else inside a date.
     static func correctOCRNoise(_ text: String) -> String {
         var value = normalisedForMatching(text)
+        // "11:59 p.m.", the way some Canvas locales print it. Read with its
+        // full stops, the meridiem was not recognised and the time was taken
+        // as morning: a deadline at the end of the day became one at its start.
+        value = value.replacingOccurrences(
+            of: "(?<=\\d)\\s*([ap])\\.\\s?m\\.?",
+            with: " $1m",
+            options: [.regularExpression, .caseInsensitive]
+        )
         // "al" and "af" are common misreads of "at" between a date and a time.
         value = value.replacingOccurrences(
             of: "\\b(al|af|ai)\\b(?=\\s*\\d)",
@@ -371,9 +379,21 @@ enum CanvasDateTextParser {
         guard let thisYear = calendar.date(from: parts) else {
             return currentYear
         }
+        let monthAgo = calendar.date(byAdding: .day, value: -31, to: now) ?? now
+
+        // In the first days of a year, a date late in December is the one that
+        // has just gone, not one eleven months away. Read in January, "Due 20
+        // Dec" used to become next December, with no warning that it was past.
+        var lastYearParts = parts
+        lastYearParts.year = currentYear - 1
+        if let lastYear = calendar.date(from: lastYearParts),
+           lastYear >= monthAgo,
+           lastYear <= now {
+            return currentYear - 1
+        }
+
         // Anything more than a month behind is far likelier to be next year's
         // deadline than one already missed.
-        let monthAgo = calendar.date(byAdding: .day, value: -31, to: now) ?? now
         return thisYear < monthAgo ? currentYear + 1 : currentYear
     }
 

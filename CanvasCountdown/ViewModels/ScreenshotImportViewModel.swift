@@ -38,8 +38,17 @@ final class ScreenshotImportViewModel {
     private let coordinator: any ScreenshotImportCoordinating
     @ObservationIgnored
     private let existingProvider: @Sendable () async throws -> [AssignmentSnapshot]
+    /// The read in progress. Held so that Cancel Reading, closing the sheet,
+    /// or a second screenshot dropped part-way can all stop it. It used to be
+    /// declared and never set, so none of them did: the read ran to the end
+    /// and put its rows back on screen — into a sheet that had been closed,
+    /// which then reopened in the middle of a review nobody had asked for.
     @ObservationIgnored
-    private var recognitionTask: Task<Void, Never>?
+    private var recognitionTask: Task<ScreenshotImportSession, Never>?
+    /// The screenshots added for the read in progress, so cancelling it lets
+    /// go of them rather than reading them again next time.
+    @ObservationIgnored
+    private var pendingSourceIDs: Set<UUID> = []
 
     init(
         coordinator: any ScreenshotImportCoordinating,
@@ -71,6 +80,7 @@ final class ScreenshotImportViewModel {
     /// Accepts file URLs from the picker or a drop. Unsupported or unreadable
     /// files are reported rather than silently dropped.
     func load(urls: [URL]) async {
+        errorMessage = nil
         var accepted: [ScreenshotSource] = []
         var rejected: [String] = []
 
@@ -114,6 +124,7 @@ final class ScreenshotImportViewModel {
 
     /// Accepts an image already on the pasteboard.
     func pasteFromClipboard() async {
+        errorMessage = nil
         guard let image = Self.imageFromPasteboard() else {
             errorMessage = "There is no image on the clipboard to paste."
             return
@@ -123,19 +134,42 @@ final class ScreenshotImportViewModel {
         ])
     }
 
+    /// Reads one screenshot that is already in memory, the way a paste does.
+    func pasteSource(_ source: ScreenshotSource) async {
+        errorMessage = nil
+        await recognise([source])
+    }
+
     private func recognise(_ newSources: [ScreenshotSource]) async {
+        recognitionTask?.cancel()
         sources.append(contentsOf: newSources)
+        pendingSourceIDs.formUnion(newSources.map(\.id))
         stage = .recognising
         progressText = newSources.count == 1
             ? "Reading 1 screenshot…"
             : "Reading \(newSources.count) screenshots…"
 
-        let existing = (try? await existingProvider()) ?? []
-        let session = await coordinator.buildSession(
-            from: sources,
-            existing: existing,
-            now: .now
-        )
+        let allSources = sources
+        let coordinator = coordinator
+        let existingProvider = existingProvider
+        let task = Task {
+            let existing = (try? await existingProvider()) ?? []
+            return await coordinator.buildSession(
+                from: allSources,
+                existing: existing,
+                now: .now
+            )
+        }
+        recognitionTask = task
+        let session = await task.value
+
+        // Cancelled, closed, or overtaken by a newer read while this one was
+        // running: what it found is no longer wanted.
+        guard recognitionTask == task, !task.isCancelled else {
+            return
+        }
+        recognitionTask = nil
+        pendingSourceIDs = []
 
         progressText = nil
         screenshotNames = session.screenshotNames
@@ -161,6 +195,8 @@ final class ScreenshotImportViewModel {
     func cancelRecognition() {
         recognitionTask?.cancel()
         recognitionTask = nil
+        sources.removeAll { pendingSourceIDs.contains($0.id) }
+        pendingSourceIDs = []
         progressText = nil
         stage = candidates.isEmpty ? .choosing : .reviewing
     }
@@ -210,6 +246,7 @@ final class ScreenshotImportViewModel {
         guard canImport else {
             return
         }
+        errorMessage = nil
         do {
             let summary = try await coordinator.commit(candidates, now: .now)
             stage = .finished(summary)
@@ -221,11 +258,19 @@ final class ScreenshotImportViewModel {
     }
 
     /// Called when the sheet closes, however it closes.
+    ///
+    /// Everything goes, messages included. An error from the last visit used
+    /// to be waiting in red the next time the sheet was opened.
     func discard() {
         recognitionTask?.cancel()
         recognitionTask = nil
+        pendingSourceIDs = []
         candidates = []
         screenshotNames = [:]
+        selectedCandidateID = nil
+        errorMessage = nil
+        noticeMessage = nil
+        progressText = nil
         releaseImages()
         stage = .choosing
     }

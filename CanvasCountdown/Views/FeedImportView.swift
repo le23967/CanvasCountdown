@@ -155,10 +155,12 @@ struct FeedImportView: View {
             }
             .padding()
 
-            List(previewItems, selection: Binding(
-                get: { selectedIDs },
-                set: { selectedIDs = $0 }
-            )) { item in
+            // No list selection. It used to be bound to the same set as the
+            // checkboxes, so clicking anywhere on a row other than its box
+            // made that row the only selection: every other event unticked
+            // at once, the button changed to "Import 1 Event", and importing
+            // then recorded all the rest as deliberately left out.
+            List(previewItems) { item in
                 Toggle(isOn: Binding(
                     get: { selectedIDs.contains(item.id) },
                     set: { isSelected in

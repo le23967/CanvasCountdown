@@ -32,8 +32,12 @@ struct SearchOverlayView: View {
                 }
                 .accessibilityHidden(true)
 
+            // As wide as it likes up to its own width, and never wider than
+            // the window: a fixed width ran off both sides of a narrow one,
+            // taking the start of what was typed with it.
             panel
-                .frame(width: panelWidth)
+                .frame(maxWidth: panelWidth)
+                .padding(.horizontal, 16)
                 .padding(.top, 96)
         }
         .transition(
@@ -162,17 +166,22 @@ struct SearchOverlayView: View {
                 hint("↩", "Open")
                 hint("esc", "Close")
                 Spacer(minLength: 0)
-                Text(
-                    results.count == 1
-                        ? "1 result"
-                        : "\(results.count) results"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(resultCountDescription(shown: results.count))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
+    }
+
+    private func resultCountDescription(shown: Int) -> String {
+        let total = viewModel.searchMatchCount
+        guard total > shown else {
+            return shown == 1 ? "1 result" : "\(shown) results"
+        }
+        return "\(shown) of \(total) results — type more to narrow"
     }
 
     /// Says which keys do what, because a panel that only answers to keys

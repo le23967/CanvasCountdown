@@ -185,6 +185,12 @@ final class SettingsStore {
         didSet { persist() }
     }
 
+    /// The version that last started, so the first launch after an update
+    /// can be told apart from every other. Bookkeeping, like the above.
+    var lastLaunchedVersion: String? {
+        didSet { persist() }
+    }
+
     @ObservationIgnored
     private let defaults: UserDefaults
 
@@ -258,6 +264,8 @@ final class SettingsStore {
             .string(forKey: Key.dismissedUpdateVersion)
         lastUpdateCheck = defaults
             .object(forKey: Key.lastUpdateCheck) as? Date
+        lastLaunchedVersion = defaults
+            .string(forKey: Key.lastLaunchedVersion)
 
         // Writing the starting labels out on the first run pins them: an event
         // labelled today keeps its colour even if a later version ships a
@@ -368,6 +376,7 @@ final class SettingsStore {
         )
         defaults.set(dismissedUpdateVersion, forKey: Key.dismissedUpdateVersion)
         defaults.set(lastUpdateCheck, forKey: Key.lastUpdateCheck)
+        defaults.set(lastLaunchedVersion, forKey: Key.lastLaunchedVersion)
     }
 
     private enum Key {
@@ -390,6 +399,7 @@ final class SettingsStore {
             prefix + "treatsMidnightAsEndOfDay"
         static let dismissedUpdateVersion = prefix + "dismissedUpdateVersion"
         static let lastUpdateCheck = prefix + "lastUpdateCheck"
+        static let lastLaunchedVersion = prefix + "lastLaunchedVersion"
     }
 }
 

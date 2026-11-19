@@ -141,11 +141,14 @@ struct DockPresetNameSheet: View {
                 .accessibilityLabel("Preset name")
 
             // Reserved height, so typing an invalid name does not make the
-            // sheet jump.
-            Text(error?.message ?? " ")
+            // sheet jump. Said as soon as the name is a problem, not only
+            // after Return: the button below is greyed out by the same rule,
+            // and a suggested name that was already taken used to open the
+            // sheet with Save disabled and no word about why.
+            Text(problem?.message ?? " ")
                 .font(.caption)
-                .foregroundStyle(error == nil ? Color.secondary : Color.red)
-                .accessibilityHidden(error == nil)
+                .foregroundStyle(problem == nil ? Color.secondary : Color.red)
+                .accessibilityHidden(problem == nil)
 
             HStack {
                 Spacer()
@@ -162,6 +165,18 @@ struct DockPresetNameSheet: View {
             name = initialName
             isFieldFocused = true
         }
+    }
+
+    /// What is wrong with the name as it stands. An empty field is left
+    /// unremarked until something is typed or Return is pressed.
+    private var problem: DockPresetNameError? {
+        if let error {
+            return error
+        }
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return validate(name)
     }
 
     private func confirm() {
@@ -259,10 +274,14 @@ struct DockThemeSwatch: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 5, style: .continuous)
             .fill(
+                // The same way up as the tile itself, which draws
+                // `backgroundBottom` at its head. The swatch used to be drawn
+                // the other way up, so a preset looked inverted beside the
+                // Dock it would produce.
                 LinearGradient(
                     colors: [
-                        Color(nsColor: NSColor(hex: colours.backgroundTop) ?? .systemBlue),
                         Color(nsColor: NSColor(hex: colours.backgroundBottom) ?? .systemBlue),
+                        Color(nsColor: NSColor(hex: colours.backgroundTop) ?? .systemBlue),
                     ],
                     startPoint: .top,
                     endPoint: .bottom

@@ -298,7 +298,9 @@ enum AssistantError: LocalizedError, Equatable, Sendable {
         case .notConfigured:
             "Turn on the assistant in Settings first."
         case .missingAPIKey:
-            "Add your Groq API key in Settings, or switch to a model on this Mac."
+            // Not "your Groq key": that was the only hosted service once, and
+            // the message went on naming it to people using any of the others.
+            "Add an API key for this model in Settings, or switch to a model on this Mac."
         case .invalidEndpoint:
             "That assistant address is not a valid URL."
         case .unreachable:

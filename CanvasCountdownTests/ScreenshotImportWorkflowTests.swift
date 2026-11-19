@@ -338,6 +338,100 @@ final class ScreenshotImportWorkflowTests: XCTestCase {
         XCTAssertEqual(stored?.first?.source, .canvasCalendarFeed)
     }
 
+    /// "Update existing" was offered and read nowhere: choosing it added a
+    /// second copy. It is no longer offered, and nothing here can write over
+    /// an event that is already stored.
+    func testAPossibleDuplicateIsSkippedOrAddedNeverWrittenOver() async throws {
+        XCTAssertEqual(DuplicateResolution.allCases, [.skip, .importSeparately])
+
+        let typedIn = storedAssignment(
+            title: "Example Quiz",
+            day: 4,
+            course: "PHYS200",
+            source: .manual
+        )
+        let (coordinator, repository) = makeCoordinator(
+            observations: [
+                line("Example Quiz", y: 0.10),
+                line("Due 4 Aug at 11:00", y: 0.125),
+            ],
+            repository: ScopeRepositoryStub(snapshots: [typedIn])
+        )
+        let session = await coordinator.buildSession(
+            from: [source()],
+            existing: [typedIn],
+            now: referenceNow
+        )
+        var candidates = session.candidates
+        XCTAssertTrue(candidates[0].possibleDuplicate)
+        candidates[0].selectedDuplicateAction = .importSeparately
+
+        let summary = try await coordinator.commit(candidates, now: referenceNow)
+
+        XCTAssertEqual(summary.added, 1)
+        let stored = try await repository.fetchAll()
+        let original = try XCTUnwrap(stored.first { $0.id == typedIn.id })
+        XCTAssertEqual(original.courseName, "PHYS200", "Left exactly as it was")
+        XCTAssertEqual(original.dueDate, typedIn.dueDate)
+    }
+
+    /// Closing the sheet used to leave the last error waiting in red for the
+    /// next time it was opened.
+    func testClosingTheSheetClearsWhatItWasSaying() async {
+        let viewModel = ScreenshotImportViewModel(
+            coordinator: ScreenshotImportCoordinator(
+                ocr: StubOCRService(result: .success([])),
+                repository: ScopeRepositoryStub(snapshots: [])
+            ),
+            existingProvider: { [] }
+        )
+        viewModel.errorMessage = "There is no image on the clipboard to paste."
+        viewModel.noticeMessage = "No Canvas deadlines were detected."
+
+        viewModel.discard()
+
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertNil(viewModel.noticeMessage)
+        XCTAssertEqual(viewModel.stage, .choosing)
+    }
+
+    /// Cancel Reading used to cancel nothing: the read ran on and put its rows
+    /// on screen anyway.
+    func testCancellingAReadKeepsItsResultsOffTheScreen() async throws {
+        let gate = ReadGate()
+        let viewModel = ScreenshotImportViewModel(
+            coordinator: ScreenshotImportCoordinator(
+                ocr: GatedOCRService(
+                    gate: gate,
+                    observations: [
+                        line("Example Quiz", y: 0.10),
+                        line("Due 4 Aug at 16:00", y: 0.125),
+                    ]
+                ),
+                repository: ScopeRepositoryStub(snapshots: [])
+            ),
+            existingProvider: { [] }
+        )
+
+        let pasted = Task { await viewModel.pasteSource(source()) }
+        for _ in 0..<200 where viewModel.stage != .recognising {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTAssertEqual(viewModel.stage, .recognising)
+
+        viewModel.cancelRecognition()
+        await gate.open()
+        await pasted.value
+
+        XCTAssertEqual(viewModel.stage, .choosing)
+        XCTAssertTrue(viewModel.candidates.isEmpty)
+        XCTAssertEqual(
+            viewModel.retainedImageCount,
+            0,
+            "The screenshot whose read was cancelled is let go"
+        )
+    }
+
     // MARK: - Review validation and commit
 
     func testOnlySelectedValidRowsAreImported() async throws {
@@ -575,6 +669,36 @@ final class ScreenshotImportWorkflowTests: XCTestCase {
             2,
             "The duplicate defaults to skip and the invalid row cannot import"
         )
+    }
+}
+
+/// Holds a read until the test lets it go.
+private actor ReadGate {
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+
+    func wait() async {
+        guard !isOpen else {
+            return
+        }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiting.forEach { $0.resume() }
+        waiting.removeAll()
+    }
+}
+
+/// Recognises the given lines, but only once the gate opens.
+private struct GatedOCRService: ScreenshotOCRServicing {
+    let gate: ReadGate
+    let observations: [OCRTextObservation]
+
+    func recognizeText(in source: ScreenshotSource) async throws -> [OCRTextObservation] {
+        await gate.wait()
+        return observations
     }
 }
 

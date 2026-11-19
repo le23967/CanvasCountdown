@@ -65,9 +65,10 @@ protocol AssignmentRepository: Sendable {
         _ request: FeedReconciliationRequest
     ) async throws -> FeedReconciliationOutcome
 
-    /// Removes every event belonging to one course, archived ones included, and
-    /// answers how many went. Used when a course wandered in from the Canvas
-    /// feed and does not belong here at all.
+    /// Removes every Canvas feed event belonging to one course, archived ones
+    /// included, and answers how many went. Used when a course wandered in
+    /// from the Canvas feed and does not belong here at all. Events the user
+    /// added, by hand or from a screenshot, stay.
     @discardableResult
     func deleteEvents(inCourse courseName: String) async throws -> Int
 
@@ -307,7 +308,10 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
             guard let event = try event(id: id) else {
                 throw AssignmentRepositoryError.assignmentNotFound
             }
-            guard event.source == .manual else {
+            // Anything the feed did not send. An event read out of a
+            // screenshot has nothing that will ever refresh it, so this is the
+            // only place a misread title or date can be put right.
+            guard event.source != .canvasCalendarFeed else {
                 throw AssignmentRepositoryError
                     .cannotEditImportedAssignmentAsManual
             }
@@ -317,6 +321,16 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
             event.dueDate = draft.dueDate
             event.sourceURL = sourceURL
             event.updatedAt = now
+            // A screenshot row is found again by an identifier made from what
+            // was read. Once it has been corrected by hand, a later import of
+            // the same misreading would match that identifier and write the
+            // misreading straight back over the correction. Corrected, it is
+            // the user's own: no import may claim it again, and a screenshot
+            // that shows the same thing is caught as a possible duplicate
+            // instead.
+            if event.source == .screenshot {
+                event.externalID = nil
+            }
             try modelContext.save()
             return AssignmentSnapshot(event)
         }
@@ -414,6 +428,19 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
             }
             let normalizedID = Self.normalizedExternalID(externalID)
 
+            if excluded.contains(normalizedID) {
+                // The user deselected it during import. This has to be asked
+                // before whether Canvas still publishes it, because it nearly
+                // always does: asked second, a deselected event that was
+                // already stored was confirmed instead of archived, stayed in
+                // the list, and was never updated again.
+                if !event.isArchived {
+                    archive(event, at: request.observedAt)
+                    outcome.archivedCount += 1
+                }
+                continue
+            }
+
             if active.contains(normalizedID) {
                 event.lastSeenInFeedAt = request.observedAt
                 event.missingRefreshCount = 0
@@ -428,8 +455,7 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
                 continue
             }
 
-            if excluded.contains(normalizedID) || cancelled.contains(normalizedID) {
-                // Explicit signals: the user deselected it during import, or
+            if cancelled.contains(normalizedID) {
                 // Canvas published a cancellation tombstone for it.
                 if !event.isArchived {
                     archive(event, at: request.observedAt)
@@ -467,13 +493,22 @@ actor SwiftDataAssignmentRepository: AssignmentRepository {
     /// the course and would come back the moment Canvas published it again.
     /// Removing a course is a deletion, which is why it is confirmed first and
     /// why the course is blocked at the same time.
+    ///
+    /// Only what the Canvas feed sent. An event added by hand or from a
+    /// screenshot under the same course is the user's own, and allowing the
+    /// course again — the way back from a removal — brings back only what the
+    /// feed still publishes, so one of those deleted here could never return.
+    /// Settings says as much. This used to delete them with the rest.
     @discardableResult
     func deleteEvents(inCourse courseName: String) async throws -> Int {
         guard let key = CourseName.normalized(courseName) else {
             return 0
         }
         let events = try modelContext.fetch(FetchDescriptor<AssignmentEvent>())
-            .filter { CourseName.normalized($0.courseName) == key }
+            .filter {
+                $0.source == .canvasCalendarFeed
+                    && CourseName.normalized($0.courseName) == key
+            }
         guard !events.isEmpty else {
             return 0
         }

@@ -101,6 +101,30 @@ final class CanvasDateTextParserTests: XCTestCase {
         XCTAssertTrue(result.warnings.contains(.yearInferred(2027)))
     }
 
+    /// Read in the first days of January, late December is the month that has
+    /// just gone. It used to be read as eleven months away.
+    func testLateDecemberReadInJanuaryIsTheDecemberJustGone() throws {
+        let result = try XCTUnwrap(parse("Due 20 Dec at 23:59", from: now(2027, 1, 5)))
+
+        XCTAssertEqual(calendar.component(.year, from: result.date), 2026)
+        XCTAssertTrue(
+            result.warnings.contains(.dateInPast),
+            "Shown as already gone, so it is checked rather than trusted"
+        )
+    }
+
+    func testAMeridiemWrittenWithFullStopsIsRead() throws {
+        let evening = try XCTUnwrap(parse("Due 4 Aug at 11:59 p.m."))
+        XCTAssertEqual(calendar.component(.hour, from: evening.date), 23)
+        XCTAssertEqual(calendar.component(.minute, from: evening.date), 59)
+
+        let morning = try XCTUnwrap(parse("Due 4 Aug at 9 a.m."))
+        XCTAssertEqual(calendar.component(.hour, from: morning.date), 9)
+
+        let spaced = try XCTUnwrap(parse("Due 4 Aug at 4:30 P.M"))
+        XCTAssertEqual(calendar.component(.hour, from: spaced.date), 16)
+    }
+
     func testRecentlyPastDateKeepsThisYearAndIsFlagged() throws {
         let result = try XCTUnwrap(parse("Due 20 Jul at 23:59", from: now(2026, 7, 28)))
 

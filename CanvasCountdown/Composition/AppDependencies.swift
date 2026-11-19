@@ -37,6 +37,7 @@ struct AppDependencies {
         let dockRenderer: any DockRendering
         let releaseChecker: any ReleaseChecking
         let updateDownloader: any UpdateDownloading
+        let assistantKeyStore: any AssistantKeyStoring
 
         switch environment {
         case .production:
@@ -48,6 +49,7 @@ struct AppDependencies {
             dockRenderer = DockTileService()
             releaseChecker = GitHubReleaseChecker()
             updateDownloader = DownloadsFolderUpdateDownloader()
+            assistantKeyStore = KeychainAssistantKeyStore()
         case .automatedTesting:
             feedURLStore = IsolatedFeedURLStore()
             feedFetcher = OfflineFeedFetcher()
@@ -59,6 +61,7 @@ struct AppDependencies {
             // suite would pass or fail on somebody else's release.
             releaseChecker = InertReleaseChecker()
             updateDownloader = InertUpdateDownloader()
+            assistantKeyStore = IsolatedAssistantKeyStore()
         }
 
         // Recognition is local either way; an automated run uses a stub so no
@@ -92,6 +95,7 @@ struct AppDependencies {
             dockRenderer: dockRenderer,
             notificationScheduler: notificationScheduler,
             automaticActivityEnabled: !environment.isAutomatedTesting,
+            assistantKeyStore: assistantKeyStore,
             courseBlocklist: courseBlocklist,
             releaseChecker: releaseChecker,
             updateDownloader: updateDownloader

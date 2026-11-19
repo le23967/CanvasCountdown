@@ -88,7 +88,7 @@ final class MainViewModel {
     @ObservationIgnored
     private var transientStatusTask: Task<Void, Never>?
     @ObservationIgnored
-    private let assistantKeyStore: KeychainAssistantKeyStore
+    private let assistantKeyStore: any AssistantKeyStoring
     @ObservationIgnored
     private let localModels: any LocalModelManaging
     @ObservationIgnored
@@ -121,7 +121,7 @@ final class MainViewModel {
         notificationScheduler: any NotificationScheduling,
         calendar: Calendar = .autoupdatingCurrent,
         automaticActivityEnabled: Bool = true,
-        assistantKeyStore: KeychainAssistantKeyStore = KeychainAssistantKeyStore(),
+        assistantKeyStore: any AssistantKeyStoring = KeychainAssistantKeyStore(),
         localModels: any LocalModelManaging = OllamaModelManager(),
         courseBlocklist: any CourseBlocklisting =
             UserDefaultsCourseBlocklistStore(),
@@ -231,16 +231,33 @@ final class MainViewModel {
     /// Every course with something stored against it, plus how much, so
     /// removing one says what it is about to take with it.
     var managedCourses: [ManagedCourse] {
-        var counts: [String: (name: String, count: Int)] = [:]
+        // A course already removed is listed under Removed, with its way
+        // back. Events the user added under it are still here, and used to
+        // keep it in this list too, with a second trash button that offered
+        // to delete "0 events".
+        let blocked = Set(blockedCourses.compactMap { CourseName.normalized($0) })
+        var counts: [String: (name: String, count: Int, imported: Int)] = [:]
         for item in assignments {
             guard let name = item.normalizedCourseName,
-                  let key = CourseName.normalized(name) else {
+                  let key = CourseName.normalized(name),
+                  !blocked.contains(key) else {
                 continue
             }
-            counts[key] = (name, (counts[key]?.count ?? 0) + 1)
+            let existing = counts[key] ?? (name, 0, 0)
+            counts[key] = (
+                existing.name,
+                existing.count + 1,
+                existing.imported + (item.isUserOwned ? 0 : 1)
+            )
         }
         return counts
-            .map { ManagedCourse(name: $0.value.name, eventCount: $0.value.count) }
+            .map {
+                ManagedCourse(
+                    name: $0.value.name,
+                    eventCount: $0.value.count,
+                    importedEventCount: $0.value.imported
+                )
+            }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
@@ -365,6 +382,10 @@ final class MainViewModel {
             do {
                 try await manager.pull(name, baseURL: url, progress: onProgress)
                 await self?.finishDownload(message: "\(name) is ready to use.")
+            } catch LocalModelError.cancelled {
+                // Whoever cancelled it has already said so, and may already
+                // have started another download that this must not clear.
+                return
             } catch {
                 await self?.finishDownload(message: error.localizedDescription)
             }
@@ -411,9 +432,45 @@ final class MainViewModel {
     private func makeAssistant() -> any AssistantServicing {
         assistantFactory(
             settingsStore.assistant,
-            assistantAPIKey.isEmpty ? nil : assistantAPIKey,
+            assistantKeyForCurrentAddress,
             calendar
         )
+    }
+
+    /// The host the assistant's address names right now.
+    private var assistantHost: String? {
+        settingsStore.assistant.resolvedURL?.host?.lowercased()
+    }
+
+    /// The stored key, if it is this address's to use.
+    ///
+    /// A key saved for one service is never sent to another. When the address
+    /// has been pointed somewhere else since the key was saved, the request
+    /// goes without one and fails saying a key is needed, which is true: this
+    /// address has not been given one. The key is not thrown away, so putting
+    /// the address back brings it back.
+    var assistantKeyForCurrentAddress: String? {
+        guard !assistantAPIKey.isEmpty else {
+            return nil
+        }
+        guard let keyHost = activeAssistantProfile?.keyHost else {
+            // Nothing recorded: a configuration that was never saved under a
+            // name. There is no second address for its key to follow it to.
+            return assistantAPIKey
+        }
+        return keyHost == assistantHost ? assistantAPIKey : nil
+    }
+
+    /// Said under the key field when a key is being held back, so an empty
+    /// field beside a model that used to work is not left as a mystery.
+    var assistantKeyNote: String? {
+        guard !assistantAPIKey.isEmpty,
+              assistantKeyForCurrentAddress == nil,
+              let keyHost = activeAssistantProfile?.keyHost else {
+            return nil
+        }
+        let destination = assistantHost ?? "this address"
+        return "The key saved with this model is for \(keyHost), so it is not sent to \(destination). Save a key for this address to use it, or put the address back."
     }
 
     /// Kept in settings rather than here, so closing the window or quitting no
@@ -454,10 +511,32 @@ final class MainViewModel {
 
     /// Accurate by construction: it reads the endpoint rather than the provider
     /// name, so pointing "local" at a remote host cannot produce a false claim.
+    ///
+    /// Names the service when the address is one it recognises, and says only
+    /// "Cloud" when it is not. It used to append the provider's title, which
+    /// since there has been one kind of hosted provider read "Cloud · AI
+    /// (Cloud)" for every one of them.
     var assistantPrivacyLabel: String {
-        settingsStore.assistant.staysOnThisMac
-            ? "On this Mac"
-            : "Cloud · \(settingsStore.assistant.provider.title)"
+        guard !settingsStore.assistant.staysOnThisMac else {
+            return "On this Mac"
+        }
+        guard let service = AssistantService.matching(
+            baseURL: settingsStore.assistant.baseURL
+        ) else {
+            return "Cloud"
+        }
+        return "Cloud · \(service.name)"
+    }
+
+    /// The same thing as a sentence, for the tooltip and for VoiceOver, which
+    /// is where it is read when the panel is too narrow for the label.
+    var assistantPrivacyDescription: String {
+        guard !settingsStore.assistant.staysOnThisMac else {
+            return "The assistant runs on this Mac. Nothing is uploaded."
+        }
+        let host = settingsStore.assistant.resolvedURL?.host
+            ?? "the service you chose"
+        return "What you type here, and the titles, courses and due dates of your assignments, are sent to \(host)."
     }
 
     var assistantStaysOnThisMac: Bool {
@@ -487,7 +566,7 @@ final class MainViewModel {
     }
 
     func openAssistant(about item: AssignmentListItem? = nil) {
-        if let item {
+        if let item, !item.isCompleted, !item.isIgnored {
             assistantContext = AssistantContext(item)
         }
         move(
@@ -534,7 +613,7 @@ final class MainViewModel {
             return
         }
         settingsForm.assistant.sidebarWidth = width
-        applySettings(settingsForm)
+        applySettings(settingsForm, announce: false)
     }
 
     func clearAssistantContext() {
@@ -565,13 +644,13 @@ final class MainViewModel {
                 history: history,
                 digests: assistantDigests(),
                 now: .now
-            )
-            recordConversation(
-                AssistantMessage(
-                    role: .assistant,
-                    text: reply.trimmingCharacters(in: .whitespacesAndNewlines)
-                )
-            )
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            // An answer with nothing in it is not kept, so without this the
+            // question would sit there unanswered with no word about why.
+            guard !reply.isEmpty else {
+                throw AssistantError.badResponse
+            }
+            recordConversation(AssistantMessage(role: .assistant, text: reply))
         } catch {
             assistantErrorMessage = error.localizedDescription
         }
@@ -733,6 +812,18 @@ final class MainViewModel {
                 instruction: trimmed,
                 now: .now
             )
+            // The drafts are the user's while the model is thinking: they can
+            // be ticked, edited, saved or thrown away. A reply about a list
+            // that has since changed is about a list that no longer exists,
+            // and writing it over the top brought back drafts that had just
+            // been saved, ready to be saved a second time.
+            guard assistantDrafts == before else {
+                if !assistantDrafts.isEmpty {
+                    assistantErrorMessage =
+                        "The drafts changed while that was being worked out, so it was not applied. Send it again."
+                }
+                return
+            }
             guard revised != before else {
                 assistantErrorMessage =
                     "That did not change anything. Try naming what should be different."
@@ -1007,18 +1098,55 @@ final class MainViewModel {
         assistantAPIKey = (try? await assistantKeyStore.load(
             for: settingsStore.assistant.activeProfileID
         )) ?? ""
+        // A key saved before the app kept track of where keys belong. The
+        // address it sits beside now is the only one it can be tied to.
+        if !assistantAPIKey.isEmpty,
+           let profile = activeAssistantProfile,
+           profile.keyHost == nil {
+            recordAssistantKeyHost(assistantHost, for: profile.id)
+        }
     }
 
     func saveAssistantKey(_ key: String) {
         let profileID = settingsStore.assistant.activeProfileID
+        // Read now, not when the Keychain answers: the key is for the address
+        // on screen when Save was pressed.
+        let host = assistantHost
+        // A key is tied to the service it is for. Saved beside an address
+        // with no host — half-typed, or missing its https:// — it would be
+        // tied to nothing, and go to whatever the address became.
+        guard host != nil
+                || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Enter the service’s full address, starting with https://, before saving its key."
+            return
+        }
         Task {
             do {
                 try await assistantKeyStore.save(key, for: profileID)
-                assistantAPIKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let profileID {
+                    recordAssistantKeyHost(
+                        trimmed.isEmpty ? nil : host,
+                        for: profileID
+                    )
+                }
+                // Only if that model is still the one selected. Otherwise the
+                // key just saved for one model would be shown, and used, as
+                // the key of whichever was picked while Keychain was busy.
+                if settingsStore.assistant.activeProfileID == profileID {
+                    assistantAPIKey = trimmed
+                }
                 showTransientStatus("Assistant key saved")
             } catch {
                 present(error)
             }
+        }
+    }
+
+    private func recordAssistantKeyHost(_ host: String?, for profileID: UUID) {
+        var library = settingsStore.assistantProfiles
+        if library.setKeyHost(host, for: profileID) {
+            settingsStore.assistantProfiles = library
         }
     }
 
@@ -1092,6 +1220,9 @@ final class MainViewModel {
             profile,
             to: settingsForm.assistant
         )
+        // The key in hand belongs to the model just left. Until the new
+        // one's has been read, there is none, rather than the wrong one.
+        assistantAPIKey = ""
         applySettings(settingsForm)
         Task {
             await loadAssistantKey()
@@ -1115,6 +1246,7 @@ final class MainViewModel {
             saved,
             to: settingsForm.assistant
         )
+        assistantAPIKey = ""
         applySettings(settingsForm)
         Task {
             await loadAssistantKey()
@@ -1174,6 +1306,7 @@ final class MainViewModel {
         settingsStore.assistantProfiles = library
 
         if settingsStore.assistant.activeProfileID == id {
+            assistantAPIKey = ""
             if let next = library.profiles.first {
                 settingsForm.assistant = AssistantSettings.applying(
                     next,
@@ -1220,14 +1353,24 @@ final class MainViewModel {
     ///
     /// With an assignment in context the list narrows to that one item: asking
     /// about a single deadline is not a reason to send the whole term.
+    ///
+    /// That one item is looked for among everything stored, not only among
+    /// what is upcoming. It used to be looked for in the upcoming list alone,
+    /// and when it was not there — an overdue assignment, a completed one, one
+    /// outside the course filter — the whole upcoming list was sent in its
+    /// place: more than was asked about, and without the one thing that was.
     func assistantDigests() -> [AssistantAssignmentDigest] {
-        let scoped = visibleUpcomingAssignments
-            .filter { !$0.isCompleted && !$0.isIgnored && $0.dueDate >= currentDate }
-        if let assistantContext,
-           let focused = scoped.first(where: { $0.id == assistantContext.id }) {
-            return [AssistantAssignmentDigest(focused)]
+        if let assistantContext {
+            return assignments
+                .first {
+                    $0.id == assistantContext.id
+                        && !$0.isCompleted && !$0.isIgnored
+                }
+                .map { [AssistantAssignmentDigest($0)] } ?? []
         }
-        return scoped.map(AssistantAssignmentDigest.init)
+        return visibleUpcomingAssignments
+            .filter { !$0.isCompleted && !$0.isIgnored && $0.dueDate >= currentDate }
+            .map(AssistantAssignmentDigest.init)
     }
 
     var isAssistantEnabled: Bool {
@@ -1311,7 +1454,7 @@ final class MainViewModel {
             return
         }
         settingsForm.calendarScale = scale
-        applySettings(settingsForm)
+        applySettings(settingsForm, announce: false)
         selectedCalendarDay = nil
     }
 
@@ -1490,6 +1633,19 @@ final class MainViewModel {
     /// where you happened to be standing, which is the opposite of what a
     /// search is for. A completed assignment is still a thing you can look for.
     var searchResults: [AssignmentListItem] {
+        Array(allSearchMatches.prefix(Self.maximumSearchResults))
+    }
+
+    /// How many things match, before the panel stops showing them.
+    ///
+    /// Said in the panel's footer. It used to print the number shown, so a
+    /// course with twenty deadlines read "8 results" and the other twelve
+    /// were not known to exist.
+    var searchMatchCount: Int {
+        allSearchMatches.count
+    }
+
+    private var allSearchMatches: [AssignmentListItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
             return []
@@ -1513,8 +1669,6 @@ final class MainViewModel {
                 }
                 return left.dueDate < right.dueDate
             }
-            .prefix(Self.maximumSearchResults)
-            .map { $0 }
     }
 
     var hasSearchQuery: Bool {
@@ -1705,6 +1859,10 @@ final class MainViewModel {
             )
             apply(snapshots)
             storedFeedURLString = feedURL?.absoluteString ?? ""
+            restoreLoginItemAfterAnUpdate()
+            // As the system has it now: the login item may have been removed
+            // in System Settings while the app was closed.
+            settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
             settingsForm = SettingsFormState(
                 settings: settingsStore.snapshot,
                 feedURL: feedURL
@@ -1728,13 +1886,81 @@ final class MainViewModel {
             return
         }
 
-        startAutomaticRefreshLoop()
         startCountdownTransitionLoop()
 
         if hasConfiguredFeed {
             await refresh(trigger: .launch, announcesResult: false)
         } else {
             await synchronizeNotifications()
+        }
+        // After the launch refresh rather than before it, so that if that one
+        // failed the first wait is the short retry and not a whole interval.
+        startAutomaticRefreshLoop()
+
+        await checkForUpdate()
+        hasFinishedStarting = true
+    }
+
+    /// Puts the login item back once, on the first launch after an update,
+    /// if it was on before and has gone.
+    ///
+    /// Replacing an ad-hoc signed app can cost it its login item, which is
+    /// not something anyone chose. A login item removed by hand in System
+    /// Settings, with no update in between, is left removed: the app no
+    /// longer puts back what the toggle says is off.
+    private func restoreLoginItemAfterAnUpdate() {
+        let running = runningVersion?.description
+        defer {
+            if let running {
+                settingsStore.lastLaunchedVersion = running
+            }
+        }
+        guard let running,
+              settingsStore.lastLaunchedVersion != running,
+              settingsStore.launchAtLogin,
+              !LaunchAtLoginController.isEnabled else {
+            return
+        }
+        try? LaunchAtLoginController.setEnabled(true)
+    }
+
+    /// Launch does its own catching up. Coming to the front during it — which
+    /// a launch always does — must not run the same work alongside.
+    @ObservationIgnored
+    private var hasFinishedStarting = false
+
+    /// Catches up with what may have changed while the app was in the
+    /// background.
+    ///
+    /// Notification permission is granted in System Settings, not here, so the
+    /// app only finds out by asking again when it comes back: it used to ask
+    /// once at launch, and reminders allowed a minute later stayed greyed out
+    /// and unscheduled until the next relaunch. The login item can be removed
+    /// there too. And an app that is never quit — the countdown lives in the
+    /// Dock — has to look for updates on some occasion other than launching,
+    /// or it never hears about one.
+    func appDidBecomeActive() async {
+        guard hasFinishedStarting, automaticActivityEnabled else {
+            return
+        }
+
+        let permission = NotificationPermissionState(
+            await notificationScheduler.authorizationStatus()
+        )
+        if permission != notificationPermission {
+            let wasAuthorized = notificationPermission == .authorized
+            notificationPermission = permission
+            if permission == .authorized, !wasAuthorized {
+                await synchronizeNotifications()
+            }
+        }
+
+        let loginItem = LaunchAtLoginController.isEnabled
+        if settingsStore.launchAtLogin != loginItem {
+            settingsStore.launchAtLogin = loginItem
+        }
+        if settingsForm.launchAtLogin != loginItem {
+            settingsForm.launchAtLogin = loginItem
         }
 
         await checkForUpdate()
@@ -1766,13 +1992,28 @@ final class MainViewModel {
     }
 
     /// Whether enough time has passed to ask again.
+    ///
+    /// A check that failed is not asked again for an hour either. Checks now
+    /// also happen when the app comes to the front, and behind a captive
+    /// portal or a shared campus address that GitHub is rate-limiting, every
+    /// switch back to the app would otherwise have sent another request.
     func shouldCheckForUpdate(now: Date = .now) -> Bool {
+        if let failed = lastFailedUpdateCheck,
+           failed <= now,
+           now.timeIntervalSince(failed) < Self.failedUpdateCheckRetryInterval {
+            return false
+        }
         guard let last = settingsStore.lastUpdateCheck else {
             return true
         }
         return now.timeIntervalSince(last) >= Self.updateCheckInterval
             || last > now
     }
+
+    static let failedUpdateCheckRetryInterval: TimeInterval = 3_600
+
+    @ObservationIgnored
+    private var lastFailedUpdateCheck: Date?
 
     /// Looks for something newer.
     ///
@@ -1806,6 +2047,7 @@ final class MainViewModel {
         do {
             let latest = try await releaseChecker.latestRelease()
             settingsStore.lastUpdateCheck = now
+            lastFailedUpdateCheck = nil
 
             guard let latest, latest.version > running else {
                 availableUpdate = nil
@@ -1828,6 +2070,7 @@ final class MainViewModel {
         } catch {
             // A launch check that cannot reach GitHub says nothing. Being
             // offline is not news, and it is not the user's problem to solve.
+            lastFailedUpdateCheck = now
             if force {
                 updateCheckAnnouncement = error.localizedDescription
             }
@@ -1936,7 +2179,7 @@ final class MainViewModel {
     /// Opens the right surface for a row: full editing for a manual event, and
     /// a details sheet limited to local state for anything Canvas owns.
     func presentEditor(for item: AssignmentListItem) {
-        if item.isManual {
+        if item.isUserOwned {
             manualEventDraft = ManualEventDraft(item: item)
             isShowingManualEditor = true
         } else {
@@ -2145,7 +2388,7 @@ final class MainViewModel {
     /// Keyboard Delete on the focused row. Only manual events can be deleted;
     /// imported ones are Canvas's to remove.
     func deletionCandidate() -> AssignmentListItem? {
-        guard let item = selectedItem, item.isManual else {
+        guard let item = selectedItem, item.isUserOwned else {
             return nil
         }
         return item
@@ -2159,14 +2402,16 @@ final class MainViewModel {
     }
 
     func deleteManualEvent(_ item: AssignmentListItem) {
-        guard item.isManual else {
+        guard item.isUserOwned else {
             return
         }
         Task {
             do {
                 try await repository.delete(id: item.id)
                 try await reloadAssignmentsAndSynchronize()
-                statusMessage = "Manual event deleted"
+                statusMessage = item.isManual
+                    ? "Manual event deleted"
+                    : "Event deleted"
             } catch {
                 present(error)
             }
@@ -2225,10 +2470,22 @@ final class MainViewModel {
     /// Persistence and anything cheap happen immediately. Notification
     /// rescheduling is debounced, because dragging through a picker or editing a
     /// reminder would otherwise rebuild every pending request on each keystroke.
-    func applySettings(_ form: SettingsFormState) {
+    /// - Parameter announce: Whether to say "Settings updated". False for the
+    ///   things that are remembered rather than set — which calendar view was
+    ///   last open, how wide the assistant was left — because a strip saying
+    ///   settings changed, every time Week is clicked, is reporting on
+    ///   something nobody thinks of as a setting, and it moved the calendar
+    ///   down and back up each time it came and went.
+    func applySettings(_ form: SettingsFormState, announce: Bool = true) {
         // The feed URL is Keychain-managed and only ever changes through the
         // preview and import flow, so the form's copy is never written back.
-        if form.launchAtLogin != LaunchAtLoginController.isEnabled {
+
+        // A change to the toggle is measured against what this app last set,
+        // not against the system. Measured against the system, a login item
+        // removed in System Settings was put straight back the next time
+        // anything here was applied — a click on Week was enough — by a
+        // toggle nobody had touched.
+        if form.launchAtLogin != settingsStore.launchAtLogin {
             do {
                 try LaunchAtLoginController.setEnabled(form.launchAtLogin)
             } catch {
@@ -2238,11 +2495,16 @@ final class MainViewModel {
             }
         }
 
+        let refreshIntervalChanged =
+            settingsStore.refreshInterval != form.refreshInterval.modelValue
         settingsStore.refreshInterval = form.refreshInterval.modelValue
         settingsStore.dockDisplayLanguage = form.dockLabel.modelValue
         settingsStore.dockCountMode = form.dockCourseScope.modelValue
         settingsStore.selectedCourses = form.selectedCourses
         settingsStore.launchAtLogin = LaunchAtLoginController.isEnabled
+        if settingsForm.launchAtLogin != settingsStore.launchAtLogin {
+            settingsForm.launchAtLogin = settingsStore.launchAtLogin
+        }
         settingsStore.calendarScale = form.calendarScale
 
         // Every deadline on screen is re-read through the policy, so the change
@@ -2272,7 +2534,14 @@ final class MainViewModel {
         }
 
         synchronizeDock()
-        startAutomaticRefreshLoop()
+        // Only when the interval itself changed. Restarting the wait on every
+        // call meant that anything passing through here — a click on Week, a
+        // drag of the assistant's divider — put the next automatic refresh a
+        // full interval away again, so an app in regular use never refreshed
+        // on its own at all.
+        if refreshIntervalChanged {
+            startAutomaticRefreshLoop()
+        }
         startCountdownTransitionLoop()
 
         if dueTimesChanged {
@@ -2290,7 +2559,7 @@ final class MainViewModel {
 
         if remindersChanged {
             scheduleDebouncedNotificationUpdate()
-        } else {
+        } else if announce {
             showTransientStatus("Settings updated")
         }
     }
@@ -2665,7 +2934,9 @@ final class MainViewModel {
         }
 
         isRefreshing = true
-        errorMessage = nil
+        if announcesResult {
+            errorMessage = nil
+        }
         defer { isRefreshing = false }
 
         do {
@@ -2674,14 +2945,61 @@ final class MainViewModel {
                 trigger: trigger
             )
             lastRefreshDate = result.refreshedAt
+            lastUnattendedRefreshFailed = false
+            refreshFailureDescription = nil
             try await reloadAssignmentsAndSynchronize()
             if announcesResult {
                 statusMessage = ImportSummary(result.importResult).message
             }
         } catch {
+            // A refresh nobody asked for does not get to interrupt anybody.
+            // One that runs at login or on waking, before the network is back,
+            // fails every time, and each failure used to put up an alert about
+            // an action the user had not taken. The header still says how old
+            // the list is, and pressing Refresh says why.
+            guard !(error is CancellationError) else {
+                return
+            }
+            // Said quietly, beside where the time of the last refresh goes,
+            // until a refresh succeeds, so a feed that has stopped working is
+            // not silently shown as the truth for days.
+            refreshFailureDescription = error.localizedDescription
+            guard announcesResult else {
+                lastUnattendedRefreshFailed = Self.isPassing(error)
+                return
+            }
             present(error)
         }
     }
+
+    /// Why the last refresh the app ran on its own failed, while it has not
+    /// succeeded since. Shown in the header with a way to try again.
+    private(set) var refreshFailureDescription: String?
+
+    /// Whether the last refresh the app ran on its own failed in a way worth
+    /// retrying soon, so the next one is tried in minutes rather than a whole
+    /// interval later.
+    @ObservationIgnored
+    private var lastUnattendedRefreshFailed = false
+
+    /// A failure the network can recover from by itself. A refused address or
+    /// a broken feed will be just as broken in five minutes, and asking again
+    /// that often would only spend the battery.
+    static func isPassing(_ error: any Error) -> Bool {
+        switch error {
+        case CanvasFeedFetchError.networkFailure:
+            true
+        case CanvasFeedFetchError.HTTPStatus(let status):
+            status == 408 || status == 429 || (500...599).contains(status)
+        default:
+            false
+        }
+    }
+
+    /// How long to wait after a refresh that failed on its own before trying
+    /// again. Long enough for a network to come back, short enough that a Mac
+    /// opened in the morning is not showing yesterday's list until lunchtime.
+    static let unattendedRefreshRetryDelay: Duration = .seconds(300)
 
     private func reloadAssignmentsAndSynchronize() async throws {
         let snapshots = try await repository.fetchAll()
@@ -2712,6 +3030,17 @@ final class MainViewModel {
         if let selectedCourse,
            !availableCourses.contains(selectedCourse) {
             self.selectedCourse = nil
+        }
+
+        // The assignment a question was about has gone, or has been finished
+        // or set aside, so the panel stops saying it is asking about it. The
+        // model is never told whether something is done — that mark stays on
+        // this Mac — so asked about finished work it could only call it late.
+        if let assistantContext,
+           !assignments.contains(where: {
+               $0.id == assistantContext.id && !$0.isCompleted && !$0.isIgnored
+           }) {
+            self.assistantContext = nil
         }
     }
 
@@ -2783,7 +3112,12 @@ final class MainViewModel {
                 guard let self else {
                     return
                 }
-                let interval = self.settingsStore.refreshInterval.duration
+                let interval = self.lastUnattendedRefreshFailed
+                    ? min(
+                        self.settingsStore.refreshInterval.duration,
+                        Self.unattendedRefreshRetryDelay
+                    )
+                    : self.settingsStore.refreshInterval.duration
                 do {
                     try await Task.sleep(for: interval)
                 } catch {
@@ -2796,6 +3130,9 @@ final class MainViewModel {
                     trigger: .automatic,
                     announcesResult: false
                 )
+                // Once a day at most, whatever the refresh interval: this is
+                // what tells a copy that is never quit about a new version.
+                await self.checkForUpdate()
             }
         }
     }

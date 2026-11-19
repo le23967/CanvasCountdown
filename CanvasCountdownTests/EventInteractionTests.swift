@@ -167,6 +167,46 @@ final class EventInteractionTests: XCTestCase {
         )
     }
 
+    /// An event read out of a screenshot is the user's to change: no refresh
+    /// will ever correct it for them. It used to open the read-only sheet
+    /// headed "From Canvas", with no way to fix a misread date or remove it.
+    func testAnEventFromAScreenshotIsEditedAndDeletedLikeOneTypedByHand() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+        let fromScreenshot = try XCTUnwrap(
+            context.viewModel.assignments.first(where: \.isFromScreenshot)
+        )
+
+        XCTAssertFalse(fromScreenshot.isManual, "It was not typed in")
+        XCTAssertTrue(fromScreenshot.isUserOwned)
+
+        context.viewModel.presentEditor(for: fromScreenshot)
+        XCTAssertTrue(context.viewModel.isShowingManualEditor)
+        XCTAssertFalse(context.viewModel.isShowingImportedDetails)
+        XCTAssertEqual(
+            context.viewModel.manualEventDraft.eventID,
+            fromScreenshot.id
+        )
+
+        context.viewModel.selectedEventID = fromScreenshot.id
+        XCTAssertEqual(
+            context.viewModel.deletionCandidate()?.id,
+            fromScreenshot.id
+        )
+    }
+
+    func testOnlyWhatTheFeedSentBelongsToCanvas() async throws {
+        let context = try makeContext()
+        await context.viewModel.start()
+
+        XCTAssertEqual(
+            context.viewModel.assignments
+                .filter { !$0.isUserOwned }
+                .map(\.title),
+            ["Imported quiz"]
+        )
+    }
+
     // MARK: - Helpers
 
     private struct Context {
@@ -191,6 +231,12 @@ final class EventInteractionTests: XCTestCase {
                     courseName: nil,
                     dueDate: due.addingTimeInterval(86_400),
                     source: .manual
+                ),
+                AssignmentSnapshot(
+                    title: "Read from a screenshot",
+                    courseName: "PHYS200",
+                    dueDate: due.addingTimeInterval(172_800),
+                    source: .screenshot
                 ),
             ]
         )

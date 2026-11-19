@@ -30,6 +30,23 @@ final class DockThemePresetTests: XCTestCase {
 
     // MARK: - Naming
 
+    func testCopyingALongNamedPresetGivesAReadableName() throws {
+        var library = DockThemePresetLibrary.empty
+        let long = "Evening gradient with a very long name"
+        XCTAssertLessThanOrEqual(long.count, DockThemePresetLibrary.maximumNameLength)
+        let id = try XCTUnwrap(
+            library.add(name: long, colours: DockAppearance.defaults.colours)
+        )
+        let original = try XCTUnwrap(library.preset(withID: id))
+
+        let name = library.availableCopyName(for: original)
+
+        XCTAssertNil(UUID(uuidString: name), "Not named after a UUID")
+        XCTAssertTrue(name.hasSuffix(" Copy"))
+        XCTAssertTrue(name.hasPrefix("Evening gradient"))
+        XCTAssertLessThanOrEqual(name.count, DockThemePresetLibrary.maximumNameLength)
+    }
+
     func testANameIsTrimmedBeforeItIsStored() {
         var library = DockThemePresetLibrary.empty
         let id = library.add(name: "   Green Gradient  ", colours: colours())

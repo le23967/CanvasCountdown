@@ -331,6 +331,68 @@ final class FeedReconciliationTests: XCTestCase {
         XCTAssertEqual(outcome.restoredCount, 0)
     }
 
+    /// The README says deselecting an event during import archives it straight
+    /// away. For an event already stored it did nothing: Canvas still
+    /// publishes what the user unticked, and "still published" was asked first.
+    func testDeselectingAStoredEventArchivesItEvenThoughCanvasStillPublishesIt() async throws {
+        let repository = try makeRepository()
+        _ = try await repository.upsert(
+            [
+                AssignmentImportRecord(
+                    externalID: "alpha@example.edu",
+                    title: "Alpha task",
+                    dueDate: day(0)
+                ),
+                AssignmentImportRecord(
+                    externalID: "beta@example.edu",
+                    title: "Beta task",
+                    dueDate: day(1)
+                ),
+            ],
+            importedAt: day(0)
+        )
+        let beta = try await repository.fetchAll()
+            .first { $0.title == "Beta task" }
+        try await repository.updateStatus(
+            id: try XCTUnwrap(beta).id,
+            isCompleted: true,
+            isIgnored: nil,
+            now: day(0)
+        )
+
+        let outcome = try await repository.reconcileCanvasFeed(
+            FeedReconciliationRequest(
+                activeExternalIDs: ["alpha@example.edu", "beta@example.edu"],
+                excludedExternalIDs: ["beta@example.edu"],
+                observedAt: day(1),
+                countsAbsentEventsAsMissing: false
+            )
+        )
+
+        XCTAssertEqual(outcome.archivedCount, 1)
+        XCTAssertEqual(outcome.confirmedCount, 1)
+        let visible = try await repository.fetchAll()
+        XCTAssertEqual(visible.map(\.title), ["Alpha task"])
+
+        // Ticked again: back, and still marked the way it was left.
+        _ = try await repository.reconcileCanvasFeed(
+            FeedReconciliationRequest(
+                activeExternalIDs: ["alpha@example.edu", "beta@example.edu"],
+                observedAt: day(2),
+                countsAbsentEventsAsMissing: false
+            )
+        )
+        let restored = try await repository.fetchAll()
+        XCTAssertEqual(
+            restored.map(\.title).sorted(),
+            ["Alpha task", "Beta task"]
+        )
+        XCTAssertEqual(
+            restored.first { $0.title == "Beta task" }?.isCompleted,
+            true
+        )
+    }
+
     // MARK: - Fixtures
 
     private var fullFeed: String {

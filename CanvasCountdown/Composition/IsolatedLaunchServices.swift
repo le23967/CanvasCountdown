@@ -29,6 +29,43 @@ actor IsolatedFeedURLStore: FeedURLStoring {
     }
 }
 
+/// Holds assistant API keys for the lifetime of the process only.
+///
+/// An isolated launch used to be given the real Keychain store. Starting up
+/// reads the key for the selected model, and the first start on fresh
+/// preferences moves the single key older versions kept onto a new model and
+/// deletes the original — so a launch that was meant to touch nothing could
+/// read a real key and, on the right machine, take it away from the app that
+/// owned it.
+actor IsolatedAssistantKeyStore: AssistantKeyStoring {
+    private var keys: [String: String] = [:]
+
+    func save(_ key: String, for profileID: UUID?) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        keys[Self.account(for: profileID)] = trimmed.isEmpty ? nil : trimmed
+    }
+
+    func load(for profileID: UUID?) -> String? {
+        keys[Self.account(for: profileID)]
+    }
+
+    func delete(for profileID: UUID?) {
+        keys[Self.account(for: profileID)] = nil
+    }
+
+    func adoptLegacyKey(as profileID: UUID) {
+        guard let legacy = keys[Self.account(for: nil)] else {
+            return
+        }
+        keys[Self.account(for: profileID)] = legacy
+        keys[Self.account(for: nil)] = nil
+    }
+
+    private static func account(for profileID: UUID?) -> String {
+        profileID?.uuidString ?? "legacy"
+    }
+}
+
 /// Fails every download attempt. An isolated launch has no feed URL to begin
 /// with, and this guarantees that no code path can reach Canvas even if one
 /// were supplied.

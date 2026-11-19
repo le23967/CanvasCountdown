@@ -106,6 +106,173 @@ final class AssistantDraftFlowTests: XCTestCase {
         )
     }
 
+    // MARK: - The same reading, in Chinese
+
+    /// Sentences shaped like the one this was reported with. Chinese has no
+    /// spaces, so it has no first word to look up: every one of these used to
+    /// be read as a question, and a sentence like the first was answered with
+    /// "I can only manage coursework deadlines" instead of being drafted.
+    func testChineseSentencesThatNameSomethingToDoAreReadAsTasks() {
+        for task in [
+            "提醒我今天下午一点洗衣服 然后晚上去超市 你来定",
+            "明天下午三点交实验报告",
+            "周五前写完读书笔记",
+            "帮我加一个任务：周三晚上健身",
+            "12月3号交论文初稿",
+            "后天上午去图书馆还书",
+            "下午一点开组会",
+            "三天后交读书报告",
+            "请帮我记一下：买牛奶",
+            "下周交期中论文",
+            "复习 quiz 2 on 26/8",
+            // Traditional characters, typed on a different keyboard.
+            "提醒我明天下午兩點開會",
+            "週五前寫完讀書筆記",
+        ] {
+            XCTAssertFalse(
+                AssistantRequestReader.readsAsQuestion(task),
+                "\(task) names something to put on the list"
+            )
+        }
+    }
+
+    func testChineseQuestionsAreStillAnswered() {
+        for question in [
+            "这周有几个作业要交",
+            "最近的截止日期是什么时候",
+            "今天有什么要交的吗",
+            "明天要交什么",
+            "我应该先做哪个",
+            "还剩多少没做",
+            "帮我总结一下这周的任务",
+            "最紧急的是哪一项",
+            "明天的作业呢",
+            "你能不能告诉我下周有什么",
+            "第3点是什么意思",
+            "這週有幾個作業要交",
+            "今天有作业吗？",
+        ] {
+            XCTAssertTrue(
+                AssistantRequestReader.readsAsQuestion(question),
+                "\(question) is a question"
+            )
+        }
+    }
+
+    /// Nothing said when and nothing asked for: answered, the same as in
+    /// English. "一点" on its own is "a little", not one o'clock.
+    func testAChineseSentenceWithNoTimeIsAnswered() {
+        for sentence in [
+            "你好",
+            "这个可以录入",
+            "这个作业有一点难",
+            "读书笔记",
+            "一日三餐",
+        ] {
+            XCTAssertTrue(
+                AssistantRequestReader.readsAsQuestion(sentence),
+                "\(sentence) names no time, so it is answered"
+            )
+        }
+    }
+
+    /// Questions asked the way Chinese most often asks them: a verb either
+    /// side of 不 or 没, or 没 at the end. And sentences that only look like
+    /// they name a day or a question.
+    func testChineseYesOrNoQuestionsAreAnswered() {
+        for question in [
+            "明天交不交作业",
+            "下周三之前来不来得及",
+            "明天的作业需不需要打印",
+            "下周三的作业多不多",
+            "今天的作业交了没",
+            "这周一共要交三个作业",
+            "明日の課題は何ですか",
+        ] {
+            XCTAssertTrue(
+                AssistantRequestReader.readsAsQuestion(question),
+                "\(question) is a question"
+            )
+        }
+    }
+
+    func testChineseTasksThatContainAQuestionAreStillTasks() {
+        for task in [
+            // "A few", not "how many".
+            "周六下午买几个本子",
+            "明天打印几份简历",
+            // A question for somebody else, as part of the task.
+            "明天问老师要不要打印报告",
+            "周五前确认是否参加比赛",
+            "明天问助教作业怎么交",
+            // A course or a report whose name starts with an asking verb.
+            "统计学作业周五交",
+            "分析化学实验报告周三交",
+            "总结报告下周一交",
+            // A term, rather than a day.
+            "期末前交论文",
+            // A request phrased politely is still a request.
+            "能不能提醒我明天交作业",
+            "提醒我周五交报告好吗",
+        ] {
+            XCTAssertFalse(
+                AssistantRequestReader.readsAsQuestion(task),
+                "\(task) names something to put on the list"
+            )
+        }
+    }
+
+    func testTheBoxSaysItWillAddATaskForASentenceLikeTheReportedOne() async throws {
+        let harness = try makeHarness()
+
+        harness.viewModel.assistantComposerInput =
+            "提醒我今天下午一点洗衣服 然后晚上去超市 你来定"
+
+        XCTAssertEqual(harness.viewModel.assistantComposerMode, .automatic)
+        XCTAssertEqual(
+            harness.viewModel.assistantComposerRole,
+            .addTask,
+            "Sent as it stands, this is drafted rather than answered"
+        )
+    }
+
+    // MARK: - A reply that arrives late
+
+    /// The drafts stay the user's while the model is thinking. A revision of a
+    /// list that was saved or thrown away in the meantime used to be written
+    /// back over the empty review, and could then be saved a second time.
+    func testARevisionThatArrivesAfterTheDraftsWereDiscardedIsDropped() async throws {
+        let harness = try makeHarness()
+        harness.viewModel.assistantComposerMode = .addTask
+        harness.viewModel.assistantComposerInput = "gym monday wednesday friday"
+        await harness.viewModel.sendComposer()
+        XCTAssertEqual(harness.viewModel.assistantDrafts.count, 2)
+
+        let viewModel = harness.viewModel
+        harness.service.revision = { drafts, _ in
+            // What the user does while the request is out.
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    viewModel.clearAssistantDrafts()
+                }
+            }
+            return drafts.map { draft in
+                var changed = draft
+                changed.courseName = "Gym"
+                return changed
+            }
+        }
+
+        await Task.detached {
+            await viewModel.reviseAssistantDrafts(with: "put them under Gym")
+        }.value
+
+        XCTAssertTrue(
+            harness.viewModel.assistantDrafts.isEmpty,
+            "Discarded drafts must not come back with a late reply"
+        )
+    }
+
     /// Automatic is a default, not a verdict. Picking a side means the sentence
     /// goes there however it reads.
     func testChoosingASideOverridesTheReading() async throws {

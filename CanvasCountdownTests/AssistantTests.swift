@@ -337,6 +337,130 @@ final class AssistantTests: XCTestCase {
 
     // MARK: - Reading the model's reply
 
+    // MARK: - Reading what models actually send
+
+    /// Asked for "2026-08-07T17:00", models send something close to it. An
+    /// exact match threw all of these away and the draft said no date was
+    /// given.
+    func testDueDatesAreReadTheWayModelsWriteThem() throws {
+        func read(_ text: String) -> DateComponents? {
+            ChatCompletionsAssistantService.dueDate(from: text, calendar: calendar)
+                .map { calendar.dateComponents([.year, .month, .day, .hour, .minute], from: $0) }
+        }
+        let expected = DateComponents(year: 2026, month: 8, day: 7, hour: 17, minute: 0)
+        for text in [
+            "2026-08-07T17:00",
+            "2026-08-07T17:00:00",
+            "2026-08-07T17:00:00Z",
+            "2026-08-07T17:00:00+10:00",
+            "2026-08-07 17:00",
+            "2026-08-07 5:00 PM",
+            "2026-08-07 5pm".replacingOccurrences(of: "5pm", with: "5:00pm"),
+            "2026/08/07 17:00",
+        ] {
+            let parts = try XCTUnwrap(read(text), text)
+            XCTAssertEqual(parts.year, expected.year, text)
+            XCTAssertEqual(parts.month, expected.month, text)
+            XCTAssertEqual(parts.day, expected.day, text)
+            XCTAssertEqual(parts.hour, expected.hour, text)
+            XCTAssertEqual(parts.minute, expected.minute, text)
+        }
+
+        XCTAssertEqual(read("2026-08-07")?.hour, 23, "A day alone is the end of it")
+        XCTAssertEqual(read("2026-08-07")?.minute, 59)
+        XCTAssertEqual(read("2026-08-07T24:00")?.hour, 23)
+        XCTAssertEqual(read("2026-08-07T12:30 a.m.")?.hour, 0)
+        XCTAssertEqual(read("2026-08-07T12:30 p.m.")?.hour, 12)
+
+        XCTAssertNil(read("2026-02-30T10:00"), "A day that does not exist")
+        XCTAssertNil(read("2026-08-07T13:00 PM"), "A clock that does not exist")
+        XCTAssertNil(read("next Friday"))
+        XCTAssertNil(read(""))
+    }
+
+    /// Told the date alone, a model has to work out that the 19th is a
+    /// Thursday before it can find "Friday", which is what they get wrong.
+    func testTheModelIsToldTheWeekdayAndTheTime() throws {
+        let thursday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 15, minute: 4))
+        )
+
+        XCTAssertEqual(
+            ChatCompletionsAssistantService.clock(at: thursday, calendar: calendar),
+            "Today is Thursday 2026-11-19 and the time is 15:04."
+        )
+    }
+
+    /// Told only that it helped with coursework, a model asked to add a
+    /// personal task refused, and said the app could not hold one.
+    func testTheModelIsNotToldTheAppOnlyKeepsCoursework() {
+        let instructions = ChatCompletionsAssistantService.answerInstructions(
+            figures: "Total upcoming: 0",
+            items: ""
+        )
+
+        XCTAssertTrue(instructions.contains("personal tasks included"))
+        XCTAssertTrue(instructions.contains("Add task"))
+        XCTAssertTrue(instructions.contains("Items:\nnone"))
+    }
+
+    // MARK: - Showing an answer
+
+    private func plain(_ reply: String) -> String {
+        String(AssistantReplyText.rendered(reply).characters)
+    }
+
+    func testMarkdownIsDrawnRatherThanSpelledOut() {
+        XCTAssertEqual(plain("Start with **the essay** first."), "Start with the essay first.")
+        XCTAssertEqual(plain("## Plan\n- Read\n- Write"), "Plan\n• Read\n• Write")
+        XCTAssertEqual(plain("我只能记录**课程作业**的截止日期。"), "我只能记录课程作业的截止日期。")
+    }
+
+    /// Nothing the model wrote is lost to the parser.
+    func testTildesProductsAndChineseBoldSurvive() {
+        XCTAssertEqual(plain("大约需要2~3小时，建议提前1~2天开始。"), "大约需要2~3小时，建议提前1~2天开始。")
+        XCTAssertEqual(plain("about 2~3 hours"), "about 2~3 hours")
+        XCTAssertEqual(plain("5*3*2 = 30"), "5*3*2 = 30")
+        XCTAssertEqual(plain("**截止时间：**明天"), "截止时间：明天")
+        XCTAssertEqual(plain("Use `a~b` as written"), "Use a~b as written")
+
+        let bold = AssistantReplyText.rendered("**截止时间：**明天")
+        let emphasised = bold.runs.filter {
+            $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true
+        }
+        XCTAssertEqual(
+            emphasised.map { String(bold[$0.range].characters) },
+            ["截止时间"]
+        )
+    }
+
+    func testOnlyWebLinksAreKept() {
+        let rendered = AssistantReplyText.rendered(
+            "[notes](https://example.com/notes) and [file](file:///etc/hosts)"
+        )
+        let links = rendered.runs.compactMap(\.link)
+        XCTAssertEqual(links.map(\.absoluteString), ["https://example.com/notes"])
+        XCTAssertEqual(String(rendered.characters), "notes and file")
+    }
+
+    func testThinkingOutLoudIsNotPartOfTheAnswer() {
+        XCTAssertEqual(
+            AssistantReplyText.withoutReasoning("<think>count them</think>Two are due."),
+            "Two are due."
+        )
+        XCTAssertEqual(
+            AssistantReplyText.withoutReasoning("count them first</think>\nTwo are due."),
+            "Two are due.",
+            "Only the closing tag, when the prompt opened it"
+        )
+        XCTAssertEqual(
+            AssistantReplyText.withoutReasoning("<think>still going"),
+            "",
+            "Cut off mid-thought, there is no answer"
+        )
+        XCTAssertEqual(AssistantReplyText.withoutReasoning("Two are due."), "Two are due.")
+    }
+
     func testWellFormedReplyBecomesDrafts() {
         let reply = """
         {"tasks":[{"title":"Essay draft","course":null,"due":"2026-08-07T17:00"}]}

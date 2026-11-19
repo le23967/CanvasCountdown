@@ -121,9 +121,15 @@ enum ScreenshotCandidateStatus: String, Equatable, Sendable {
 }
 
 /// What to do about a row that looks like something already stored.
+///
+/// There used to be a third choice, "Update existing". It was read nowhere, so
+/// choosing it added a second copy beside the first. It has not been brought
+/// back as a real update: writing a screenshot's reading over an event the user
+/// keeps, with no way to take it back, is the kind of change this app does not
+/// make on one click. Correcting the existing event is one click away instead,
+/// in its editor.
 enum DuplicateResolution: String, Equatable, Sendable, CaseIterable, Identifiable {
     case skip
-    case updateExisting
     case importSeparately
 
     var id: String { rawValue }
@@ -132,8 +138,6 @@ enum DuplicateResolution: String, Equatable, Sendable, CaseIterable, Identifiabl
         switch self {
         case .skip:
             "Skip"
-        case .updateExisting:
-            "Update existing"
         case .importSeparately:
             "Import separately"
         }

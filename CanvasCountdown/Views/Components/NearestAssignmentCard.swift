@@ -30,20 +30,23 @@ struct NearestAssignmentCard: View {
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .tracking(0.8)
+                    .lineLimit(1)
 
                 Text(item.title)
                     .font(.title2.weight(.semibold))
                     .lineLimit(2)
 
-                HStack(spacing: 8) {
-                    if let courseName = item.normalizedCourseName {
-                        Label(courseName, systemImage: "book.closed")
-                            .lineLimit(1)
+                // Side by side while they fit, one above the other when they
+                // do not. Sharing a line they could not fit on, the date
+                // wrapped a word at a time while the course was cut short.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        courseLabel
+                        dueLabel
                     }
-                    Label {
-                        Text(item.dueDate, format: .dateTime.weekday(.wide).month(.wide).day().hour().minute())
-                    } icon: {
-                        Image(systemName: "clock")
+                    VStack(alignment: .leading, spacing: 4) {
+                        courseLabel
+                        dueLabel
                     }
                 }
                 .font(.callout)
@@ -59,6 +62,23 @@ struct NearestAssignmentCard: View {
                 .stroke(.separator.opacity(0.55), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private var courseLabel: some View {
+        if let courseName = item.normalizedCourseName {
+            Label(courseName, systemImage: "book.closed")
+                .lineLimit(1)
+        }
+    }
+
+    private var dueLabel: some View {
+        Label {
+            Text(item.dueDate, format: .dateTime.weekday(.wide).month(.wide).day().hour().minute())
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: "clock")
+        }
     }
 
     private var dayLabel: String {

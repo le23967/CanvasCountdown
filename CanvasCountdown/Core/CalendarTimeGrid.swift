@@ -25,11 +25,17 @@ enum CalendarTimeGrid {
     /// Midnight means "this day" rather than "00:00", which is how Canvas
     /// writes a deadline with no time on it. Those belong in the strip above
     /// the grid, not squeezed into the first row.
+    ///
+    /// Read off the item as well as the clock. With midnight deadlines shown
+    /// as 11:59 PM, which is the default, a Canvas all-day deadline no longer
+    /// sits on midnight by the time it gets here, so judged by the clock alone
+    /// none of them ever reached the strip: they were drawn at the very
+    /// bottom of the grid instead, below the last hour and out of sight.
     static func isAllDay(
         _ item: AssignmentListItem,
         calendar: Calendar = .autoupdatingCurrent
     ) -> Bool {
-        minuteOfDay(item.dueDate, calendar: calendar) == 0
+        item.isAllDayDeadline || minuteOfDay(item.dueDate, calendar: calendar) == 0
     }
 
     static func minuteOfDay(
@@ -108,15 +114,21 @@ enum CalendarTimeGrid {
         calendar: Calendar = .autoupdatingCurrent,
         locale: Locale = .autoupdatingCurrent
     ) -> [String] {
+        // Counted out on a clock that never changes for daylight saving. On
+        // the day the clocks change, adding hours to local midnight skips an
+        // hour or repeats one, and every label after it named the wrong row.
+        var steady = calendar
+        steady.timeZone = TimeZone(secondsFromGMT: 0) ?? calendar.timeZone
+
         let formatter = DateFormatter()
-        formatter.calendar = calendar
+        formatter.calendar = steady
         formatter.locale = locale
-        formatter.timeZone = calendar.timeZone
+        formatter.timeZone = steady.timeZone
         formatter.setLocalizedDateFormatFromTemplate("j")
 
-        let reference = calendar.startOfDay(for: .now)
+        let reference = steady.startOfDay(for: .now)
         return (0..<hoursShown).map { hour in
-            guard let date = calendar.date(
+            guard let date = steady.date(
                 byAdding: .hour,
                 value: hour,
                 to: reference

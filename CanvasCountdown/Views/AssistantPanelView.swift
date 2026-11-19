@@ -36,6 +36,69 @@ enum AssistantStyle {
     static let cardCornerRadius: CGFloat = 12
 }
 
+/// One turn of the conversation.
+///
+/// Your own words sit on the right, the answer on the left, both short of the
+/// full width so the two sides are told apart at a glance. The name and the
+/// time stay: this is a record that survives a relaunch, not a scrollback.
+///
+/// A view of its own, and equatable, so that it is only worked out again when
+/// the message changes. The panel redraws on every letter typed into the box
+/// below, and an answer has its Markdown read each time it is drawn; with a
+/// long history open that would be two hundred replies re-read per keystroke.
+struct AssistantMessageBubble: View, Equatable {
+    let message: AssistantMessage
+
+    nonisolated static func == (
+        lhs: AssistantMessageBubble,
+        rhs: AssistantMessageBubble
+    ) -> Bool {
+        lhs.message == rhs.message
+    }
+
+    var body: some View {
+        let isUser = message.role == .user
+        HStack(spacing: 0) {
+            if isUser {
+                Spacer(minLength: 28)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(isUser ? "You" : "Assistant")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text(message.date.formatted(.dateTime.hour().minute()))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                // What you typed is shown as you typed it. Only an answer is
+                // read as Markdown, because only a model writes it without
+                // meaning the asterisks.
+                (isUser
+                    ? Text(message.text)
+                    : Text(AssistantReplyText.rendered(message.text)))
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(10)
+            .background(
+                AssistantStyle.messageFill(isUser: isUser),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+
+            if !isUser {
+                Spacer(minLength: 28)
+            }
+        }
+    }
+}
+
 struct AssistantPanelView: View {
     @Bindable var viewModel: MainViewModel
     let onSaveDrafts: @MainActor ([AssistantDraftTask]) async -> Void
@@ -90,9 +153,15 @@ struct AssistantPanelView: View {
                 composer
             }
         }
-        .frame(minWidth: 220)
+        .frame(minWidth: AssistantLayout.paneMinimum)
     }
 
+    /// Everything in this row keeps its own width except the note saying where
+    /// the model runs, which is the one part that can afford to shorten.
+    ///
+    /// Left to share the row evenly, the title and the badge were the ones that
+    /// gave way: "Assistant" wrapped to "As-" and "sistant" in a panel with
+    /// room to spare, and to one letter a line in a narrow one.
     private var header: some View {
         HStack(spacing: 9) {
             Image(systemName: "sparkles")
@@ -104,9 +173,13 @@ struct AssistantPanelView: View {
 
             Text("Assistant")
                 .font(.headline)
+                .lineLimit(1)
+                .fixedSize()
 
             Text("Beta")
                 .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1)
                 .background(
@@ -116,17 +189,7 @@ struct AssistantPanelView: View {
 
             Spacer(minLength: 4)
 
-            // Reads the endpoint, not the provider name, so this cannot claim
-            // privacy the configuration does not provide.
-            Label(
-                viewModel.assistantPrivacyLabel,
-                systemImage: viewModel.assistantStaysOnThisMac
-                    ? "lock.fill"
-                    : "arrow.up.right.circle.fill"
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
+            privacyBadge
 
             // Which model is in use is chosen on the composer now, beside the
             // sentence it will answer, rather than in here as well.
@@ -167,6 +230,33 @@ struct AssistantPanelView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    /// Where the model runs: written out while there is room, and as its
+    /// symbol alone when there is not.
+    ///
+    /// Reads the endpoint, not the provider name, so this cannot claim privacy
+    /// the configuration does not provide. The symbol is never dropped, and the
+    /// words stay in the tooltip and for VoiceOver, so shortening it takes
+    /// nothing away: a cut-off "Cloud ·…" said less than the arrow does.
+    private var privacyBadge: some View {
+        let symbol = viewModel.assistantStaysOnThisMac
+            ? "lock.fill"
+            : "arrow.up.right.circle.fill"
+        return ViewThatFits(in: .horizontal) {
+            Label(viewModel.assistantPrivacyLabel, systemImage: symbol)
+                .lineLimit(1)
+                .fixedSize()
+            Image(systemName: symbol)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        // Ahead of the spacer beside it, so the words are offered the whole of
+        // what is left over rather than half of it.
+        .layoutPriority(1)
+        .help(viewModel.assistantPrivacyDescription)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(viewModel.assistantPrivacyDescription)
     }
 
     /// Shown when a question is about one assignment, so the panel says what it
@@ -249,7 +339,8 @@ struct AssistantPanelView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 4)
                     }
-                    messageBubble(message)
+                    AssistantMessageBubble(message: message)
+                        .equatable()
                 }
 
                 Button("Clear conversation") {
@@ -393,45 +484,6 @@ struct AssistantPanelView: View {
         return message.date.formatted(
             .dateTime.weekday(.abbreviated).day().month(.abbreviated)
         )
-    }
-
-    /// Your own words sit on the right, the answer on the left, both short of
-    /// the full width so the two sides are told apart at a glance. The name and
-    /// the time stay: this is a record that survives a relaunch, not a
-    /// scrollback.
-    private func messageBubble(_ message: AssistantMessage) -> some View {
-        let isUser = message.role == .user
-        return HStack(spacing: 0) {
-            if isUser {
-                Spacer(minLength: 28)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(isUser ? "You" : "Assistant")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(message.date.formatted(.dateTime.hour().minute()))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer(minLength: 0)
-                }
-                Text(message.text)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(10)
-            .background(
-                AssistantStyle.messageFill(isUser: isUser),
-                in: RoundedRectangle(cornerRadius: 14)
-            )
-
-            if !isUser {
-                Spacer(minLength: 28)
-            }
-        }
     }
 
     // MARK: - Drafts waiting to be checked
@@ -707,21 +759,7 @@ struct AssistantPanelView: View {
             .onSubmit(send)
             .accessibilityLabel(composerDescription)
 
-            HStack(spacing: 6) {
-                if viewModel.assistantComposerRole == .reviseDrafts {
-                    revisingNotice
-                } else {
-                    modeChip
-                    automaticReading
-                    if viewModel.showsAssistantModelPicker {
-                        modelChip
-                    }
-                }
-
-                Spacer(minLength: 0)
-
-                sendControl
-            }
+            composerControls
         }
         .padding(10)
         .background(
@@ -744,6 +782,52 @@ struct AssistantPanelView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             isComposerFocused = true
+        }
+    }
+
+    /// The chips under the field, on one line while they fit and on two when
+    /// they do not.
+    ///
+    /// A chip is as wide as its title and no narrower, and the model's name is
+    /// whatever somebody typed. On one line, a long name made this row wider
+    /// than the panel it was in; a row cannot be squeezed, so the whole panel
+    /// was drawn at the row's width, over the list on one side and off the
+    /// window on the other. The model moves down a line before that happens.
+    @ViewBuilder
+    private var composerControls: some View {
+        if viewModel.assistantComposerRole == .reviseDrafts {
+            HStack(spacing: 6) {
+                revisingNotice
+                Spacer(minLength: 0)
+                sendControl
+            }
+        } else if viewModel.showsAssistantModelPicker {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    modeChip
+                    automaticReading
+                    modelChip
+                    Spacer(minLength: 0)
+                    sendControl
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        modeChip
+                        automaticReading
+                        Spacer(minLength: 0)
+                        sendControl
+                    }
+                    modelChip
+                }
+            }
+        } else {
+            HStack(spacing: 6) {
+                modeChip
+                automaticReading
+                Spacer(minLength: 0)
+                sendControl
+            }
         }
     }
 
@@ -771,18 +855,36 @@ struct AssistantPanelView: View {
     /// The whole safety of guessing rests on this line: it appears as soon as
     /// there is something to read, so a wrong reading is caught and the chip
     /// changed before Return is ever pressed.
+    ///
+    /// Its room is kept whether or not there is anything to say yet, and kept
+    /// at the width of the longer reading. Otherwise the first letter typed
+    /// would make the row wider, and in a panel where the chips only just fit
+    /// that is the letter that would knock the model onto a second line.
     @ViewBuilder
     private var automaticReading: some View {
-        if viewModel.assistantComposerMode == .automatic, hasTypedText {
-            Text(viewModel.assistantComposerRole == .addTask
-                ? "will add a task"
-                : "will answer")
+        if viewModel.assistantComposerMode == .automatic {
+            Text("will add a task")
+                .hidden()
+                .accessibilityHidden(true)
+                .overlay(alignment: .leading) {
+                    if hasTypedText {
+                        Text(viewModel.assistantComposerRole == .addTask
+                            ? "will add a task"
+                            : "will answer")
+                            .fixedSize()
+                            .accessibilityLabel(
+                                viewModel.assistantComposerRole == .addTask
+                                    ? "Read as a task to add"
+                                    : "Read as a question to answer"
+                            )
+                    }
+                }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .accessibilityLabel(viewModel.assistantComposerRole == .addTask
-                    ? "Read as a task to add"
-                    : "Read as a question to answer")
+                // Ahead of the spacer, so it is offered what is left of the
+                // row rather than half of it.
+                .layoutPriority(1)
         }
     }
 
@@ -833,7 +935,32 @@ struct AssistantPanelView: View {
 
     /// The toolbar's old Model button, rehoused beside the sentence it will
     /// answer. Only appears once there is more than one saved model.
+    ///
+    /// The name on it is the user's own and can be any length, and a chip
+    /// cannot shorten its own title, so the shortening is done here: the whole
+    /// name where it fits, the start of it where it does not, and the word
+    /// "Model" in a panel too narrow for either. The full name stays in the
+    /// menu and in the tooltip.
     private var modelChip: some View {
+        let name = viewModel.activeAssistantProfile?.name ?? "Model"
+        return ViewThatFits(in: .horizontal) {
+            modelMenu(titled: name)
+            modelMenu(titled: Self.shortened(name))
+            modelMenu(titled: "Model")
+        }
+    }
+
+    /// The start of a name, for a chip the whole of it will not fit on.
+    static func shortened(_ name: String, to limit: Int = 14) -> String {
+        guard name.count > limit else {
+            return name
+        }
+        return name.prefix(limit - 1).trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ) + "…"
+    }
+
+    private func modelMenu(titled title: String) -> some View {
         Menu {
             ForEach(viewModel.assistantProfiles) { profile in
                 Button {
@@ -854,7 +981,7 @@ struct AssistantPanelView: View {
                 viewModel.sidebarSelection = .settings
             }
         } label: {
-            Text(viewModel.activeAssistantProfile?.name ?? "Model")
+            Text(title)
                 .font(.caption)
                 .lineLimit(1)
         }

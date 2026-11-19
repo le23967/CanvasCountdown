@@ -80,10 +80,10 @@ actor NotificationService: NotificationScheduling {
                 guard !scheduledOffsets.contains(rule.offsetMinutes) else {
                     continue
                 }
-                guard let fireDate = calendar.date(
-                    byAdding: .minute,
-                    value: -rule.offsetMinutes,
-                    to: candidate.dueDate
+                guard let fireDate = Self.fireDate(
+                    for: rule,
+                    before: candidate.dueDate,
+                    calendar: calendar
                 ), fireDate > now else {
                     continue
                 }
@@ -152,6 +152,29 @@ actor NotificationService: NotificationScheduling {
             return
         }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
+    /// When a rule goes off for a deadline.
+    ///
+    /// A rule counted in days is counted on the calendar, not in 24-hour
+    /// blocks. Counted in minutes, "1 day before" a 23:59 deadline went off at
+    /// 22:59 or 00:59 whenever the clocks changed in between, which is twice a
+    /// year for anyone in a place that has daylight saving.
+    static func fireDate(
+        for rule: ReminderRule,
+        before dueDate: Date,
+        calendar: Calendar
+    ) -> Date? {
+        switch rule.unit {
+        case .days:
+            calendar.date(byAdding: .day, value: -rule.amount, to: dueDate)
+        case .hours:
+            calendar.date(
+                byAdding: .minute,
+                value: -rule.offsetMinutes,
+                to: dueDate
+            )
+        }
     }
 
     private static func identifier(

@@ -10,6 +10,7 @@ struct MainView: View {
     @State private var assistantWindow = AssistantWindowController()
     @State private var draggedSidebarWidth: CGFloat?
     @State private var sidebarWidthAtDragStart: CGFloat?
+    @State private var isResizeCursorPushed = false
     @State private var navigationColumnVisibility: NavigationSplitViewVisibility = .automatic
     /// Only what this view folded away is unfolded again, so a sidebar the user
     /// closed themselves stays closed.
@@ -25,13 +26,27 @@ struct MainView: View {
             .navigationSplitViewColumnWidth(min: 185, ideal: 220, max: 280)
         } detail: {
             detailWithAssistant
-                .frame(minHeight: 420)
+                // The same floor whether or not the assistant is open, so
+                // opening it never changes what the window is allowed to be
+                // and macOS is never given a reason to move the window.
+                .frame(minWidth: AssistantLayout.paneMinimum, minHeight: 420)
                 // Across the content column, not the whole window: an inset on
                 // the split view itself lays the strip over the sidebar's first
                 // row, which then reads as a rendering fault rather than a
                 // notice.
                 .safeAreaInset(edge: .top) {
                     updateBanner
+                }
+                // Here for the same reason, at the other end. Set on the split
+                // view, the strip was drawn over the last 36 points of every
+                // column instead of making room for itself: the bottom row of
+                // the list sat behind it, and so did the assistant's Send
+                // button, for as long as a message that does not time out —
+                // "Event updated", an import summary — was left showing.
+                .safeAreaInset(edge: .bottom) {
+                    if let statusMessage = viewModel.statusMessage {
+                        statusBanner(statusMessage)
+                    }
                 }
                 .animation(
                     reduceMotion ? nil : .snappy(duration: 0.22),
@@ -40,6 +55,13 @@ struct MainView: View {
         }
         .task {
             await viewModel.start()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task { await viewModel.appDidBecomeActive() }
         }
         .background(ToolbarDisplayModeConfigurator())
         .onChange(of: viewModel.assistantPresentation) { _, presentation in
@@ -101,7 +123,7 @@ struct MainView: View {
             Text(viewModel.errorMessage ?? "")
         }
         .alert(
-            "Delete manual event?",
+            "Delete this event?",
             isPresented: Binding(
                 get: { eventPendingDeletion != nil },
                 set: { visible in
@@ -121,11 +143,6 @@ struct MainView: View {
             }
         } message: { item in
             Text("“\(item.title)” will be permanently removed.")
-        }
-        .safeAreaInset(edge: .bottom) {
-            if let statusMessage = viewModel.statusMessage {
-                statusBanner(statusMessage)
-            }
         }
         // Floating, so it covers nothing and moves nothing: the list underneath
         // stays exactly where it was while the offer is up.
@@ -176,28 +193,71 @@ struct MainView: View {
     /// what keeps the window still: with nothing asking for more room, macOS has
     /// no reason to widen the window, so a tiled or split-screen window opens
     /// the assistant at the size the user left it.
+    ///
+    /// A width cut from the column is only half of it, though. A pane handed
+    /// less than its contents can be laid out in does not shrink to fit: it is
+    /// centred on the space it was given and hangs out of both sides. That put
+    /// the assistant on top of the list on one side and off the edge of the
+    /// window on the other. So neither pane is ever laid out narrower than
+    /// `AssistantLayout.paneMinimum`, both are clipped to their own room, and a
+    /// column too narrow for two of them gives the panel all of it.
     private var detailWithAssistant: some View {
         GeometryReader { proxy in
-            let panel = panelWidth(inColumnOf: proxy.size.width)
+            let panes = AssistantLayout.panes(
+                isPanelShown: isAssistantSidebarShown,
+                preferred: draggedSidebarWidth ?? viewModel.preferredSidebarWidth,
+                columnWidth: proxy.size.width,
+                dividerWidth: assistantDividerWidth
+            )
+            let dividerWidth = panes.panelCoversList ? 0 : assistantDividerWidth
+            let panelContentWidth = max(0, panes.panelWidth - dividerWidth)
 
-            HStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
                 detail
                     // Leading, so what is cut off in the very narrowest window
                     // is the trailing edge rather than both edges at once.
-                    .frame(
-                        width: max(0, proxy.size.width - panel),
-                        alignment: .leading
-                    )
+                    .frame(width: panes.listWidth, alignment: .leading)
                     .clipped()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Covered rather than removed: taking it out of the window
+                    // would throw away where it was scrolled to and anything
+                    // half-typed in Settings. Covered also means not there to
+                    // be clicked or read out.
+                    .opacity(panes.panelCoversList ? 0 : 1)
+                    .allowsHitTesting(!panes.panelCoversList)
+                    .accessibilityHidden(panes.panelCoversList)
+                    // Nor there to be typed at: a row that kept keyboard
+                    // focus could still be opened with Return, or offered for
+                    // deletion with Delete, without being seen.
+                    .disabled(panes.panelCoversList)
 
                 if isAssistantSidebarShown {
-                    assistantResizeDivider
-                    assistantPanel
-                        .frame(width: max(0, panel - assistantDividerWidth))
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    HStack(spacing: 0) {
+                        if !panes.panelCoversList {
+                            assistantResizeDivider
+                        }
+                        VStack(spacing: 0) {
+                            if panes.panelCoversList {
+                                backToListBar
+                            }
+                            assistantPanel
+                        }
+                        .frame(
+                            width: max(
+                                panelContentWidth,
+                                AssistantLayout.paneMinimum
+                            ),
+                            alignment: .leading
+                        )
+                        .frame(width: panelContentWidth, alignment: .leading)
+                        .clipped()
+                    }
+                    .frame(width: panes.panelWidth, alignment: .leading)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
             .animation(
                 reduceMotion ? nil : .snappy(duration: 0.22),
                 value: isAssistantSidebarShown
@@ -237,17 +297,35 @@ struct MainView: View {
 
     private var assistantDividerWidth: CGFloat { 1 }
 
-    /// What the panel and its divider take from the column, which is never more
-    /// than the column has. Nothing is asked of the window.
-    private func panelWidth(inColumnOf columnWidth: CGFloat) -> CGFloat {
-        guard isAssistantSidebarShown else {
-            return 0
+    /// The way back, written out, for when the panel has the column to itself.
+    ///
+    /// With the list covered, the only other things that close the panel are a
+    /// small cross and a toolbar button that a window this narrow has usually
+    /// pushed into the overflow menu. Neither says that the list is still
+    /// there. This names the page underneath and goes back to it.
+    private var backToListBar: some View {
+        let section = (viewModel.sidebarSelection ?? .upcoming).title
+        return HStack(spacing: 0) {
+            Button {
+                viewModel.closeAssistant()
+            } label: {
+                Label(section, systemImage: "chevron.left")
+                    .font(.callout)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tint)
+            .help("Close the assistant and go back to \(section). The window is too narrow to show both side by side.")
+            .accessibilityLabel("Back to \(section)")
+
+            Spacer(minLength: 0)
         }
-        let fitted = AssistantLayout.fittedSidebarWidth(
-            preferred: draggedSidebarWidth ?? viewModel.preferredSidebarWidth,
-            availableWidth: columnWidth
-        )
-        return min(columnWidth, fitted + assistantDividerWidth)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(.bar)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
     }
 
     /// Replaces the drag handle the inspector used to provide. The width is only
@@ -260,10 +338,23 @@ struct MainView: View {
                     .frame(width: 10)
                     .contentShape(Rectangle())
                     .onHover { isInside in
-                        if isInside {
+                        // Tracked, because the handle can go away while the
+                        // pointer is still on it — the panel is closed from
+                        // the keyboard, or the window narrows until the panel
+                        // covers the list — and a cursor pushed without its
+                        // pop stays a resize arrow over the whole window.
+                        if isInside, !isResizeCursorPushed {
                             NSCursor.resizeLeftRight.push()
-                        } else {
+                            isResizeCursorPushed = true
+                        } else if !isInside, isResizeCursorPushed {
                             NSCursor.pop()
+                            isResizeCursorPushed = false
+                        }
+                    }
+                    .onDisappear {
+                        if isResizeCursorPushed {
+                            NSCursor.pop()
+                            isResizeCursorPushed = false
                         }
                     }
                     .gesture(
@@ -299,6 +390,7 @@ struct MainView: View {
                 settings: $viewModel.settingsForm,
                 availableCourses: viewModel.availableCourses,
                 notificationPermission: viewModel.notificationPermission,
+                hasConfiguredFeed: viewModel.hasConfiguredFeed,
                 onConnectFeed: { value in
                     viewModel.presentFeedImport(initialURL: value)
                 },
@@ -382,7 +474,8 @@ struct MainView: View {
                     delete: { viewModel.deleteAssistantProfile($0) },
                     useService: { viewModel.useAssistantService($0) }
                 ),
-                assistantAPIKey: viewModel.assistantAPIKey,
+                assistantAPIKey: viewModel.assistantKeyForCurrentAddress ?? "",
+                assistantKeyNote: viewModel.assistantKeyNote,
                 onSaveAssistantKey: { key in
                     viewModel.saveAssistantKey(key)
                 },
@@ -441,12 +534,26 @@ struct MainView: View {
                     if (viewModel.sidebarSelection ?? .upcoming) == .calendar {
                         compactNextDeadline(nearest)
                     } else {
-                        NearestAssignmentCard(
-                            item: nearest,
-                            now: viewModel.currentDate
-                        )
-                            .padding(.horizontal, 22)
-                            .padding(.bottom, 14)
+                        // The card needs room for its count, its title and a
+                        // date on one line. In a column narrower than that it
+                        // folded its text a few letters to a line and grew
+                        // tall enough to push the list off the window, so
+                        // there it becomes the one-line version instead.
+                        ViewThatFits(in: .horizontal) {
+                            NearestAssignmentCard(
+                                item: nearest,
+                                now: viewModel.currentDate
+                            )
+                                .frame(
+                                    minWidth: 420,
+                                    idealWidth: 420,
+                                    maxWidth: .infinity
+                                )
+                                .padding(.horizontal, 22)
+                                .padding(.bottom, 14)
+
+                            compactNextDeadline(nearest)
+                        }
                     }
                 }
 
@@ -648,12 +755,15 @@ struct MainView: View {
     }
 
     private func compactNextDeadline(_ item: AssignmentListItem) -> some View {
-        HStack(spacing: 8) {
-            Text("\(item.remainingDays(relativeTo: viewModel.currentDate))")
+        let days = item.remainingDays(relativeTo: viewModel.currentDate)
+        return HStack(spacing: 8) {
+            Text("\(days)")
                 .font(.title3.weight(.bold))
                 .monospacedDigit()
-            Text("days left")
+            Text(days == 1 ? "day left" : "days left")
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
             Text("·")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
@@ -666,44 +776,103 @@ struct MainView: View {
         .padding(.bottom, 12)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Next deadline, \(item.title), \(item.remainingDays(relativeTo: viewModel.currentDate)) days left"
+            days == 1
+                ? "Next deadline, \(item.title), 1 day left"
+                : "Next deadline, \(item.title), \(days) days left"
         )
     }
 
+    /// The title with when the list was last refreshed beside it, or under it
+    /// when the column is too narrow to hold both on a line.
+    ///
+    /// They used to share one row whatever the width. Squeezed, the row gave
+    /// the title whatever was left over and the title wrapped to fit, down to
+    /// "Can-", "vas", "Coun", "tdow", "n". The title stays on one line now and
+    /// gets smaller before it is cut short.
     private var dashboardHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Canvas Countdown")
-                    .font(.largeTitle.weight(.semibold))
-                Text((viewModel.sidebarSelection ?? .upcoming).title)
-                    .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                dashboardTitle
+                Spacer(minLength: 12)
+                refreshStatus
             }
 
-            Spacer()
-
-            if viewModel.isRefreshing {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityLabel("Refreshing Canvas calendar")
-            } else if let lastRefreshDate = viewModel.lastRefreshDate {
-                Text("Updated \(lastRefreshDate, format: .relative(presentation: .named))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel(
-                        "Last updated \(lastRefreshDate.formatted(date: .abbreviated, time: .shortened))"
-                    )
+            VStack(alignment: .leading, spacing: 4) {
+                dashboardTitle
+                refreshStatus
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 22)
         .padding(.top, 18)
         .padding(.bottom, 16)
     }
 
+    private var dashboardTitle: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Canvas Countdown")
+                .font(.largeTitle.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text((viewModel.sidebarSelection ?? .upcoming).title)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder
+    private var refreshStatus: some View {
+        if viewModel.isRefreshing {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Refreshing Canvas calendar")
+        } else if let failure = viewModel.refreshFailureDescription {
+            // A refresh the app ran by itself no longer interrupts with an
+            // alert, so it says here that the list may be out of date, and
+            // why on hover.
+            HStack(spacing: 6) {
+                Label("Couldn’t refresh", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .lineLimit(1)
+                    .help(failure)
+                Button("Try Again") {
+                    viewModel.refreshManually()
+                }
+                .buttonStyle(.link)
+                .font(.caption)
+                .fixedSize()
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Couldn’t refresh the Canvas calendar. \(failure)")
+        } else if let lastRefreshDate = viewModel.lastRefreshDate {
+            // Worked out again every minute. Written once, "Updated 2 minutes
+            // ago" went on saying so for as long as the window stayed open.
+            TimelineView(.everyMinute) { _ in
+                Text("Updated \(lastRefreshDate, format: .relative(presentation: .named))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .accessibilityLabel(
+                        "Last updated \(lastRefreshDate.formatted(date: .abbreviated, time: .shortened))"
+                    )
+            }
+        }
+    }
+
     @ViewBuilder
     private var assignmentList: some View {
         if viewModel.filteredAssignments.isEmpty {
-            emptyState
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Measured here because the empty state cannot measure itself: it
+            // offers its buttons a fixed reading width whatever the column is,
+            // so nothing inside it can tell a wide column from a narrow one.
+            GeometryReader { proxy in
+                emptyState(
+                    stackingActions: proxy.size.width
+                        < Self.widthForEmptyStateActionsInARow
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+            }
         } else {
             List(
                 viewModel.filteredAssignments,
@@ -752,7 +921,7 @@ struct MainView: View {
                     eventActions(for: item)
                 }
                 .accessibilityHint(
-                    item.isManual
+                    item.isUserOwned
                         ? "Opens the event editor"
                         : "Opens details for this Canvas assignment"
                 )
@@ -775,8 +944,16 @@ struct MainView: View {
         }
     }
 
+    /// What a column has to be before three buttons fit across it.
+    ///
+    /// The empty state gives each of its buttons the width of the longest
+    /// title and sets them side by side, 525 points in all, without asking
+    /// whether there is room. In a narrower column the row ran off both sides
+    /// and the first and last buttons were cut in half.
+    private static let widthForEmptyStateActionsInARow: CGFloat = 560
+
     @ViewBuilder
-    private var emptyState: some View {
+    private func emptyState(stackingActions: Bool) -> some View {
         if viewModel.selectedCourse != nil {
             ContentUnavailableView(
                 "No events in this course",
@@ -798,20 +975,14 @@ struct MainView: View {
                             : "Connect a Canvas calendar feed or add a manual event."
                     )
                 } actions: {
-                    if viewModel.hasConfiguredFeed {
-                        Button("Refresh Now") {
-                            viewModel.refreshManually()
+                    // In a row while they fit, and one above the other when
+                    // they do not.
+                    if stackingActions {
+                        VStack(spacing: 8) {
+                            emptyStateActions
                         }
                     } else {
-                        Button("Connect Canvas…") {
-                            viewModel.presentFeedImport(onboarding: true)
-                        }
-                    }
-                    Button("Add Manual Event") {
-                        viewModel.presentNewManualEvent()
-                    }
-                    Button("Import from Screenshot…") {
-                        viewModel.presentScreenshotImport()
+                        emptyStateActions
                     }
                 }
             case .allEvents, .calendar:
@@ -829,6 +1000,25 @@ struct MainView: View {
             case .settings:
                 EmptyView()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStateActions: some View {
+        if viewModel.hasConfiguredFeed {
+            Button("Refresh Now") {
+                viewModel.refreshManually()
+            }
+        } else {
+            Button("Connect Canvas…") {
+                viewModel.presentFeedImport(onboarding: true)
+            }
+        }
+        Button("Add Manual Event") {
+            viewModel.presentNewManualEvent()
+        }
+        Button("Import from Screenshot…") {
+            viewModel.presentScreenshotImport()
         }
     }
 
@@ -908,10 +1098,15 @@ struct MainView: View {
             )
         }
 
-        Button {
-            viewModel.openAssistant(about: item)
-        } label: {
-            Label("Ask the Assistant…", systemImage: "sparkles")
+        // Not for finished or ignored work. Whether something is done is
+        // never sent to the model, so asked about it, all it could say is
+        // that it was late.
+        if !item.isCompleted, !item.isIgnored {
+            Button {
+                viewModel.openAssistant(about: item)
+            } label: {
+                Label("Ask the Assistant…", systemImage: "sparkles")
+            }
         }
 
         Button {
@@ -930,10 +1125,10 @@ struct MainView: View {
         Button {
             viewModel.presentEditor(for: item)
         } label: {
-            Label(item.isManual ? "Edit…" : "Details…", systemImage: "pencil")
+            Label(item.isUserOwned ? "Edit…" : "Details…", systemImage: "pencil")
         }
 
-        if item.isManual {
+        if item.isUserOwned {
 
             Button(role: .destructive) {
                 eventPendingDeletion = item

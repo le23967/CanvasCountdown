@@ -61,8 +61,13 @@ struct CalendarMonthGrid: View {
 
         return VStack(alignment: .leading, spacing: 3) {
             HStack {
+                // One line, always. Given less room than "10" needs, the number
+                // used to wrap a digit to a line in narrow columns.
                 Text("\(day.dayNumber)")
                     .font(.caption.weight(day.isToday ? .bold : .regular))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(dayNumberStyle(day))
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -76,18 +81,23 @@ struct CalendarMonthGrid: View {
 
             // Two entries fit comfortably; the rest are counted so the row
             // height stays even across the month.
+            // A line each. The chip's colour bar takes any height it is
+            // offered, so a day with one deadline drew it as a tall block.
             ForEach(day.items.prefix(2)) { item in
                 CalendarEventChip(
                     item: item,
                     labelColor: label(item).map { Color(nsColor: $0.color) },
                     isCompact: true
                 )
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             if day.items.count > 2 {
                 Text("+\(day.items.count - 2) more")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .padding(.horizontal, 4)
             }
 
@@ -96,6 +106,8 @@ struct CalendarMonthGrid: View {
         .padding(4)
         .frame(minHeight: 62, idealHeight: 86, maxHeight: 96, alignment: .topLeading)
         .frame(maxWidth: .infinity)
+        // Nothing in a day is drawn over the day beside it.
+        .clipped()
         .background(day.isInDisplayedMonth ? Color.clear : Color.secondary.opacity(0.05))
         .overlay {
             RoundedRectangle(cornerRadius: 4)

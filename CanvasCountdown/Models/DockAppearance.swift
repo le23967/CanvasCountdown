@@ -138,7 +138,12 @@ enum DockThemePreset: String, Codable, CaseIterable, Identifiable, Sendable {
 /// Everything the user can choose about how the Dock tile looks.
 struct DockAppearance: Equatable, Codable, Sendable {
     struct Colours: Equatable, Codable, Sendable {
+        /// Drawn at the foot of the tile, whatever the name says. The renderer
+        /// has drawn it there since the first version, in the Dock, in the
+        /// preview and in the app icon, so the names are kept as they are
+        /// stored and the controls are labelled by where each one appears.
         var backgroundTop: String
+        /// Drawn at the head of the tile, behind the header label.
         var backgroundBottom: String
         var number: String
         var label: String

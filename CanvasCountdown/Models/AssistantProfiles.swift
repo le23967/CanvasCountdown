@@ -16,19 +16,30 @@ struct AssistantProfile: Identifiable, Equatable, Codable, Sendable {
     var provider: AssistantProvider
     var baseURL: String
     var model: String
+    /// The host this profile's API key was saved for, if it has one.
+    ///
+    /// A key is a secret shared with one service. The address beside it can be
+    /// changed in a click — the suggested services under the field rewrite it —
+    /// and a key that simply followed the profile would then be sent, on the
+    /// very next question, to whichever host the address now names. Recording
+    /// where the key belongs is what lets the app keep it to that host. The
+    /// key itself still lives only in Keychain.
+    var keyHost: String?
 
     init(
         id: UUID = UUID(),
         name: String,
         provider: AssistantProvider,
         baseURL: String,
-        model: String
+        model: String,
+        keyHost: String? = nil
     ) {
         self.id = id
         self.name = name
         self.provider = provider
         self.baseURL = baseURL
         self.model = model
+        self.keyHost = keyHost
     }
 
     /// A profile pointed at one of the known services, ready to name.
@@ -171,19 +182,22 @@ struct AssistantProfileLibrary: Equatable, Codable, Sendable {
 
     /// "Groq" becomes "Groq 2", then "Groq 3", so adding the same service twice
     /// does not fail on the name.
+    ///
+    /// Shortened first where it has to be, so a long name still leaves room
+    /// for its number rather than every candidate being refused as too long
+    /// and the model ending up named after a UUID.
     func availableName(startingFrom base: String) -> String {
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
         let seed = trimmed.isEmpty ? "Model" : trimmed
-        if validate(name: seed) == nil {
-            return seed
-        }
-        for suffix in 2...99 {
-            let candidate = "\(seed) \(suffix)"
+        for suffix in [""] + (2...99).map({ " \($0)" }) {
+            let stem = String(seed.prefix(Self.maximumNameLength - suffix.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let candidate = stem + suffix
             if validate(name: candidate) == nil {
                 return candidate
             }
         }
-        return UUID().uuidString
+        return String(UUID().uuidString.prefix(Self.maximumNameLength))
     }
 
     // MARK: - Changing the library
@@ -217,6 +231,13 @@ struct AssistantProfileLibrary: Equatable, Codable, Sendable {
     }
 
     /// Writes the live address and model back over a saved profile.
+    ///
+    /// Not an address that could not be used. The fields are written through
+    /// on every keystroke, so a half-typed address used to be saved as it
+    /// stood; reading the library back drops anything unusable, which meant
+    /// quitting with "api.example.com/v1" in the field — no scheme, so no
+    /// host — deleted the profile and left its key in Keychain with nothing
+    /// pointing at it. The profile keeps its last good address instead.
     @discardableResult
     mutating func update(
         _ id: UUID,
@@ -227,10 +248,42 @@ struct AssistantProfileLibrary: Equatable, Codable, Sendable {
         guard let index = profiles.firstIndex(where: { $0.id == id }) else {
             return false
         }
-        profiles[index].provider = provider
-        profiles[index].baseURL = baseURL
-        profiles[index].model = model
+        var updated = profiles[index]
+        updated.provider = provider
+        updated.baseURL = baseURL
+        updated.model = model
+        guard Self.isUsable(updated) else {
+            return false
+        }
+        profiles[index] = updated
         return true
+    }
+
+    /// Records which host a profile's key belongs to, or that it has none.
+    @discardableResult
+    mutating func setKeyHost(_ host: String?, for id: UUID) -> Bool {
+        guard let index = profiles.firstIndex(where: { $0.id == id }),
+              profiles[index].keyHost != host else {
+            return false
+        }
+        profiles[index].keyHost = host
+        return true
+    }
+
+    /// "Groq" becomes "Groq Copy", then "Groq Copy 2", shortening the
+    /// original first where it has to so that " Copy" always fits.
+    func availableCopyName(for name: String) -> String {
+        let base = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        for suffix in [""] + (2...99).map({ " \($0)" }) {
+            let ending = " Copy" + suffix
+            let stem = String(base.prefix(Self.maximumNameLength - ending.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let candidate = stem + ending
+            if validate(name: candidate) == nil {
+                return candidate
+            }
+        }
+        return String(UUID().uuidString.prefix(Self.maximumNameLength))
     }
 
     @discardableResult
@@ -240,7 +293,7 @@ struct AssistantProfileLibrary: Equatable, Codable, Sendable {
         }
         return add(
             AssistantProfile(
-                name: availableName(startingFrom: "\(existing.name) Copy"),
+                name: availableCopyName(for: existing.name),
                 provider: existing.provider,
                 baseURL: existing.baseURL,
                 model: existing.model

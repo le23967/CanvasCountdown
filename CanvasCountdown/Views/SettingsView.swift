@@ -26,6 +26,9 @@ struct SettingsView: View {
 
     let availableCourses: [String]
     let notificationPermission: NotificationPermissionState
+    /// Whether a feed is stored, which is not the same as whether the field
+    /// below has text in it: the field is only a draft until it is previewed.
+    var hasConfiguredFeed = false
     let onConnectFeed: (String) -> Void
     let onRemoveFeed: @MainActor () async throws -> Void
     let onRequestNotificationPermission: @MainActor () async throws -> Bool
@@ -46,6 +49,8 @@ struct SettingsView: View {
     let courses: CourseManagementActions
     let assistant: AssistantProfileActions
     let assistantAPIKey: String
+    /// Why the key field is empty for a model that has a key, when it does.
+    var assistantKeyNote: String? = nil
     let onSaveAssistantKey: @MainActor (String) -> Void
     let models: LocalModelPresentation
     let updates: UpdatePresentation
@@ -86,7 +91,15 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         // Every control writes straight through: there is no save step.
-        .onChange(of: settings) { _, updated in
+        .onChange(of: settings) { previous, updated in
+            // The feed address typed here is a draft: it only becomes the
+            // feed through Preview. Typing in it is not a change to anything
+            // stored, and used to announce "Settings updated" on every letter.
+            var ignoringTheDraft = previous
+            ignoringTheDraft.feedURL = updated.feedURL
+            guard ignoringTheDraft != updated else {
+                return
+            }
             onSettingsChanged(updated)
         }
         .safeAreaInset(edge: .bottom) {
@@ -169,13 +182,17 @@ struct SettingsView: View {
                 .accessibilityLabel(revealFeedURL ? "Hide feed URL" : "Reveal feed URL")
             }
 
+            // Read off the stored feed, not the field. Clearing the field used
+            // to make Remove Feed disappear while the feed went on refreshing,
+            // and typing into an empty one offered to remove a feed that did
+            // not exist.
             HStack {
-                Button(settings.feedURL.isEmpty ? "Connect Feed…" : "Preview & Update…") {
+                Button(hasConfiguredFeed ? "Preview & Update…" : "Connect Feed…") {
                     onConnectFeed(settings.feedURL)
                 }
                 .disabled(settings.feedURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                if !settings.feedURL.isEmpty {
+                if hasConfiguredFeed {
                     Button("Remove Feed", role: .destructive) {
                         showRemoveFeedConfirmation = true
                     }
@@ -381,14 +398,20 @@ struct SettingsView: View {
 
             DockThemeRow(actions: dockThemes)
 
+            // Named for where each colour is drawn. The tile has always put
+            // `backgroundTop` at its foot and `backgroundBottom` at its head —
+            // the Dock, the preview above and the app icon all agree, and it
+            // is what everyone's Dock already looks like — but these two were
+            // labelled by the stored names, so the colour picked for the top
+            // appeared at the bottom.
             ColorPicker(
                 "Background top",
-                selection: hexBinding(\.backgroundTop),
+                selection: hexBinding(\.backgroundBottom),
                 supportsOpacity: false
             )
             ColorPicker(
                 "Background bottom",
-                selection: hexBinding(\.backgroundBottom),
+                selection: hexBinding(\.backgroundTop),
                 supportsOpacity: false
             )
             ColorPicker(
@@ -627,7 +650,7 @@ struct SettingsView: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
-                        .help("Remove this course and everything in it")
+                        .help("Remove this course and everything the Canvas feed sent for it")
                         .accessibilityLabel("Remove \(course.name)")
                     }
                 }
@@ -654,7 +677,7 @@ struct SettingsView: View {
         } header: {
             Text("Courses")
         } footer: {
-            Text("Removing a course permanently deletes its events on this Mac and stops the Canvas feed from importing it again. Manual events are never touched. Allowing a course again brings it back on the next refresh.")
+            Text("Removing a course permanently deletes its Canvas feed events on this Mac and stops the feed from importing it again. Events you added yourself, by hand or from a screenshot, are never touched. Allowing a course again brings back what Canvas still publishes on the next refresh.")
         }
         .alert(
             "Remove this course?",
@@ -676,7 +699,7 @@ struct SettingsView: View {
                 coursePendingRemoval = nil
             }
         } message: { course in
-            Text("“\(course.name)” and its \(course.eventCountDescription) will be deleted from this Mac, and the Canvas feed will stop importing it. You can allow it again later.")
+            Text(course.removalMessage)
         }
     }
 
@@ -787,6 +810,16 @@ struct SettingsView: View {
                         .disabled(apiKeyDraft == assistantAPIKey)
                     }
 
+                    if let assistantKeyNote {
+                        Label(
+                            assistantKeyNote,
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     Label(
                         "Each model keeps its own key in the macOS Keychain, never in preferences or diagnostics.",
                         systemImage: "lock.fill"
@@ -798,7 +831,7 @@ struct SettingsView: View {
         } header: {
             Text("AI Assistant (optional)")
         } footer: {
-            Text("Off by default. It can summarise your workload and turn a sentence into a task, and anything it proposes is reviewed by you before it is saved. It never changes an event on its own.")
+            Text("It can summarise your workload and turn a sentence into a task, and anything it proposes is reviewed by you before it is saved. It never changes an event on its own. Until you choose a hosted model it runs on this Mac and uploads nothing.")
         }
         .onAppear {
             apiKeyDraft = assistantAPIKey
@@ -809,6 +842,13 @@ struct SettingsView: View {
         // what this field is showing.
         .onChange(of: assistantAPIKey) { _, key in
             apiKeyDraft = key
+        }
+        // Also when the model changes and the stored key happens not to: two
+        // models with no key yet look the same from here, and a key typed for
+        // the first and not saved would otherwise still be in the field, one
+        // click from being saved as the second one's.
+        .onChange(of: assistant.activeID) { _, _ in
+            apiKeyDraft = assistantAPIKey
         }
     }
 

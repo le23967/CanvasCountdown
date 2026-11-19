@@ -153,6 +153,126 @@ final class CourseManagementTests: XCTestCase {
         XCTAssertEqual(remaining.count, 1)
     }
 
+    /// Settings says manual events are never touched, and allowing a course
+    /// again cannot bring one back, so removing a course has to leave them.
+    func testDeletingACourseLeavesWhatWasTypedInByHand() async throws {
+        let repository = try makeRepository()
+        _ = try await repository.saveManual(
+            ManualAssignmentDraft(
+                title: "Study group",
+                courseName: "PHYS200",
+                dueDate: date(2026, 8, 6)
+            ),
+            now: date(2026, 7, 31)
+        )
+        _ = try await repository.upsert(
+            [record("Lab report", course: "PHYS200", day: 20)],
+            importedAt: date(2026, 7, 31)
+        )
+
+        let removed = try await repository.deleteEvents(inCourse: "PHYS200")
+
+        XCTAssertEqual(removed, 1, "Only the imported event is counted as removed")
+        let remaining = try await repository.fetchAll(includingArchived: true)
+        XCTAssertEqual(remaining.map(\.title), ["Study group"])
+    }
+
+    /// An event read from a screenshot is the user's own too: allowing the
+    /// course again could never bring it back.
+    func testDeletingACourseLeavesWhatCameFromAScreenshot() async throws {
+        let repository = try makeRepository()
+        _ = try await repository.upsert(
+            [
+                record("Lab report", course: "PHYS200", day: 20),
+                AssignmentImportRecord(
+                    externalID: "screenshot|quiz|phys200|1",
+                    title: "Quiz from a screenshot",
+                    courseName: "PHYS200",
+                    dueDate: date(2026, 8, 21),
+                    source: .screenshot
+                ),
+            ],
+            importedAt: date(2026, 7, 31)
+        )
+
+        let removed = try await repository.deleteEvents(inCourse: "PHYS200")
+
+        XCTAssertEqual(removed, 1)
+        let remaining = try await repository.fetchAll(includingArchived: true)
+        XCTAssertEqual(remaining.map(\.title), ["Quiz from a screenshot"])
+    }
+
+    @MainActor
+    func testARemovedCourseIsListedOnceUnderRemoved() async throws {
+        let harness = try makeViewModelHarness()
+        await harness.viewModel.start()
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(
+                title: "Study group",
+                courseName: "PHYS200",
+                dueDate: date(2026, 8, 6)
+            )
+        )
+
+        harness.viewModel.removeCourse("PHYS200")
+        try await Task.sleep(for: .milliseconds(150))
+
+        XCTAssertEqual(harness.viewModel.blockedCourses, ["PHYS200"])
+        XCTAssertFalse(
+            harness.viewModel.managedCourses.contains { $0.name == "PHYS200" },
+            "Not offered for removal a second time"
+        )
+    }
+
+    @MainActor
+    func testTheConfirmationCountsOnlyWhatWillGo() async throws {
+        let harness = try makeViewModelHarness()
+        await harness.viewModel.start()
+        try await harness.viewModel.saveManualEvent(
+            ManualEventDraft(
+                title: "Study group",
+                courseName: "PHYS200",
+                dueDate: date(2026, 8, 6)
+            )
+        )
+
+        let course = try XCTUnwrap(
+            harness.viewModel.managedCourses.first { $0.name == "PHYS200" }
+        )
+        XCTAssertEqual(course.eventCount, 2)
+        XCTAssertEqual(course.importedEventCount, 1)
+        XCTAssertEqual(
+            course.removalMessage,
+            "The 1 event from the Canvas feed for “PHYS200” will be deleted from this Mac, and the Canvas feed will stop importing it. The 1 event you added yourself stays. You can allow it again later."
+        )
+
+        harness.viewModel.removeCourse("PHYS200")
+        try await Task.sleep(for: .milliseconds(150))
+
+        XCTAssertEqual(
+            harness.viewModel.assignments
+                .filter { $0.normalizedCourseName == "PHYS200" }
+                .map(\.title),
+            ["Study group"],
+            "What was typed in by hand is still there after the course is removed"
+        )
+    }
+
+    func testACourseWithNothingTypedInIsDescribedAsBefore() {
+        XCTAssertEqual(
+            ManagedCourse(name: "PHYS200", eventCount: 3).removalMessage,
+            "“PHYS200” and its 3 events will be deleted from this Mac, and the Canvas feed will stop importing it. You can allow it again later."
+        )
+        XCTAssertEqual(
+            ManagedCourse(
+                name: "PHYS200",
+                eventCount: 4,
+                importedEventCount: 1
+            ).removalMessage,
+            "The 1 event from the Canvas feed for “PHYS200” will be deleted from this Mac, and the Canvas feed will stop importing it. The 3 events you added yourself stay. You can allow it again later."
+        )
+    }
+
     // MARK: - The refresh has to respect it
 
     func testARefreshDoesNotBringABlockedCourseBack() async throws {

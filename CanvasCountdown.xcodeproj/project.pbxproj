@@ -96,6 +96,7 @@
 		C9AC8533F40AEA60491EDF0D /* CountdownCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D022A0B3B11D5F806507BF /* CountdownCalculator.swift */; };
 		CA46E10EBC54D5D851128060 /* LocalModelManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A8C5482738CA906A45CAAE /* LocalModelManagerTests.swift */; };
 		D5337014D3F5010F4BEAA3F8 /* AppRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B61F68418DCF8283A0A887 /* AppRelease.swift */; };
+		D7C31AC92E6FCB948BE921D0 /* AssistantReplyText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2FDC804BE31169C6ADDEBFC /* AssistantReplyText.swift */; };
 		D819A504296ACA82DC7FCA12 /* CanvasDateTextParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA416AAC321EE7477CE225B0 /* CanvasDateTextParserTests.swift */; };
 		D88CBFBD1048289F3BCC5147 /* ImmediateSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313BE752B7E3E167E9DF44FA /* ImmediateSettingsTests.swift */; };
 		DBA66166C20757BECB573252 /* DockDigitSpacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751AAF71611CC0CABC565638 /* DockDigitSpacingTests.swift */; };
@@ -243,6 +244,7 @@
 		E130BED4C512B79DB8354236 /* CalendarEventChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventChip.swift; sourceTree = "<group>"; };
 		E1D49100D1712E153967086D /* CourseManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseManagementTests.swift; sourceTree = "<group>"; };
 		E26F90425C17FF762BF4D06E /* UserNotifications.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UserNotifications.framework; path = System/Library/Frameworks/UserNotifications.framework; sourceTree = SDKROOT; };
+		E2FDC804BE31169C6ADDEBFC /* AssistantReplyText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantReplyText.swift; sourceTree = "<group>"; };
 		E3424A6AD7F8175A023FEB3D /* UpdatePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatePresentation.swift; sourceTree = "<group>"; };
 		E3474D2B160F43F1020069F1 /* DueTimePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DueTimePolicyTests.swift; sourceTree = "<group>"; };
 		E47C5C6D34C043144DD73CE5 /* UpdateDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDownloader.swift; sourceTree = "<group>"; };
@@ -361,6 +363,7 @@
 				58B0151CB4CE887D1FC7EDAA /* AssistantConversationLog.swift */,
 				67437A424E5302E6D524E523 /* AssistantPresentation.swift */,
 				385E74FD3C210D49163658B2 /* AssistantProfiles.swift */,
+				E2FDC804BE31169C6ADDEBFC /* AssistantReplyText.swift */,
 				9378FB9D226843FABE519F96 /* AssistantSaveSummary.swift */,
 				BB0100C0F5D51B82DE990269 /* AssistantSettings.swift */,
 				354D08732371A4156B46E57D /* DockAppearance.swift */,
@@ -692,6 +695,7 @@
 				848D9224180F580C027E38FB /* AssistantPresentation.swift in Sources */,
 				B017797EC0B2E19F5C36430C /* AssistantProfileViews.swift in Sources */,
 				BAA4E2505C78EE47739D2E12 /* AssistantProfiles.swift in Sources */,
+				D7C31AC92E6FCB948BE921D0 /* AssistantReplyText.swift in Sources */,
 				F44964BB31E209C36D51DAF1 /* AssistantSaveSummary.swift in Sources */,
 				458BD306852C568BFD818170 /* AssistantService.swift in Sources */,
 				93DA62B41C768B713C5AF2DB /* AssistantSettings.swift in Sources */,

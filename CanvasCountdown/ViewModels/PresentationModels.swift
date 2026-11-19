@@ -48,9 +48,27 @@ struct AssignmentListItem: Identifiable, Hashable, Sendable {
     var isCompleted: Bool
     var isIgnored: Bool
     var isManual: Bool
+    /// Read out of a screenshot rather than typed in or sent by the feed.
+    var isFromScreenshot = false
+    /// Canvas sent this with no time of day. Kept apart from `dueDate`,
+    /// which may have been moved to 11:59 PM by then, so the calendar can
+    /// still put it with the other all-day deadlines.
+    var isAllDayDeadline = false
     /// The user's label, if any. Carried on the item so every list, grid and
     /// chip can colour itself without reaching back into settings.
     var labelID: UUID?
+
+    /// Whether this event is the user's to change and to delete.
+    ///
+    /// Everything except what the Canvas feed sent. A feed event is rewritten
+    /// by the next refresh, so editing one would only be undone; nothing ever
+    /// refreshes an event typed in by hand or read out of a screenshot, so if
+    /// those cannot be corrected here they cannot be corrected at all. An
+    /// event from a screenshot used to be treated as Canvas's: a misread date
+    /// could be looked at and never fixed, and the event never removed.
+    var isUserOwned: Bool {
+        isManual || isFromScreenshot
+    }
 
     func remainingDays(
         relativeTo now: Date = .now,
@@ -127,11 +145,46 @@ struct ManualEventDraft: Hashable, Sendable {
 struct ManagedCourse: Identifiable, Hashable, Sendable {
     let name: String
     let eventCount: Int
+    /// How many of them came from the Canvas feed. Only these are removed
+    /// with the course: allowing a course again brings back what the feed
+    /// still publishes, and an event the user added themselves — by hand or
+    /// from a screenshot — is not among that.
+    let importedEventCount: Int
+
+    init(name: String, eventCount: Int, importedEventCount: Int? = nil) {
+        self.name = name
+        self.eventCount = eventCount
+        self.importedEventCount = importedEventCount ?? eventCount
+    }
 
     var id: String { name }
 
     var eventCountDescription: String {
-        eventCount == 1 ? "1 event" : "\(eventCount) events"
+        Self.events(eventCount)
+    }
+
+    /// What the confirmation says will happen, counting only what will really
+    /// go. It used to promise that manual events were never touched and then
+    /// delete them with the rest.
+    var removalMessage: String {
+        let kept = eventCount - importedEventCount
+        let removed = kept == 0
+            ? "“\(name)” and its \(Self.events(importedEventCount)) will be deleted from this Mac"
+            : "The \(Self.events(importedEventCount)) from the Canvas feed for “\(name)” will be deleted from this Mac"
+        let stays: String
+        switch kept {
+        case 0:
+            stays = ""
+        case 1:
+            stays = " The 1 event you added yourself stays."
+        default:
+            stays = " The \(kept) events you added yourself stay."
+        }
+        return "\(removed), and the Canvas feed will stop importing it.\(stays) You can allow it again later."
+    }
+
+    private static func events(_ count: Int) -> String {
+        count == 1 ? "1 event" : "\(count) events"
     }
 }
 
@@ -267,15 +320,21 @@ extension AssignmentListItem {
             id: snapshot.id,
             title: snapshot.title,
             courseName: snapshot.courseName,
+            // Only what the feed sent is ever moved. A time read out of a
+            // screenshot was checked by the user before it was saved, the same
+            // as one they typed.
             dueDate: DueTimePolicy.effectiveDueDate(
                 snapshot.dueDate,
-                isManual: snapshot.source == .manual,
+                isManual: snapshot.source != .canvasCalendarFeed,
                 treatsMidnightAsEndOfDay: treatsMidnightAsEndOfDay,
                 calendar: calendar
             ),
             isCompleted: snapshot.isCompleted,
             isIgnored: snapshot.isIgnored,
             isManual: snapshot.source == .manual,
+            isFromScreenshot: snapshot.source == .screenshot,
+            isAllDayDeadline: snapshot.source == .canvasCalendarFeed
+                && DueTimePolicy.isMidnight(snapshot.dueDate, calendar: calendar),
             labelID: snapshot.labelID
         )
     }
@@ -315,7 +374,7 @@ extension NotificationCandidate {
             courseName: snapshot.courseName,
             dueDate: DueTimePolicy.effectiveDueDate(
                 snapshot.dueDate,
-                isManual: snapshot.source == .manual,
+                isManual: snapshot.source != .canvasCalendarFeed,
                 treatsMidnightAsEndOfDay: treatsMidnightAsEndOfDay,
                 calendar: calendar
             ),

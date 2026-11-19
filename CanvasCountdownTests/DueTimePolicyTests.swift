@@ -174,6 +174,52 @@ final class DueTimePolicyTests: XCTestCase {
         XCTAssertEqual(item.dueDate, date(2026, 9, 1))
     }
 
+    /// A time read out of a screenshot was looked at and confirmed before it
+    /// was saved. Settings says events you added yourself are never adjusted,
+    /// and this one used to be, because only "typed by hand" counted.
+    func testAnEventFromAScreenshotKeepsTheTimeThatWasConfirmed() {
+        let midnight = date(2026, 8, 14)
+        let fromScreenshot = AssignmentListItem(
+            snapshot: AssignmentSnapshot(
+                title: "Quiz",
+                courseName: nil,
+                dueDate: midnight,
+                source: .screenshot
+            ),
+            treatsMidnightAsEndOfDay: true,
+            calendar: calendar
+        )
+        let fromFeed = AssignmentListItem(
+            snapshot: AssignmentSnapshot(
+                title: "Quiz",
+                courseName: nil,
+                dueDate: midnight,
+                source: .canvasCalendarFeed
+            ),
+            treatsMidnightAsEndOfDay: true,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(fromScreenshot.dueDate, midnight)
+        XCTAssertEqual(fromFeed.dueDate, date(2026, 8, 14, 23, 59))
+
+        let reminder = NotificationCandidate(
+            snapshot: AssignmentSnapshot(
+                title: "Quiz",
+                courseName: nil,
+                dueDate: midnight,
+                source: .screenshot
+            ),
+            treatsMidnightAsEndOfDay: true,
+            calendar: calendar
+        )
+        XCTAssertEqual(
+            reminder.dueDate,
+            midnight,
+            "A reminder counts back from the same time the list shows"
+        )
+    }
+
     // MARK: - What the reminders see
 
     /// A reminder counts back from the deadline. If the list says 11:59 PM and

@@ -186,6 +186,11 @@ actor OllamaModelManager: LocalModelManaging {
             throw LocalModelError.cancelled
         } catch let error as LocalModelError {
             throw error
+        } catch let error as URLError where error.code == .cancelled {
+            // Stopping the task stops the stream with this rather than with
+            // a CancellationError. Read as unreachable, it replaced "Download
+            // cancelled." with a claim that Ollama was not running.
+            throw LocalModelError.cancelled
         } catch {
             throw LocalModelError.serverUnreachable
         }
